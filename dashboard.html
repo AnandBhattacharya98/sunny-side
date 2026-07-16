@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PM Job Hunter — Pipeline Board</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--sur:#fff;--bdr:#e5e3db;--txt:#1a1a18;--mut:#5f5e5a;--hin:#888780;
+  --pur:#534AB7;--purl:#EEEDFE;--purt:#3C3489;
+  --tl:#0F6E56;--tll:#E1F5EE;
+  --am:#854F0B;--aml:#FAEEDA;
+  --rd:#A32D2D;--rdl:#FCEBEB;
+  --gn:#3B6D11;--gnl:#EAF3DE;
+  --r:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden}
+
+/* Layout */
+.app{display:grid;grid-template-columns:220px 1fr;height:100vh}
+.sidebar{background:var(--sur);border-right:1px solid var(--bdr);padding:0;
+          height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.main{padding:20px 24px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.logo{padding:18px 16px;font-size:14px;font-weight:600;color:var(--pur);
+      border-bottom:1px solid var(--bdr);letter-spacing:-.01em}
+.ns{padding:14px 16px 4px;font-size:10px;font-weight:700;color:var(--hin);
+    letter-spacing:.08em;text-transform:uppercase}
+.nl{display:flex;align-items:center;gap:6px;padding:8px 16px;color:var(--mut);
+    text-decoration:none;font-size:13px;transition:all .12s;border-radius:0}
+.nl:hover, .nl.on{background:var(--purl);color:var(--pur)}
+.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--bdr);
+                font-size:11px;color:var(--hin);line-height:1.8}
+
+/* Kanban Board */
+.board-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.board-title{font-size:18px;font-weight:600;color:var(--txt)}
+.board{display:flex;gap:14px;flex:1;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.col{background:rgba(229, 227, 219, 0.35);border:1px solid var(--bdr);border-radius:var(--r);
+     width:280px;flex-shrink:0;max-height:100%;display:flex;flex-direction:column;padding:12px}
+.col.over{background:var(--purl);border-color:var(--pur)}
+.col-hd{display:flex;justify-content:space-between;align-items:center;font-size:12px;
+         font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px}
+.col-ct{background:rgba(26,26,24,0.06);color:var(--mut);font-size:10px;padding:2px 7px;border-radius:10px}
+.col-cards{display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:150px}
+
+/* Cards */
+.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;
+       padding:12px;cursor:grab;transition:all .15s;user-select:none;position:relative}
+.jcard:hover{box-shadow:0 3px 10px rgba(0,0,0,.06);border-color:var(--pur)}
+.jcard:hover .delete-card-btn{opacity:1 !important}
+.jcard:active{cursor:grabbing}
+.jcard.dragging{opacity:.4;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.jt{font-size:13px;font-weight:600;line-height:1.4;margin-bottom:2px;color:var(--txt)}
+.jc{font-size:11px;color:var(--mut)}
+.jdetails{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.js{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+.sh{background:var(--gnl);color:var(--gn)}
+.sm{background:var(--aml);color:var(--am)}
+.sl2{background:var(--rdl);color:var(--rd)}
+.jmode{font-size:9px;color:var(--hin);border:1px solid var(--bdr);padding:1px 5px;border-radius:4px}
+.drop-hint{text-align:center;padding:24px 10px;color:var(--hin);border:2px dashed var(--bdr);
+            border-radius:8px;font-size:11px;margin-top:auto}
+
+/* Toolbar & Buttons */
+.btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;
+     border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .12s;white-space:nowrap}
+.btn:hover{border-color:var(--pur);color:var(--pur)}
+.btn:disabled{opacity:0.6;cursor:not-allowed}
+.btn-p{background:var(--pur);color:#fff;border-color:var(--pur)}
+.btn-p:hover{background:var(--purt);color:#fff;border-color:var(--purt)}
+.btn-g{background:var(--gnl);color:var(--gn);border-color:transparent}
+.btn-g:hover{background:#d0e8b8;color:var(--gn)}
+
+/* Modal Overlay */
+.modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);
+                display:none;align-items:center;justify-content:center;z-index:1000}
+.modal{background:var(--sur);border-radius:14px;width:820px;max-height:85vh;
+       display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.18);
+       animation:modalIn 0.2s ease-out;overflow:hidden}
+@keyframes modalIn{from{transform:scale(0.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;
+              justify-content:space-between;align-items:flex-start}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:2px}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--hin);transition:color .12s}
+.modal-close:hover{color:var(--txt)}
+
+.modal-content{display:grid;grid-template-columns:180px 1fr;flex:1;overflow:hidden}
+.modal-tabs{background:rgba(229, 227, 219, 0.2);border-right:1px solid var(--bdr);
+            padding:12px 6px;display:flex;flex-direction:column;gap:4px}
+.tab-btn{text-align:left;padding:8px 12px;background:none;border:none;font-size:12px;
+         font-weight:500;color:var(--mut);border-radius:6px;cursor:pointer;transition:all .12s}
+.tab-btn:hover,.tab-btn.active{background:var(--purl);color:var(--pur)}
+.modal-body{padding:20px;overflow-y:auto;height:100%}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Detail panel content styling */
+.lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+     color:var(--hin);margin-bottom:6px;display:block}
+.fit{font-size:13px;color:var(--mut);line-height:1.6;margin-bottom:10px}
+.reqs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.rtag{font-size:11px;padding:2px 8px;border-radius:8px;background:var(--purl);color:var(--purt)}
+.subj{width:100%;padding:7px 9px;border:1px solid var(--bdr);border-radius:7px;
+      font-size:13px;color:var(--txt);background:var(--bg);margin-bottom:7px}
+.body{width:100%;padding:9px;border:1px solid var(--bdr);border-radius:7px;
+      font-size:12px;line-height:1.7;resize:vertical;min-height:190px;
+      color:var(--txt);background:var(--bg);font-family:inherit}
+.notes{width:100%;padding:7px 9px;border:1px solid var(--bdr);border-radius:7px;
+        font-size:12px;resize:vertical;min-height:90px;color:var(--txt);
+        background:var(--bg);font-family:inherit;margin-top:6px}
+.contact{border:1px solid var(--bdr);border-radius:8px;padding:9px 11px;margin-bottom:7px}
+.cn{font-weight:500;font-size:13px}
+.ct2{font-size:11px;color:var(--mut)}
+.cl2{display:flex;gap:8px;margin-top:5px}
+.cl2 a{font-size:11px;color:var(--pur);text-decoration:none}
+.cl2 a:hover{text-decoration:underline}
+.note-box{background:var(--bg);border:1px solid var(--bdr);border-radius:7px;padding:9px;
+           font-size:12px;color:var(--mut);line-height:1.6;margin-top:7px;white-space:pre-wrap}
+.tl-item{font-size:11px;color:var(--hin);padding:2px 0;
+          border-left:2px solid var(--bdr);padding-left:8px;margin-bottom:2px}
+
+/* Message Card specific */
+.mcard{border:1px solid var(--bdr);border-radius:8px;margin-bottom:12px;overflow:hidden;flex-shrink:0}
+.mcard-header{background:rgba(229, 227, 219, 0.25);padding:10px 14px;border-bottom:1px solid var(--bdr);
+                    display:flex;justify-content:space-between;align-items:flex-start}
+.mcard-sender{font-weight:600;font-size:12px;color:var(--txt)}
+.mcard-time{font-size:10px;color:var(--hin)}
+.mcard-subject{font-size:12px;color:var(--mut);font-weight:500;margin-top:2px}
+.mcard-body{padding:12px 14px;font-size:12px;white-space:pre-wrap;color:var(--txt);
+                  background:var(--sur);max-height:220px;overflow-y:auto;line-height:1.6}
+
+/* Toast */
+#toast{position:fixed;bottom:20px;right:20px;background:#1a1a18;color:#fff;
+       padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;
+       transition:opacity .2s;pointer-events:none;z-index:9999}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">PM Job Hunter</div>
+
+  <div class="ns">Views</div>
+  <a class="nl {% if view_mode=='board' %}on{% endif %}" href="/" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
+    <span>📋</span> Pipeline Board
+  </a>
+  <a class="nl {% if view_mode=='emails' %}on{% endif %}" href="/emails" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
+    <span>✉</span> Synced Emails <span class="nc" style="margin-left:auto;background:var(--pur);color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
+  </a>
+
+  <div class="ns">Stats</div>
+  <div style="padding:0 16px 12px;font-size:12px;color:var(--mut);line-height:2.1">
+    Avg score: <strong>{{ stats.avg_score }}</strong><br>
+    Inbox: <strong>{{ stats.by_status.get('new',0) + stats.by_status.get('scored',0) + stats.by_status.get('ready',0) }}</strong><br>
+    Shortlisted: <strong>{{ stats.by_status.get('shortlisted',0) + stats.by_status.get('interviewing',0) }}</strong><br>
+    Applied: <strong>{{ stats.by_status.get('applied',0) }}</strong><br>
+    Offers: <strong>{{ stats.by_status.get('offer',0) }}</strong><br>
+    Rejected: <strong>{{ stats.by_status.get('rejected',0) }}</strong>
+  </div>
+
+  <div class="sidebar-footer" style="padding: 16px;">
+    <div style="margin-bottom:12px;font-size:12px;color:var(--txt)">
+      Last Scraped:<br><strong>{{ stats.last_updated }}</strong>
+    </div>
+    <button class="btn" style="width:100%;margin-bottom:12px;background:#25d366;color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;" onclick="openWhatsappModal()">
+      <span>💬</span> WhatsApp Import
+    </button>
+    <button class="btn btn-p refresh-btn" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px" onclick="triggerRefresh()">
+      <span>↺</span> Refresh Now
+    </button>
+    <div style="font-size:11px;color:var(--hin);line-height:1.4">
+      Or run <code style="background:var(--bdr);padding:1px 5px;border-radius:4px;word-break:break-all">python main.py --run-now</code> in terminal.
+    </div>
+  </div>
+</nav>
+
+<!-- Main Kanban Board / Emails Feed -->
+<main class="main">
+  {% if view_mode == 'board' %}
+  <div class="board-header" style="gap: 16px;">
+    <h2 class="board-title" style="flex-shrink: 0; margin-bottom: 0;">Application Pipeline</h2>
+    
+    <!-- Single global search bar in the middle -->
+    <div style="flex: 1; display: flex; justify-content: center; max-width: 460px;">
+      <input type="text" placeholder="🔍 Search company or job title..." id="global-search" style="width: 100%; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
+    </div>
+    
+    <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
+      <select id="source-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
+        <option value="all">🔍 Source: All</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="naukri">Naukri</option>
+        <option value="indeed">Indeed</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="gmail">Gmail (Auto-discovered)</option>
+        <option value="direct">Direct Startups</option>
+      </select>
+      <select id="board-sort" onchange="sortAllColumns(this.value)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
+        <option value="score">Sort: Score</option>
+        <option value="date">Sort: Date</option>
+      </select>
+      <span class="jmode" style="background:var(--gnl);color:var(--gn)">Gemini Active</span>
+    </div>
+  </div>
+
+  <div class="board">
+    {% for col in cols %}
+    {% set column_title = {
+      'whatsapp': 'From WhatsApp',
+      'new': 'Inbox / New',
+      'shortlisted': 'Shortlisted / Active',
+      'applied': 'Applied',
+      'offer': 'Offers',
+      'rejected': 'Rejected'
+    }.get(col, col.title()) %}
+    
+    <div class="col col-{{ col }}" id="col-{{ col }}"
+         ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event,'{{ col }}')">
+      <div class="col-hd" style="margin-bottom: {% if col == 'new' or col == 'whatsapp' %}6px{% else %}12px{% endif %};">
+        <span>{{ column_title }}</span>
+        <span class="col-ct">{{ board[col]|length }}</span>
+      </div>
+      
+      {% if col == 'whatsapp' %}
+      <div style="margin-bottom: 10px; display: flex; gap: 6px;">
+        <input type="text" placeholder="🔗 Paste WhatsApp link/msg..." id="whatsapp-quick-input" style="flex: 1; min-width: 0; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" onkeydown="if(event.key === 'Enter') quickImportWhatsapp()">
+        <button onclick="quickImportWhatsapp()" style="padding: 6px 10px; border-radius: 6px; border: none; background: #25d366; color: white; font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink:0;">Add</button>
+      </div>
+      {% endif %}
+      
+      <div class="col-cards">
+        {% for job in board[col] %}
+        {% set score = job.ai_score or 0 %}
+        {% set source_domain = "linkedin.com" %}
+        {% set source_type = "direct" %}
+        {% if "naukri.com" in job.url or job.job_id.startswith("nk_") %}
+          {% set source_domain = "naukri.com" %}
+          {% set source_type = "naukri" %}
+        {% elif "indeed.com" in job.url %}
+          {% set source_domain = "indeed.com" %}
+          {% set source_type = "indeed" %}
+        {% elif job.job_id.startswith("auto_") %}
+          {% set source_domain = "mail.google.com" %}
+          {% set source_type = "gmail" %}
+        {% elif job.job_id.startswith("wa_") %}
+          {% set source_domain = "whatsapp.com" %}
+          {% set source_type = "whatsapp" %}
+        {% elif job.job_id.startswith("li_") or "linkedin.com" in job.url %}
+          {% set source_domain = "linkedin.com" %}
+          {% set source_type = "linkedin" %}
+        {% elif job.source %}
+          {% set source_type = job.source %}
+        {% endif %}
+        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
+          <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;">🗑️</button>
+          <div class="jt">{{ job.title }}</div>
+          <div class="jc" style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+            <img src="https://www.google.com/s2/favicons?sz=32&domain={{ source_domain }}" alt="" style="width:12px;height:12px;object-fit:contain;border-radius:2px;flex-shrink:0;">
+            <span>{{ job.company }}</span>
+          </div>
+          <div class="jdetails" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span class="js {% if score>=8 %}sh{% elif score>=6.5 %}sm{% else %}sl2{% endif %}">
+              {{ '%.1f'|format(score) }}/10
+            </span>
+            <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;">
+              <span class="jc" style="font-size:10px;line-height:1.2;">{{ job.location }}</span>
+              <span class="jc" style="font-size:9px;color:var(--hin);margin-top:2px;">
+                {{ (job.posted_at or job.scraped_at[:10]) if (job.posted_at or job.scraped_at) else '' }}
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        
+        {% if not board[col] %}
+        <div class="drop-hint">Drop here</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif view_mode == 'emails' %}
+  <div class="board-header">
+    <h2 class="board-title">Synced Emails Feed</h2>
+    <div>
+      <span class="jmode" style="background:var(--gnl);color:var(--gn)">Gemini Active</span>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;min-height:0;padding-right:8px;display:flex;flex-direction:column;gap:12px;">
+    {% if emails %}
+      {% for mail in emails %}
+      <div class="mcard" style="border-radius:10px;border:1px solid var(--bdr);">
+        <div class="mcard-header" style="background:rgba(229, 227, 219, 0.25);padding:12px 16px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;" onclick="toggleEmailBody(this)">
+          <div>
+            <div class="mcard-sender" style="font-size:12px;font-weight:600;">From: {{ mail.sender }}</div>
+            <div class="mcard-subject" style="font-size:12px;color:var(--mut);font-weight:500;margin-top:2px;">Subject: {{ mail.subject }}</div>
+            {% if mail.company and mail.title %}
+            <div style="font-size:11px;color:var(--pur);margin-top:6px;font-weight:600;" onclick="event.stopPropagation(); openJobModal('{{ mail.job_id }}')">
+              Matched Job: <span style="text-decoration:underline;cursor:pointer;">{{ mail.title }} at {{ mail.company }} ↗</span>
+            </div>
+            {% endif %}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <span class="mcard-time" style="font-size:11px;white-space:nowrap;color:var(--hin);">
+              {{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}
+            </span>
+            <span class="toggle-icon" style="font-size:10px;color:var(--hin);">▼</span>
+          </div>
+        </div>
+        <div class="mcard-body" style="padding:16px;font-size:13px;max-height:none;overflow-y:visible;line-height:1.6;display:none;">{{ mail.body }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center;padding:80px 20px;color:var(--mut);">
+        <div style="font-size:40px;margin-bottom:12px;">✉</div>
+        <h3>No synced emails yet</h3>
+        <p style="color:var(--hin);margin-top:4px;">Configure your IMAP credentials in .env and click "Refresh Now" to scan your inbox.</p>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</main>
+</div>
+
+<!-- Render job details modals (hidden by default) -->
+{% for col in cols %}
+  {% for job in board[col] %}
+  <div class="modal-backdrop" id="modal-backdrop-{{ job.job_id }}" onclick="closeJobModal('{{ job.job_id }}')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">{{ job.title }}</h3>
+          <p class="jc" style="font-size:12px">{{ job.company }} &middot; {{ job.location }} &middot; <a href="{{ job.url }}" target="_blank" style="color:var(--pur);text-decoration:none">View Posting ↗</a></p>
+        </div>
+        <button class="modal-close" onclick="closeJobModal('{{ job.job_id }}')">&times;</button>
+      </div>
+      <div class="modal-content">
+        <div class="modal-tabs">
+          <button class="tab-btn active" onclick="switchTab(this, '{{ job.job_id }}', 'fit')">Fit Analysis</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'cl')">Cover Letter</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'resume')">Resume</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
+        </div>
+        <div class="modal-body">
+          
+          <!-- Fit Analysis Panel -->
+          <div class="tab-panel active" id="panel-fit-{{ job.job_id }}">
+            <span class="lbl">Fit analysis</span>
+            <div class="fit">{{ job.ai_summary or 'No summary yet — click Regenerate.' }}</div>
+            {% if job.key_reqs_list %}
+            <div class="reqs">
+              {% for r in job.key_reqs_list %}<span class="rtag">{{ r }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            
+            {% if job.description %}
+            <span class="lbl" style="margin-top:16px;display:block">Job Description Preview</span>
+            <div style="font-size:12px;color:var(--mut);max-height:220px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;line-height:1.5">{{ job.description }}</div>
+            {% endif %}
+          </div>
+          
+          <!-- Cover Letter Panel -->
+          <div class="tab-panel" id="panel-cl-{{ job.job_id }}">
+            <span class="lbl">Cover letter</span>
+            {% if job.cover_letter %}
+            <input class="subj" id="subj-{{ job.job_id }}" value="{{ job.cover_letter.subject }}" placeholder="Subject line">
+            <textarea class="body" id="body-{{ job.job_id }}">{{ job.cover_letter.body }}</textarea>
+            
+            {% if job.cover_letter.linkedin_note %}
+            <span class="lbl" style="display:block;margin-top:14px">LinkedIn connection note</span>
+            <div class="note-box">{{ job.cover_letter.linkedin_note }}</div>
+            {% endif %}
+            
+            <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="saveCL('{{ job.job_id }}')">Save Changes</button>
+              <button class="btn" onclick="regen('{{ job.job_id }}')">↺ Regenerate with AI</button>
+              <button class="btn btn-g" onclick="sendEmail('{{ job.job_id }}')">✉ Send email</button>
+            </div>
+            {% else %}
+            <div style="color:var(--mut);font-size:13px;margin-bottom:8px">No cover letter generated yet.</div>
+            <button class="btn btn-p" onclick="regen('{{ job.job_id }}')">Generate with Gemini</button>
+            {% endif %}
+          </div>
+          
+          <!-- Emails Panel -->
+          <div class="tab-panel" id="panel-emails-{{ job.job_id }}">
+            <span class="lbl">Received Emails</span>
+            {% if job.emails %}
+              {% for mail in job.emails %}
+              <div class="mcard">
+                <div class="mcard-header">
+                  <div>
+                    <div class="mcard-sender">From: {{ mail.sender }}</div>
+                    <div class="mcard-subject">Subject: {{ mail.subject }}</div>
+                  </div>
+                  <div class="mcard-time">
+                    {{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}
+                  </div>
+                </div>
+                <div class="mcard-body">{{ mail.body }}</div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div style="text-align:center;padding:40px 10px;color:var(--hin)">
+                <div style="font-size:24px;margin-bottom:8px">✉</div>
+                <div style="font-size:12px">No updates matched for this job yet from your Gmail.</div>
+                <div style="font-size:10px;color:var(--hin);margin-top:4px">Make sure IMAP is configured in your .env and click Refresh.</div>
+              </div>
+            {% endif %}
+          </div>
+          
+          <!-- Notes & Contacts Panel -->
+          <div class="tab-panel" id="panel-notes-{{ job.job_id }}">
+            <span class="lbl">Hiring Contacts</span>
+            {% if job.contacts %}
+              {% for c in job.contacts %}
+              <div class="contact">
+                <div class="cn">{{ c.name }}</div>
+                <div class="ct2">{{ c.title }}</div>
+                <div class="cl2">
+                  {% if c.linkedin_url %}
+                    <a href="{{ c.linkedin_url }}" target="_blank">LinkedIn ↗</a>
+                  {% endif %}
+                  {% if c.email %}
+                    <a href="mailto:{{ c.email }}">{{ c.email }}</a>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+            <div style="font-size:12px;color:var(--mut);margin-bottom:10px">No contacts found.</div>
+            {% endif %}
+            
+            <span class="lbl" style="display:block;margin-top:14px">Your application notes</span>
+            <textarea class="notes" id="note-{{ job.job_id }}"
+                      placeholder="Interview details, referral notes, salary targets…"
+                      onblur="saveNote('{{ job.job_id }}')">{{ job.notes.note if job.notes else '' }}</textarea>
+          </div>
+          
+          <!-- Timeline Panel -->
+          <div class="tab-panel" id="panel-timeline-{{ job.job_id }}">
+            <span class="lbl">Timeline</span>
+            {% if job.timeline %}
+              {% for t in job.timeline %}
+              <div class="tl-item">{{ t.event }} <span style="opacity:.6">— {{ t.created_at[:10] }}</span></div>
+              {% endfor %}
+            {% else %}
+              <div style="font-size:12px;color:var(--mut)">No events logged.</div>
+            {% endif %}
+          </div>
+
+          <!-- Tailored Resume Panel -->
+          <div class="tab-panel" id="panel-resume-{{ job.job_id }}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <span class="lbl">Tailored Resume</span>
+              <a href="/resume/{{ job.job_id }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
+                <span>🖨️</span> Save / Download as PDF
+              </a>
+            </div>
+            
+            <div class="resume-loading-{{ job.job_id }}" style="text-align:center;padding:40px;color:var(--mut);">
+              <span>⏳</span> Tailoring your resume for this JD...
+            </div>
+            
+            <div class="resume-content-box-{{ job.job_id }}" style="display:none;background:var(--bg);padding:16px;border-radius:8px;font-size:12px;color:var(--txt);line-height:1.6;overflow-y:auto;max-height:380px;white-space:pre-wrap;font-family:monospace;border:1px solid var(--bdr);text-align:left;">
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% endfor %}
+<!-- WhatsApp Import Modal -->
+<div class="modal-backdrop" id="modal-whatsapp" style="display: none; align-items: center; justify-content: center; z-index: 10000;">
+  <div class="modal-window" style="max-width: 500px; padding: 24px;">
+    <div class="modal-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+      <h3 class="modal-title">💬 WhatsApp Job Importer</h3>
+      <button class="modal-close" onclick="closeWhatsappModal()">&times;</button>
+    </div>
+    
+    <div style="font-size:12px; color: var(--mut); margin-bottom: 14px;">
+      Paste chat messages forwarded from your family or friends. Our AI automatically extracts company, title, links, and adds them to the <strong>From WhatsApp</strong> column.
+    </div>
+    
+    <textarea id="whatsapp-input" placeholder="Paste WhatsApp messages here..." style="width:100%; height:120px; border-radius:6px; border:1px solid var(--bdr); background:var(--sur); color:var(--txt); padding:10px; font-size:12px; outline:none; resize:none; font-family:inherit; margin-bottom: 12px; box-sizing: border-box;"></textarea>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+      <button class="btn btn-p" onclick="submitWhatsappImport()" style="background:#25d366; border:none; padding:8px 16px;">Import Jobs</button>
+      <button class="btn" onclick="closeWhatsappModal()">Cancel</button>
+    </div>
+    
+    <div style="border-top:1px solid var(--bdr); padding-top:12px;">
+      <span style="font-size:11px; font-weight:600; color:var(--txt); display:block; margin-bottom:4px;">🚀 One-Click Browser Shortcut (Bookmarklet)</span>
+      <span style="font-size:10px; color:var(--mut); line-height:1.4; display:block; margin-bottom:8px;">
+        Drag this button to your bookmarks bar. On WhatsApp Web, select text/chat and click it to auto-sync:
+      </span>
+      <a href="javascript:(function(){const text=window.getSelection().toString()||document.body.innerText;fetch('http://localhost:5050/api/whatsapp/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(res=>res.json()).then(data=>alert('Synced '+data.count+' jobs from WhatsApp!')).catch(err=>alert('Error: '+err.message));})();" class="btn" style="display:inline-block; font-size:10px; padding:6px 12px; background:var(--pur); color:#fff; text-decoration:none; border-radius:4px; text-align:center;">📥 Sync to board</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let draggingId = null;
+
+// Card Delete Controls (2-Step confirmation)
+function handleCardDelete(event, jobId) {
+  event.stopPropagation();
+  const btn = event.currentTarget;
+  
+  if (btn.dataset.confirm === "true") {
+    performCardDelete(jobId, btn);
+  } else {
+    // Step 1: change to "Confirm?" and red background
+    btn.textContent = "Confirm?";
+    btn.style.color = "#ffffff";
+    btn.style.background = "#e63946";
+    btn.style.fontWeight = "bold";
+    btn.dataset.confirm = "true";
+    btn.style.opacity = "1";
+    
+    // Automatically reset after 3 seconds if not clicked again
+    setTimeout(() => {
+      resetDeleteButton(btn);
+    }, 3000);
+  }
+}
+
+function resetDeleteButton(btn) {
+  btn.textContent = "🗑️";
+  btn.style.color = "var(--mut)";
+  btn.style.background = "none";
+  btn.style.fontWeight = "normal";
+  btn.dataset.confirm = "false";
+  btn.style.opacity = "";
+}
+
+async function performCardDelete(jobId, btn) {
+  const card = document.querySelector(`.jcard[data-job-id="${jobId}"]`);
+  if (!card) return;
+  
+  toast("Deleting job card...");
+  try {
+    const res = await fetch(`/api/job/${jobId}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status: 'archived' })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast("Job deleted!");
+      card.style.opacity = "0";
+      card.style.transform = "scale(0.8)";
+      setTimeout(() => {
+        card.remove();
+        window.location.reload();
+      }, 300);
+    } else {
+      toast("Error: " + (data.error || "Failed"));
+      resetDeleteButton(btn);
+    }
+  } catch (err) {
+    toast("Error: " + err.message);
+    resetDeleteButton(btn);
+  }
+}
+
+// WhatsApp Modal Controls
+function openWhatsappModal() {
+  document.getElementById('modal-whatsapp').style.display = 'flex';
+}
+
+function closeWhatsappModal() {
+  document.getElementById('modal-whatsapp').style.display = 'none';
+  document.getElementById('whatsapp-input').value = '';
+}
+
+async function submitWhatsappImport() {
+  const text = document.getElementById('whatsapp-input').value.trim();
+  if (!text) {
+    toast("Please paste some text first.");
+    return;
+  }
+  
+  toast("Parsing chat messages...");
+  try {
+    const res = await fetch('/api/whatsapp/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text: text })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(`Imported ${data.count} jobs successfully!`);
+      closeWhatsappModal();
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      toast("Error: " + (data.error || "Failed"));
+    }
+  } catch (err) {
+    toast("Error: " + err.message);
+  }
+}
+async function quickImportWhatsapp() {
+  const input = document.getElementById('whatsapp-quick-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) {
+    toast("Please enter a link or message.");
+    return;
+  }
+  
+  toast("Adding job from WhatsApp...");
+  try {
+    const res = await fetch('/api/whatsapp/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text: text })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(`Imported ${data.count} job(s) from WhatsApp!`);
+      input.value = '';
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      toast("Error: " + (data.error || "Failed"));
+    }
+  } catch (err) {
+    toast("Error: " + err.message);
+  }
+}
+
+// Modal Controls
+function openJobModal(id) {
+  document.getElementById('modal-backdrop-' + id).style.display = 'flex';
+}
+
+function closeJobModal(id) {
+  document.getElementById('modal-backdrop-' + id).style.display = 'none';
+}
+
+function toggleEmailBody(header) {
+  const card = header.closest('.mcard');
+  const body = card.querySelector('.mcard-body');
+  const icon = card.querySelector('.toggle-icon');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    icon.textContent = '▲';
+  } else {
+    body.style.display = 'none';
+    icon.textContent = '▼';
+  }
+}
+
+function switchTab(btn, jobId, panelName) {
+  // Deactivate all tabs in this modal
+  const tabContainer = btn.closest('.modal-tabs');
+  tabContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  
+  // Hide all panels
+  const modalContent = btn.closest('.modal-content');
+  modalContent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  
+  // Show target panel
+  modalContent.querySelector('#panel-' + panelName + '-' + jobId).classList.add('active');
+  
+  // Dynamic resume load
+  if (panelName === 'resume') {
+    loadTailoredResume(jobId);
+  }
+}
+
+async function loadTailoredResume(jobId) {
+  const loadingDiv = document.querySelector(`.resume-loading-${jobId}`);
+  const contentDiv = document.querySelector(`.resume-content-box-${jobId}`);
+  if (!loadingDiv || !contentDiv) return;
+  
+  // If already loaded once, don't refetch
+  if (contentDiv.dataset.loaded === "true") return;
+  
+  try {
+    const res = await fetch(`/api/job/${jobId}/resume`);
+    const data = await res.json();
+    if (data.ok) {
+      contentDiv.textContent = data.resume;
+      contentDiv.style.display = 'block';
+      loadingDiv.style.display = 'none';
+      contentDiv.dataset.loaded = "true";
+    } else {
+      loadingDiv.textContent = "Error generating resume: " + (data.error || "Failed");
+    }
+  } catch (err) {
+    loadingDiv.textContent = "Error: " + err.message;
+  }
+}
+
+// Drag and Drop
+function dragStart(e) {
+  draggingId = e.target.closest('.jcard').dataset.jobId;
+  e.target.closest('.jcard').classList.add('dragging');
+}
+
+document.addEventListener('dragend', function(e) {
+  const card = document.querySelector('.jcard.dragging');
+  if (card) card.classList.remove('dragging');
+});
+
+function allowDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('over');
+}
+
+function dragLeave(e) {
+  e.currentTarget.classList.remove('over');
+}
+
+async function dropCard(e, col) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  if (!draggingId) return;
+  
+  // Map column name to DB status
+  let status = col;
+  if (col === 'new') status = 'ready';
+  
+  const r = await fetch('/api/job/' + draggingId + '/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  
+  if ((await r.json()).ok) {
+    toast('Moved to ' + col);
+    setTimeout(() => location.reload(), 600);
+  }
+}
+
+// API Controls
+async function saveCL(id) {
+  const subject = document.getElementById('subj-' + id).value;
+  const body    = document.getElementById('body-' + id).value;
+  await fetch('/api/job/' + id + '/cover-letter', {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({subject, body})
+  });
+  toast('Cover letter saved');
+}
+
+async function regen(id) {
+  toast('Regenerating with Gemini…');
+  const r = await fetch('/api/job/' + id + '/regenerate', {method:'POST'});
+  const d = await r.json();
+  if (!d.ok) { toast('Error: ' + (d.error||'unknown')); return; }
+
+  // Reload to pick up fresh details in tabs
+  toast('Cover letter ready!');
+  setTimeout(() => location.reload(), 800);
+}
+
+async function saveNote(id) {
+  const note = document.getElementById('note-' + id).value;
+  await fetch('/api/job/' + id + '/note', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({note})
+  });
+  toast('Note saved');
+}
+
+async function sendEmail(id) {
+  await saveCL(id);
+  const r = await fetch('/api/job/' + id + '/send-email', {method:'POST'});
+  const d = await r.json();
+  toast(d.message || (d.ok ? 'Email sent!' : 'Failed'));
+  if (d.ok) setTimeout(() => location.reload(), 1000);
+}
+
+async function triggerRefresh() {
+  toast('Refreshing listings & Gmail updates...');
+  const btn = document.querySelector('.refresh-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Refreshing...';
+  }
+  try {
+    const r = await fetch('/api/refresh', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      toast('Listings & emails updated!');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      toast('Error: ' + (d.error || 'Failed to refresh'));
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>↺</span> Refresh Now';
+      }
+    }
+  } catch (err) {
+    toast('Error: ' + err.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>↺</span> Refresh Now';
+    }
+  }
+}
+
+function filterBoard() {
+  const query = document.getElementById('global-search') ? document.getElementById('global-search').value.toLowerCase().trim() : '';
+  const sourceValue = document.getElementById('source-filter') ? document.getElementById('source-filter').value : 'all';
+  
+  const cards = document.querySelectorAll('.jcard');
+  cards.forEach(card => {
+    const title = card.querySelector('.jt').textContent.toLowerCase();
+    const company = card.querySelector('.jc').textContent.toLowerCase();
+    const cardSource = card.dataset.sourceType;
+    
+    const matchesSearch = !query || title.includes(query) || company.includes(query);
+    const matchesSource = sourceValue === 'all' || cardSource === sourceValue;
+    
+    if (matchesSearch && matchesSource) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  
+  updateColumnCounts();
+}
+
+function sortAllColumns(sortBy) {
+  const columns = document.querySelectorAll('.col');
+  columns.forEach(col => {
+    const cardsContainer = col.querySelector('.col-cards');
+    if (!cardsContainer) return;
+    
+    const cards = Array.from(cardsContainer.querySelectorAll('.jcard'));
+    if (cards.length === 0) return;
+    
+    cards.sort((a, b) => {
+      if (sortBy === 'score') {
+        const scoreA = parseFloat(a.dataset.score) || 0;
+        const scoreB = parseFloat(b.dataset.score) || 0;
+        return scoreB - scoreA;
+      } else if (sortBy === 'date') {
+        const dateA = a.dataset.scrapedAt || '';
+        const dateB = b.dataset.scrapedAt || '';
+        return dateB.localeCompare(dateA);
+      }
+      return 0;
+    });
+    
+    cards.forEach(card => cardsContainer.appendChild(card));
+  });
+}
+
+function updateColumnCounts() {
+  const columns = document.querySelectorAll('.col');
+  columns.forEach(col => {
+    const cards = col.querySelectorAll('.jcard');
+    let visibleCount = 0;
+    cards.forEach(c => {
+      if (c.style.display !== 'none') {
+        visibleCount++;
+      }
+    });
+    const counter = col.querySelector('.col-ct');
+    if (counter) {
+      counter.textContent = visibleCount;
+    }
+  });
+}
+
+// Initial Sort
+sortAllColumns('score');
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+</script>
+</body>
+</html>

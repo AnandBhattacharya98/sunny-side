@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><title>Pipeline — PM Job Hunter</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f8f7f4;--sur:#fff;--bdr:#e5e3db;--txt:#1a1a18;--mut:#5f5e5a;--pur:#534AB7;--purl:#EEEDFE}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--txt);font-size:14px}
+header{background:var(--sur);border-bottom:1px solid var(--bdr);
+       padding:13px 20px;display:flex;align-items:center;gap:14px}
+header a{font-size:13px;color:var(--pur);text-decoration:none}
+header h1{font-size:15px;font-weight:500}
+header p{font-size:12px;color:var(--mut);margin-left:auto}
+.board{display:flex;gap:12px;padding:18px;overflow-x:auto;min-height:calc(100vh - 49px);align-items:flex-start}
+.col{flex-shrink:0;width:230px;display:flex;flex-direction:column;gap:8px}
+.col-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+         color:var(--mut);padding:4px 2px;display:flex;justify-content:space-between;align-items:center}
+.col-ct{background:var(--bdr);color:var(--mut);font-size:10px;padding:1px 6px;border-radius:8px}
+.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;
+       padding:12px;cursor:grab;user-select:none;transition:box-shadow .15s,opacity .15s}
+.jcard:hover{box-shadow:0 2px 8px rgba(0,0,0,.09)}
+.jcard.dragging{opacity:.45;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.col.over{background:var(--purl);border-radius:10px}
+.drop-hint{border:2px dashed var(--bdr);border-radius:10px;height:70px;
+           display:flex;align-items:center;justify-content:center;
+           font-size:11px;color:var(--mut)}
+.jt{font-size:13px;font-weight:500;margin-bottom:2px}
+.jc{font-size:11px;color:var(--mut)}
+.js{display:inline-block;margin-top:7px;font-size:11px;font-weight:700;
+    padding:2px 8px;border-radius:10px}
+.sh{background:#EAF3DE;color:#3B6D11}.sm{background:#FAEEDA;color:#854F0B}.sl{background:#FCEBEB;color:#A32D2D}
+.jlink{display:block;margin-top:7px;font-size:11px;color:var(--pur);text-decoration:none}
+.jlink:hover{text-decoration:underline}
+.col-shortlisted .col-hd{color:#534AB7}
+.col-applied     .col-hd{color:#0F6E56}
+.col-interviewing .col-hd{color:#854F0B}
+.col-offer       .col-hd{color:#3B6D11}
+.col-rejected    .col-hd{color:#A32D2D}
+#toast{position:fixed;bottom:16px;right:16px;background:#1a1a18;color:#fff;
+       padding:8px 14px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← Back to list</a>
+  <h1>Application Pipeline</h1>
+  <p>Drag cards to update status</p>
+</header>
+
+<div class="board">
+{% for col in cols %}
+<div class="col col-{{ col }}" id="col-{{ col }}"
+     ondragover="ev(event)" ondragleave="lv(event)" ondrop="drop(event,'{{ col }}')">
+  <div class="col-hd">
+    {{ col.title() }}
+    <span class="col-ct">{{ board[col]|length }}</span>
+  </div>
+  {% for job in board[col] %}
+  {% set s = job.ai_score or 0 %}
+  <div class="jcard" draggable="true" data-id="{{ job.job_id }}" ondragstart="ds(event)">
+    <div class="jt">{{ job.title }}</div>
+    <div class="jc">{{ job.company }}</div>
+    <span class="js {% if s>=8 %}sh{% elif s>=6.5 %}sm{% else %}sl{% endif %}">{{ '%.1f'|format(s) }}/10</span>
+    <a class="jlink" href="{{ job.url }}" target="_blank" onclick="event.stopPropagation()">View posting ↗</a>
+  </div>
+  {% endfor %}
+  {% if not board[col] %}
+  <div class="drop-hint">Drop here</div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+
+<div id="toast"></div>
+<script>
+let dragging = null;
+function ds(e){dragging=e.target.closest('.jcard');dragging.classList.add('dragging')}
+function ev(e){e.preventDefault();e.currentTarget.classList.add('over')}
+function lv(e){e.currentTarget.classList.remove('over')}
+async function drop(e,col){
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  if(!dragging) return;
+  const id=dragging.dataset.id;
+  dragging.classList.remove('dragging');
+  const r=await fetch('/api/pipeline/move',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:id,status:col})});
+  if((await r.json()).ok){toast('Moved to '+col);setTimeout(()=>location.reload(),600)}
+}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+</script>
+</body>
+</html>
