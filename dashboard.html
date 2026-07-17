@@ -4,85 +4,95 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PM Job Hunter — Pipeline Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f8f7f4;--sur:#fff;--bdr:#e5e3db;--txt:#1a1a18;--mut:#5f5e5a;--hin:#888780;
-  --pur:#534AB7;--purl:#EEEDFE;--purt:#3C3489;
-  --tl:#0F6E56;--tll:#E1F5EE;
-  --am:#854F0B;--aml:#FAEEDA;
-  --rd:#A32D2D;--rdl:#FCEBEB;
-  --gn:#3B6D11;--gnl:#EAF3DE;
-  --r:12px;
+  --bg:#fbfbfb;--sur:rgba(255,255,255,0.85);--bdr:#e4e4e7;--txt:#09090b;--mut:#71717a;--hin:#a1a1aa;
+  --pur:#6366f1;--purl:rgba(99, 102, 241, 0.1);--purt:#4f46e5;
+  --tl:#0f766e;--tll:rgba(15, 118, 110, 0.08);
+  --am:#b45309;--aml:rgba(180, 83, 9, 0.08);
+  --rd:#be123c;--rdl:rgba(190, 18, 60, 0.08);
+  --gn:#15803d;--gnl:rgba(21, 128, 61, 0.08);
+  --r:14px;
 }
 [data-theme="dark"] {
-  --bg:#121210;
-  --sur:#1e1e1b;
-  --bdr:#2d2c27;
-  --txt:#f2f1eb;
-  --mut:#b0aeb8;
-  --hin:#706e68;
-  --purl:#231f4a;
-  --purt:#8981df;
-  --tll:#113325;
-  --aml:#442805;
-  --rdl:#4c1313;
-  --gnl:#1a3206;
+  --bg:#09090b;
+  --sur:rgba(20,20,23,0.75);
+  --bdr:#27272a;
+  --txt:#fafafa;
+  --mut:#a1a1aa;
+  --hin:#52525b;
+  --pur:#818cf8;
+  --purl:rgba(129, 140, 248, 0.15);
+  --purt:#6366f1;
+  --tll:rgba(45, 212, 191, 0.12);
+  --aml:rgba(251, 191, 36, 0.12);
+  --rdl:rgba(248, 113, 113, 0.12);
+  --gnl:rgba(74, 222, 128, 0.12);
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-     background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden}
+body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden;
+     background-image: radial-gradient(var(--bdr) 1px, transparent 1px);
+     background-size: 24px 24px;}
 
 /* Layout */
-.app{display:grid;grid-template-columns:220px 1fr;height:100vh}
+.app{display:grid;grid-template-columns:240px 1fr;height:100vh}
 .sidebar{background:var(--sur);border-right:1px solid var(--bdr);padding:0;
-          height:100vh;overflow-y:auto;display:flex;flex-direction:column}
-.main{padding:20px 24px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+          height:100vh;overflow-y:auto;display:flex;flex-direction:column;backdrop-filter:blur(16px)}
+.main{padding:24px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
 /* Sidebar */
-.logo{padding:18px 16px;font-size:14px;font-weight:600;color:var(--pur);
-      border-bottom:1px solid var(--bdr);letter-spacing:-.01em}
-.ns{padding:14px 16px 4px;font-size:10px;font-weight:700;color:var(--hin);
+.logo{padding:20px 20px;font-size:15px;font-weight:700;color:var(--txt);
+      border-bottom:1px solid var(--bdr);letter-spacing:-.02em;font-family:'Space Grotesk',sans-serif;
+      background: linear-gradient(135deg, var(--txt), var(--pur)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
+.ns{padding:16px 20px 6px;font-size:10px;font-weight:700;color:var(--hin);
     letter-spacing:.08em;text-transform:uppercase}
-.nl{display:flex;align-items:center;gap:6px;padding:8px 16px;color:var(--mut);
-    text-decoration:none;font-size:13px;transition:all .12s;border-radius:0}
+.nl{display:flex;align-items:center;gap:8px;padding:10px 20px;color:var(--mut);
+    text-decoration:none;font-size:13px;transition:all .15s;font-weight:500}
 .nl:hover, .nl.on{background:var(--purl);color:var(--pur)}
-.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--bdr);
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--bdr);
                 font-size:11px;color:var(--hin);line-height:1.8}
 
 /* Kanban Board */
-.board-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-.board-title{font-size:18px;font-weight:600;color:var(--txt)}
-.board{display:flex;gap:14px;flex:1;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-.col{background:rgba(229, 227, 219, 0.35);border:1px solid var(--bdr);border-radius:var(--r);
-     width:280px;flex-shrink:0;max-height:100%;display:flex;flex-direction:column;padding:12px}
+.board-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.board-title{font-size:22px;font-weight:700;color:var(--txt);font-family:'Space Grotesk',sans-serif;letter-spacing:-0.02em;}
+.board{display:flex;gap:16px;flex:1;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.col{background:rgba(20,20,20,0.01);border:1px solid var(--bdr);border-radius:var(--r);
+     width:290px;flex-shrink:0;max-height:100%;display:flex;flex-direction:column;padding:14px;
+     backdrop-filter:blur(8px);transition:background 0.2s;}
+[data-theme="dark"] .col{background:rgba(255,255,255,0.01)}
 .col.over{background:var(--purl);border-color:var(--pur)}
-.col-hd{display:flex;justify-content:space-between;align-items:center;font-size:12px;
-         font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px}
-.col-ct{background:rgba(26,26,24,0.06);color:var(--mut);font-size:10px;padding:2px 7px;border-radius:10px}
-.col-cards{display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:150px}
+.col-hd{display:flex;justify-content:space-between;align-items:center;font-size:11px;
+         font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:14px}
+.col-ct{background:rgba(99, 102, 241, 0.1);color:var(--pur);font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+.col-cards{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:150px}
 
 /* Cards */
-.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;
-       padding:12px;cursor:grab;transition:all .15s;user-select:none;position:relative}
-.jcard:hover{box-shadow:0 3px 10px rgba(0,0,0,.06);border-color:var(--pur)}
+.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;
+       padding:14px;cursor:grab;transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);user-select:none;position:relative;
+       box-shadow: 0 1px 3px 0 rgba(0,0,0,0.02);backdrop-filter:blur(12px);}
+.jcard:hover{transform: translateY(-2px); border-color:var(--pur);
+             box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.12), 0 0 12px -3px rgba(99, 102, 241, 0.08);}
 .jcard:hover .delete-card-btn{opacity:1 !important}
 .jcard:active{cursor:grabbing}
 .jcard.dragging{opacity:.4;box-shadow:0 8px 20px rgba(0,0,0,.15)}
-.jt{font-size:13px;font-weight:600;line-height:1.4;margin-bottom:2px;color:var(--txt)}
-.jc{font-size:11px;color:var(--mut)}
-.jdetails{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.js{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+.jt{font-size:13.5px;font-weight:600;line-height:1.4;margin-bottom:4px;color:var(--txt);letter-spacing:-0.01em}
+.jc{font-size:11.5px;color:var(--mut)}
+.jdetails{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.js{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px}
 .sh{background:var(--gnl);color:var(--gn)}
 .sm{background:var(--aml);color:var(--am)}
 .sl2{background:var(--rdl);color:var(--rd)}
-.jmode{font-size:9px;color:var(--hin);border:1px solid var(--bdr);padding:1px 5px;border-radius:4px}
+.jmode{font-size:9px;color:var(--hin);border:1px solid var(--bdr);padding:2px 6px;border-radius:6px;font-weight:600}
 .drop-hint{text-align:center;padding:24px 10px;color:var(--hin);border:2px dashed var(--bdr);
             border-radius:8px;font-size:11px;margin-top:auto}
 
 /* Toolbar & Buttons */
-.btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;
-     border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .12s;white-space:nowrap}
-.btn:hover{border-color:var(--pur);color:var(--pur)}
+.btn{padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;
+     border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .15s;white-space:nowrap;
+     font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
+.btn:hover{border-color:var(--pur);color:var(--pur);box-shadow:0 4px 12px rgba(99,102,241,0.1)}
 .btn:disabled{opacity:0.6;cursor:not-allowed}
 .btn-p{background:var(--pur);color:#fff;border-color:var(--pur)}
 .btn-p:hover{background:var(--purt);color:#fff;border-color:var(--purt)}
@@ -553,7 +563,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
               </td>
               <td style="padding:10px 4px; text-align:right;">
                 {% if u.id != 1 %}
-                <button class="btn" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" style="font-size:10px; color:var(--rd); border-color:var(--bdr); padding:4px 8px; background:var(--sur);">Delete User</button>
+                <button class="btn" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" style="font-size:10px; color:var(--rd); border-color:rgba(220,38,38,0.25); padding:4px 8px; background:var(--rdl);">Delete Account</button>
                 {% else %}
                 <span style="font-size:11px; color:var(--hin); font-style:italic;">Protected</span>
                 {% endif %}
