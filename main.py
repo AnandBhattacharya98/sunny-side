@@ -1,5 +1,5 @@
 """
-main.py — PM Job Hunter entry point.
+main.py — Job Hunter Board entry point.
 
 Works with ZERO API keys out of the box.
 Demo data loads automatically so you can explore the dashboard immediately.
@@ -92,7 +92,7 @@ def open_dashboard():
 
 def main():
     ap = argparse.ArgumentParser(
-        description="PM Job Hunter — finds, scores, and drafts applications for PM roles in India",
+        description="Job Hunter Board — finds, scores, and drafts applications for roles in India",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

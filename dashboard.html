@@ -239,7 +239,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Designation / Title</label>
-                <input type="text" name="designation" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Product Manager">
+                <input type="text" name="designation" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Software Engineer">
               </div>
             </div>
 
@@ -423,51 +423,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     </div>
   </div>
 
-  {% if needs_onboarding %}
-  <!-- Onboarding Walkthrough Banner -->
-  <div style="background:var(--purl); border:1px solid var(--pur); border-radius:12px; padding:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:14px; box-shadow:0 4px 15px rgba(0,0,0,0.04);">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="font-size:14px; font-weight:700; color:var(--pur); display:flex; align-items:center; gap:6px;">
-        <span>🚀</span> Welcome! Let's set up your pipeline (Step-by-Step Guide)
-      </h3>
-      <span style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; background:var(--pur); color:#fff; padding:2px 8px; border-radius:10px;">Setup Required</span>
-    </div>
-    
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-top:4px;">
-      <!-- Step 1 -->
-      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 1</span>
-        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Upload Resume</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Directly upload a PDF/TXT resume or paste your text details under Settings. AI scores matches for you.</p>
-        <button class="btn btn-p" onclick="openSettingsModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Open Settings</button>
-      </div>
-      
-      <!-- Step 2 -->
-      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 2</span>
-        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Connect Gmail</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Configure Gmail IMAP and App Password in settings. AI matches rejection/offer updates.</p>
-        <a href="https://support.google.com/accounts/answer/185833" target="_blank" style="margin-top:auto; font-size:10px; color:var(--pur); text-decoration:none; font-weight:600;">How to get App PW &rarr;</a>
-      </div>
-      
-      <!-- Step 3 -->
-      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 3</span>
-        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">WhatsApp Sync</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Open the import modal, paste forwarded chat messages directly, or drag selection bookmarklet.</p>
-        <button class="btn btn-g" onclick="openWhatsappModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Import Chats</button>
-      </div>
-      
-      <!-- Step 4 -->
-      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 4</span>
-        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Connect LinkedIn</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Run the web scrapers or bookmarklet on job pages to auto-generate cover letters & find hiring team.</p>
-        <button class="btn btn-p refresh-btn" onclick="triggerRefresh()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Sync Board</button>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+
 
   <div class="board">
     {% for col in cols %}
@@ -874,7 +830,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
-          <input type="text" id="settings-designation" value="{{ (settings or {}).get('designation', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Product Manager">
+          <input type="text" id="settings-designation" value="{{ (settings or {}).get('designation', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Software Engineer">
         </div>
       </div>
 
@@ -1410,7 +1366,7 @@ function toggleTheme() {
 
 // Initialise Theme on Load
 (function initTheme() {
-  const saved = localStorage.getItem('theme') || 'light';
+  const saved = localStorage.getItem('theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   const icon = document.getElementById('theme-icon');
   const text = document.getElementById('theme-text');

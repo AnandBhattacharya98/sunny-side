@@ -26,22 +26,22 @@ PROFILE = {
     "name": os.getenv("YOUR_NAME", "Anand Bhattacharya"),
     "years_exp": int(os.getenv("YEARS_EXPERIENCE", "1")),
     "location": os.getenv("LOCATION", "Bengaluru"),
-    "current_role": "AI Associate Product Manager",
-    "domain": "AI voice agents, conversational AI, and speech-to-text/text-to-speech tools",
+    "current_role": "Software Engineer",
+    "domain": "web development, API design, and cloud architecture",
     "strengths": [
-        "conversational AI design",
-        "multilingual voice agents",
-        "BFSI voice automation",
-        "product roadmap and strategy",
-        "data science and predictive models"
+        "full stack web development",
+        "API integrations",
+        "database scaling",
+        "system performance tuning",
+        "CI/CD workflows"
     ],
-    "tools": ["Retell", "Deepgram", "OpenAI TTS/STT", "ElevenLabs", "MySQL", "Tableau", "Python", "Jira"],
+    "tools": ["Python", "Flask", "JavaScript", "SQL", "Docker", "Git", "Jira"],
     "achievements": [
-        "Designed and optimized multilingual conversation flows for BFSI clients, reducing call errors by 20%",
-        "Trained AI voice agents on 500+ call recordings, cutting iteration cycles by 30%",
-        "Partnered with clients to co-define AI personas, increasing adoption rates by 40%"
+        "Designed and optimized backend APIs for scale, reducing response latency by 20%",
+        "Developed auto-ingestion pipelines, cutting data syncing cycle time by 30%",
+        "Collaborated with cross-functional teams to ship new client dashboards, increasing engagement by 40%"
     ],
-    "education": "MBA & MS in Information Technology Management (UT Dallas) | BE in Computer Science",
+    "education": "BE in Computer Science",
 }
 
 RESUME_TEXT = f"""
@@ -225,12 +225,12 @@ def _local_cover_letter(title: str, company: str, description: str,
     # Pull a relevant strength from the description
     domain_line = ""
     desc_lower = description.lower()
-    if any(k in desc_lower for k in ["ai", "voice", "speech", "conversational", "llm"]):
-        domain_line = f"My experience building conversational AI and voice agents at Revrag.ai aligns perfectly with this role."
-    elif "bfsi" in desc_lower or "finance" in desc_lower or "bank" in desc_lower:
-        domain_line = f"Having designed and optimized conversation flows for BFSI clients, I am well-suited for your requirements."
+    if any(k in desc_lower for k in ["development", "web", "software", "engineering", "backend"]):
+        domain_line = f"My experience building robust applications and backend systems aligns perfectly with this role."
+    elif "data" in desc_lower or "analytics" in desc_lower:
+        domain_line = f"Having designed and optimized data models and automated sync workflows, I am well-suited for your requirements."
     else:
-        domain_line = f"With my background as an AI Associate Product Manager shipping voice automation products, I can contribute immediately."
+        domain_line = f"With my background as a Software Engineer shipping scalable automation products, I can contribute immediately."
 
     achievement = PROFILE["achievements"][0]
 
