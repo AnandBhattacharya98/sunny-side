@@ -213,6 +213,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <a class="nl" href="javascript:void(0)" onclick="openSettingsModal()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
     <span>⚙️</span> Profile Settings
   </a>
+  {% if session.get('username') == 'admin' %}
+  <a class="nl {% if view_mode=='users' %}on{% endif %}" href="/users" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
+    <span>👥</span> User Management
+  </a>
+  {% endif %}
   <a class="nl" href="javascript:void(0)" onclick="toggleTheme()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
     <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
   </a>
@@ -285,6 +290,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <span class="jmode" style="background:var(--gnl);color:var(--gn)">Gemini Active</span>
     </div>
   </div>
+
+  {% if needs_onboarding %}
+  <!-- Onboarding Walkthrough Banner -->
+  <div style="background:var(--purl); border:1px solid var(--pur); border-radius:12px; padding:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:14px; box-shadow:0 4px 15px rgba(0,0,0,0.04);">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="font-size:14px; font-weight:700; color:var(--pur); display:flex; align-items:center; gap:6px;">
+        <span>🚀</span> Welcome! Let's set up your pipeline (Step-by-Step Guide)
+      </h3>
+      <span style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; background:var(--pur); color:#fff; padding:2px 8px; border-radius:10px;">Setup Required</span>
+    </div>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-top:4px;">
+      <!-- Step 1 -->
+      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 1</span>
+        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Upload Resume</h4>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Paste your raw resume text under Profile Settings. AI uses it to score matching jobs.</p>
+        <button class="btn btn-p" onclick="openSettingsModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Open Settings</button>
+      </div>
+      
+      <!-- Step 2 -->
+      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 2</span>
+        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Connect Gmail</h4>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Configure Gmail IMAP and App Password in settings. AI matches rejection/offer updates.</p>
+        <a href="https://support.google.com/accounts/answer/185833" target="_blank" style="margin-top:auto; font-size:10px; color:var(--pur); text-decoration:none; font-weight:600;">How to get App PW &rarr;</a>
+      </div>
+      
+      <!-- Step 3 -->
+      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 3</span>
+        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">WhatsApp Sync</h4>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Use WhatsApp modal, paste chats or select messages. AI parses titles/URLs instantly.</p>
+        <button class="btn btn-g" onclick="openWhatsappModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Import Chats</button>
+      </div>
+      
+      <!-- Step 4 -->
+      <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 4</span>
+        <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Connect LinkedIn</h4>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Run the web scrapers or bookmarklet on job pages to auto-generate cover letters & find hiring team.</p>
+        <button class="btn btn-p refresh-btn" onclick="triggerRefresh()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Sync Board</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="board">
     {% for col in cols %}
@@ -401,6 +452,79 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <p style="color:var(--hin);margin-top:4px;">Configure your IMAP credentials in .env and click "Refresh Now" to scan your inbox.</p>
       </div>
     {% endif %}
+  {% elif view_mode == 'users' %}
+  <div class="board-header">
+    <h2 class="board-title">👥 User Management</h2>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 2fr; gap:24px; flex:1; min-height:0; overflow:hidden;">
+    <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px; height:fit-content;">
+      <h3 style="font-size:14px; font-weight:700; color:var(--txt);">Invite New User</h3>
+      <p style="font-size:11px; color:var(--mut); line-height:1.4;">Pre-register a new account for family or friends. They can log in immediately with the credentials you create.</p>
+      
+      {% if error %}
+      <div style="background:var(--rdl); color:var(--rd); padding:8px 10px; border-radius:6px; font-size:11px;">
+        ⚠️ {{ error }}
+      </div>
+      {% endif %}
+      
+      <form method="POST" action="/users" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Username</label>
+          <input type="text" name="username" required style="padding:8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;" placeholder="family_member">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Password</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" id="invite-password" name="password" required style="padding:8px 30px 8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none; width:100%;" placeholder="••••••••">
+            <button type="button" onclick="togglePasswordVisibility('invite-password', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; font-size:13px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:2px;">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-p" style="padding:9px; font-size:12px; font-weight:600; margin-top:4px;">Create Account</button>
+      </form>
+    </div>
+
+    <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:20px; display:flex; flex-direction:column; height:100%; overflow:hidden;">
+      <h3 style="font-size:14px; font-weight:700; color:var(--txt); margin-bottom:12px;">Registered Accounts</h3>
+      
+      <div style="flex:1; overflow-y:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--bdr); color:var(--mut); font-weight:600;">
+              <th style="padding:8px 4px;">Username</th>
+              <th style="padding:8px 4px;">Date Joined</th>
+              <th style="padding:8px 4px; text-align:center;">Jobs Tracked</th>
+              <th style="padding:8px 4px; text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr style="border-bottom:1px solid var(--bdr); color:var(--txt);">
+              <td style="padding:10px 4px; font-weight:600;">
+                👤 {{ u.username }}
+                {% if u.id == 1 %}
+                <span style="font-size:9px; font-weight:600; background:var(--purl); color:var(--pur); padding:1px 5px; border-radius:4px; margin-left:4px;">Admin</span>
+                {% endif %}
+              </td>
+              <td style="padding:10px 4px; color:var(--mut);">
+                {{ u.created_at[:10] if u.created_at else 'Legacy' }}
+              </td>
+              <td style="padding:10px 4px; text-align:center; font-weight:600; color:var(--pur);">
+                {{ u.job_count }}
+              </td>
+              <td style="padding:10px 4px; text-align:right;">
+                {% if u.id != 1 %}
+                <button class="btn" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" style="font-size:10px; color:var(--rd); border-color:var(--bdr); padding:4px 8px; background:var(--sur);">Delete User</button>
+                {% else %}
+                <span style="font-size:11px; color:var(--hin); font-style:italic;">Protected</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
   {% endif %}
 </main>
@@ -1107,6 +1231,28 @@ function togglePasswordVisibility(inputId, btn) {
   } else {
     input.type = 'password';
     btn.textContent = '👁️';
+  }
+}
+
+async function deleteUser(userId, username) {
+  if (!confirm(`Are you absolutely sure you want to delete user "${username}" and all their application data? This action cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const resp = await fetch(`/api/users/${userId}/delete`, {
+      method: 'POST'
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      toast(`User ${username} deleted.`);
+      window.location.reload();
+    } else {
+      toast(`Error deleting user: ${data.error}`);
+    }
+  } catch (err) {
+    console.error(err);
+    toast('Connection error');
   }
 }
 {% endif %}

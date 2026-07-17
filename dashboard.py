@@ -178,11 +178,13 @@ def index():
     
     # Get user settings to pass to frontend profile form
     settings = get_user_settings(conn, uid)
+    needs_onboarding = not settings.get("resume_text")
     conn.close()
     
     cols = ["whatsapp", "new", "shortlisted", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
-                           companies=companies, settings=settings, view_mode="board")
+                           companies=companies, settings=settings, view_mode="board",
+                           needs_onboarding=needs_onboarding)
 
 
 @app.route("/emails")
@@ -206,6 +208,67 @@ def view_emails():
 @app.route("/pipeline")
 def pipeline():
     return redirect("/")
+
+
+@app.route("/users", methods=["GET", "POST"])
+def admin_users():
+    if session.get("username") != "admin":
+        return redirect("/")
+    
+    conn = get_conn(DB_PATH)
+    
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        if not username or not password:
+            error = "Both fields are required."
+        else:
+            existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
+            if existing:
+                error = "Username already exists."
+            else:
+                from datetime import datetime
+                from auth import hash_password
+                conn.execute(
+                    "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                    (username, hash_password(password), datetime.now().isoformat())
+                )
+                conn.commit()
+                
+    # Fetch all users and calculate their job counts
+    raw_users = conn.execute("SELECT * FROM users ORDER BY username").fetchall()
+    users = []
+    for u in raw_users:
+        u_dict = dict(u)
+        job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (u_dict["id"],)).fetchone()[0]
+        u_dict["job_count"] = job_count
+        users.append(u_dict)
+        
+    stats = _stats(conn)
+    conn.close()
+    return render_template("dashboard.html", view_mode="users", users=users, stats=stats, error=error)
+
+
+@app.route("/api/users/<int:user_id>/delete", methods=["POST"])
+def delete_user(user_id):
+    if session.get("username") != "admin":
+        return jsonify({"error": "unauthorized"}), 403
+    if user_id == 1:
+        return jsonify({"error": "cannot delete admin"}), 400
+        
+    conn = get_conn(DB_PATH)
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM contacts WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM cover_letters WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM application_notes WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM application_timeline WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM received_emails WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM tailored_resumes WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 # ── API ────────────────────────────────────────────────────────────────────
