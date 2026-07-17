@@ -1,27 +1,98 @@
-"""
-dashboard.py — Local web dashboard for reviewing and acting on PM job matches.
-Runs at http://localhost:5050 with zero API keys.
-"""
-
 import os, json, sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from db import get_conn, add_timeline, DB_PATH, init_db
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job
 from notifier import send_email_digest
+from auth import signup_user, login_user
 
 app = Flask(__name__, template_folder='.')
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "pm_job_hunter_super_secret_key_123")
+
+# Set session cookies lifetime to be long so login stays active
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(days=30)
+
+def get_user_id() -> int:
+    return session.get("user_id", 1)
+
+def get_user_settings(conn, user_id):
+    row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row:
+        return dict(row)
+    return {}
+
+@app.before_request
+def require_login():
+    allowed_endpoints = ["login", "signup", "static"]
+    if not session.get("user_id"):
+        if request.endpoint and request.endpoint not in allowed_endpoints:
+            return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        conn = get_conn(DB_PATH)
+        user = login_user(conn, username, password)
+        conn.close()
+        if user:
+            session.permanent = True
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            return redirect(url_for("index"))
+        return render_template("dashboard.html", view_mode="login", error="Invalid username or password")
+    return render_template("dashboard.html", view_mode="login")
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        conn = get_conn(DB_PATH)
+        try:
+            uid = signup_user(conn, username, password)
+            session.permanent = True
+            session["user_id"] = uid
+            session["username"] = username
+            conn.close()
+            return redirect(url_for("index"))
+        except Exception as e:
+            conn.close()
+            return render_template("dashboard.html", view_mode="signup", error=str(e))
+    return render_template("dashboard.html", view_mode="signup")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+@app.route("/api/profile", methods=["POST"])
+def update_profile():
+    d = request.json
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    conn.execute(
+        """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ? 
+           WHERE id = ?""",
+        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), uid)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _stats(conn):
-    total = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-    by_status = dict(conn.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status").fetchall())
-    avg = conn.execute("SELECT AVG(ai_score) FROM jobs WHERE ai_score IS NOT NULL").fetchone()[0]
-    email_count = conn.execute("SELECT COUNT(*) FROM received_emails").fetchone()[0]
+    uid = get_user_id()
+    total = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
+    by_status = dict(conn.execute("SELECT status, COUNT(*) FROM jobs WHERE user_id = ? GROUP BY status", (uid,)).fetchall())
+    avg = conn.execute("SELECT AVG(ai_score) FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL", (uid,)).fetchone()[0]
+    email_count = conn.execute("SELECT COUNT(*) FROM received_emails WHERE user_id = ?", (uid,)).fetchone()[0]
     
-    last_updated_row = conn.execute("SELECT MAX(scraped_at) FROM jobs").fetchone()
+    last_updated_row = conn.execute("SELECT MAX(scraped_at) FROM jobs WHERE user_id = ?", (uid,)).fetchone()
     last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
     if last_updated:
         try:
@@ -39,26 +110,27 @@ def _stats(conn):
 
 
 def _full_job(conn, job_id):
-    j = conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+    uid = get_user_id()
+    j = conn.execute("SELECT * FROM jobs WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
     if not j:
         return None
     j = dict(j)
     j["key_reqs_list"] = json.loads(j.get("key_reqs") or "[]")
-    cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=?", (job_id,)).fetchone()
+    cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
     j["cover_letter"] = dict(cl) if cl else None
-    contacts = conn.execute("SELECT * FROM contacts WHERE job_id=?", (job_id,)).fetchall()
+    contacts = conn.execute("SELECT * FROM contacts WHERE job_id=? AND user_id=?", (job_id, uid)).fetchall()
     j["contacts"] = [dict(c) for c in contacts]
-    notes = conn.execute("SELECT * FROM application_notes WHERE job_id=?", (job_id,)).fetchone()
+    notes = conn.execute("SELECT * FROM application_notes WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
     j["notes"] = dict(notes) if notes else {"note": "", "linkedin_note": ""}
     timeline = conn.execute(
-        "SELECT event, created_at FROM application_timeline WHERE job_id=? ORDER BY created_at",
-        (job_id,)
+        "SELECT event, created_at FROM application_timeline WHERE job_id=? AND user_id=? ORDER BY created_at",
+        (job_id, uid)
     ).fetchall()
     j["timeline"] = [dict(t) for t in timeline]
     
     emails = conn.execute(
-        "SELECT * FROM received_emails WHERE job_id=? ORDER BY received_at DESC",
-        (job_id,)
+        "SELECT * FROM received_emails WHERE job_id=? AND user_id=? ORDER BY received_at DESC",
+        (job_id, uid)
     ).fetchall()
     j["emails"] = [dict(e) for e in emails]
     return j
@@ -69,9 +141,10 @@ def _full_job(conn, job_id):
 @app.route("/")
 def index():
     conn = get_conn(DB_PATH)
+    uid = get_user_id()
     
     # Fetch all active jobs (ignore archived)
-    raw_jobs = conn.execute("SELECT * FROM jobs WHERE status != 'archived' ORDER BY COALESCE(ai_score,0) DESC").fetchall()
+    raw_jobs = conn.execute("SELECT * FROM jobs WHERE user_id = ? AND status != 'archived' ORDER BY COALESCE(ai_score,0) DESC", (uid,)).fetchall()
     
     board = {
         "whatsapp": [],
@@ -84,39 +157,44 @@ def index():
     
     for row in raw_jobs:
         j = _full_job(conn, row["job_id"])
-        status = j["status"]
-        
-        if status == "whatsapp":
-            board["whatsapp"].append(j)
-        elif status in ("new", "scored", "ready"):
-            board["new"].append(j)
-        elif status in ("shortlisted", "interviewing"):
-            board["shortlisted"].append(j)
-        elif status == "applied":
-            board["applied"].append(j)
-        elif status == "offer":
-            board["offer"].append(j)
-        elif status == "rejected":
-            board["rejected"].append(j)
+        if j:
+            status = j["status"]
+            if status == "whatsapp":
+                board["whatsapp"].append(j)
+            elif status in ("new", "scored", "ready"):
+                board["new"].append(j)
+            elif status in ("shortlisted", "interviewing"):
+                board["shortlisted"].append(j)
+            elif status == "applied":
+                board["applied"].append(j)
+            elif status == "offer":
+                board["offer"].append(j)
+            elif status == "rejected":
+                board["rejected"].append(j)
             
     stats = _stats(conn)
     companies = [r[0] for r in conn.execute(
-        "SELECT DISTINCT company FROM jobs ORDER BY company").fetchall()]
+        "SELECT DISTINCT company FROM jobs WHERE user_id = ? ORDER BY company", (uid,)).fetchall()]
+    
+    # Get user settings to pass to frontend profile form
+    settings = get_user_settings(conn, uid)
     conn.close()
     
     cols = ["whatsapp", "new", "shortlisted", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
-                           companies=companies, view_mode="board")
+                           companies=companies, settings=settings, view_mode="board")
 
 
 @app.route("/emails")
 def view_emails():
     conn = get_conn(DB_PATH)
+    uid = get_user_id()
     raw_emails = conn.execute(
         """SELECT r.*, j.company, j.title 
            FROM received_emails r 
            LEFT JOIN jobs j ON r.job_id = j.job_id 
-           ORDER BY r.received_at DESC"""
+           WHERE r.user_id = ?
+           ORDER BY r.received_at DESC""", (uid,)
     ).fetchall()
     emails = [dict(e) for e in raw_emails]
     stats = _stats(conn)
@@ -139,7 +217,8 @@ def set_status(job_id):
     if status not in allowed:
         return jsonify({"error": "invalid"}), 400
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE jobs SET status=? WHERE job_id=?", (status, job_id))
+    uid = get_user_id()
+    conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status, job_id, uid))
     add_timeline(conn, job_id, f"Status → {status}")
     conn.commit(); conn.close()
     return jsonify({"ok": True, "status": status})
@@ -149,8 +228,9 @@ def set_status(job_id):
 def save_cover_letter(job_id):
     d = request.json
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE cover_letters SET subject=?, body=? WHERE job_id=?",
-                 (d["subject"], d["body"], job_id))
+    uid = get_user_id()
+    conn.execute("UPDATE cover_letters SET subject=?, body=? WHERE job_id=? AND user_id=?",
+                 (d["subject"], d["body"], job_id, uid))
     conn.commit(); conn.close()
     return jsonify({"ok": True})
 
@@ -159,9 +239,10 @@ def save_cover_letter(job_id):
 def save_note(job_id):
     d = request.json
     conn = get_conn(DB_PATH)
+    uid = get_user_id()
     conn.execute(
-        "INSERT OR REPLACE INTO application_notes (job_id, note, linkedin_note) VALUES (?,?,?)",
-        (job_id, d.get("note",""), d.get("linkedin_note",""))
+        "INSERT OR REPLACE INTO application_notes (job_id, note, linkedin_note, user_id) VALUES (?,?,?,?)",
+        (job_id, d.get("note",""), d.get("linkedin_note",""), uid)
     )
     conn.commit(); conn.close()
     return jsonify({"ok": True})
@@ -170,26 +251,28 @@ def save_note(job_id):
 @app.route("/api/job/<job_id>/regenerate", methods=["POST"])
 def regenerate(job_id):
     conn = get_conn(DB_PATH)
-    job = conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+    uid = get_user_id()
+    job = conn.execute("SELECT * FROM jobs WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
     if not job:
         conn.close(); return jsonify({"error": "not found"}), 404
     j = dict(job)
     contact = conn.execute(
-        "SELECT name, title FROM contacts WHERE job_id=? LIMIT 1", (job_id,)
+        "SELECT name, title FROM contacts WHERE job_id=? AND user_id=? LIMIT 1", (job_id, uid)
     ).fetchone()
     cn = contact[0] if contact else "Hiring Team"
     ct = contact[1] if contact else "Recruiter"
 
-    score_data = score_job(j["title"], j["company"], j.get("description",""))
-    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct)
+    settings = get_user_settings(conn, uid)
+    score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"))
+    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"))
     li_note    = generate_linkedin_note(cn, ct, j["company"], j["title"])
 
-    conn.execute("UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=? WHERE job_id=?",
+    conn.execute("UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=? WHERE job_id=? AND user_id=?",
                  (score_data["score"], score_data["fit_summary"],
-                  json.dumps(score_data.get("key_requirements",[])), job_id))
+                  json.dumps(score_data.get("key_requirements",[])), job_id, uid))
     conn.execute(
-        "INSERT OR REPLACE INTO cover_letters (job_id, subject, body, linkedin_note, created_at) VALUES (?,?,?,?,?)",
-        (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat())
+        "INSERT OR REPLACE INTO cover_letters (job_id, subject, body, linkedin_note, created_at, user_id) VALUES (?,?,?,?,?,?)",
+        (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid)
     )
     add_timeline(conn, job_id, "Regenerated cover letter")
     conn.commit(); conn.close()
@@ -202,9 +285,13 @@ def regenerate(job_id):
 @app.route("/api/job/<job_id>/send-email", methods=["POST"])
 def send_email(job_id):
     conn = get_conn(DB_PATH)
-    j  = dict(conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
-    cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=?", (job_id,)).fetchone()
-    c  = conn.execute("SELECT * FROM contacts WHERE job_id=? LIMIT 1", (job_id,)).fetchone()
+    uid = get_user_id()
+    j_row = conn.execute("SELECT * FROM jobs WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
+    if not j_row:
+        conn.close(); return jsonify({"error": "not found"}), 404
+    j  = dict(j_row)
+    cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
+    c  = conn.execute("SELECT * FROM contacts WHERE job_id=? AND user_id=? LIMIT 1", (job_id, uid)).fetchone()
     conn.close()
     if not cl:
         return jsonify({"error": "no cover letter"}), 400
@@ -219,7 +306,7 @@ def send_email(job_id):
     ok = send_email_digest([item])
     if ok:
         conn2 = get_conn(DB_PATH)
-        conn2.execute("UPDATE jobs SET status='applied' WHERE job_id=?", (job_id,))
+        conn2.execute("UPDATE jobs SET status='applied' WHERE job_id=? AND user_id=?", (job_id, uid))
         add_timeline(conn2, job_id, "Email sent → applied")
         conn2.commit(); conn2.close()
     return jsonify({"ok": ok, "message": "Email sent!" if ok else "Add SENDER_EMAIL + SENDER_PASSWORD to .env"})
@@ -231,19 +318,20 @@ def bulk_action():
     action = d.get("action")
     ids    = d.get("job_ids", [])
     conn   = get_conn(DB_PATH)
+    uid    = get_user_id()
 
     if action in ("shortlist", "archive", "applied"):
         status_map = {"shortlist": "shortlisted", "archive": "archived", "applied": "applied"}
         for jid in ids:
-            conn.execute("UPDATE jobs SET status=? WHERE job_id=?", (status_map[action], jid))
+            conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status_map[action], jid, uid))
             add_timeline(conn, jid, f"Bulk → {status_map[action]}")
 
     elif action == "send-digest":
         items = []
         for jid in ids:
-            j  = conn.execute("SELECT * FROM jobs WHERE job_id=?", (jid,)).fetchone()
-            cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=?", (jid,)).fetchone()
-            c  = conn.execute("SELECT * FROM contacts WHERE job_id=? LIMIT 1", (jid,)).fetchone()
+            j  = conn.execute("SELECT * FROM jobs WHERE job_id=? AND user_id=?", (jid, uid)).fetchone()
+            cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=? AND user_id=?", (jid, uid)).fetchone()
+            c  = conn.execute("SELECT * FROM contacts WHERE job_id=? AND user_id=? LIMIT 1", (jid, uid)).fetchone()
             if j and cl:
                 jd = dict(j)
                 items.append({
@@ -266,7 +354,8 @@ def bulk_action():
 def pipeline_move():
     d = request.json
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE jobs SET status=? WHERE job_id=?", (d["status"], d["job_id"]))
+    uid = get_user_id()
+    conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (d["status"], d["job_id"], uid))
     add_timeline(conn, d["job_id"], f"Pipeline → {d['status']}")
     conn.commit(); conn.close()
     return jsonify({"ok": True})
@@ -287,16 +376,27 @@ def refresh_listings():
     from ai_engine import process_new_jobs
     
     try:
+        uid = get_user_id()
         run_all_scrapers(DB_PATH)
+        
+        conn = get_conn(DB_PATH)
+        conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+        conn.commit()
+        
         enrich_jobs_with_contacts(DB_PATH)
+        conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+        conn.commit()
         
         # Sync application statuses from user's email
         from email_scraper import sync_job_statuses_from_email
         sync_job_statuses_from_email(DB_PATH)
+        conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+        conn.commit()
         
         # Using default MIN_SCORE or float(os.getenv("MIN_SCORE", "6.0"))
         min_score = float(os.getenv("MIN_SCORE", "0.0")) # Score everything so we don't miss jobs in dashboard
-        process_new_jobs(DB_PATH, min_score=min_score)
+        process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
+        conn.close()
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -443,6 +543,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
             parsed.append(scraped)
             
     conn = get_conn(DB_PATH)
+    uid = get_user_id()
     import uuid
     import random
     from ai_engine import score_job
@@ -455,18 +556,14 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
         desc = item.get("description", "Imported from WhatsApp.").strip()
         loc = item.get("location", "Remote").strip()
         
-        if not company:
-            continue
-            
-        existing = None
         if url:
             existing = conn.execute(
-                "SELECT title, company, status FROM jobs WHERE url = ?", (url,)
+                "SELECT title, company, status FROM jobs WHERE url = ? AND user_id = ?", (url, uid)
             ).fetchone()
         if not existing:
             existing = conn.execute(
-                "SELECT title, company, status FROM jobs WHERE LOWER(company) = ? AND LOWER(title) = ?",
-                (company.lower(), title.lower())
+                "SELECT title, company, status FROM jobs WHERE LOWER(company) = ? AND LOWER(title) = ? AND user_id = ?",
+                (company.lower(), title.lower(), uid)
             ).fetchone()
             
         if existing:
@@ -487,7 +584,8 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
         
         # Calculate real score if description and title are present
         try:
-            score_data = score_job(title, company, desc)
+            settings = get_user_settings(conn, uid)
+            score_data = score_job(title, company, desc, resume_text=settings.get("resume_text"))
             auto_score = score_data.get("score", 7.0)
             ai_summary = score_data.get("summary", "Imported from WhatsApp.")
             key_reqs = json.dumps(score_data.get("key_requirements", []))
@@ -498,9 +596,9 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
             key_reqs = "[]"
             
         conn.execute(
-            """INSERT INTO jobs (job_id, company, title, status, url, location, description, scraped_at, ai_score, ai_summary, key_reqs)
-               VALUES (?, ?, ?, 'whatsapp', ?, ?, ?, ?, ?, ?, ?)""",
-            (job_id, company, title, url, loc, desc, datetime.now().isoformat(), auto_score, ai_summary, key_reqs)
+            """INSERT INTO jobs (job_id, company, title, status, url, location, description, scraped_at, ai_score, ai_summary, key_reqs, user_id)
+               VALUES (?, ?, ?, 'whatsapp', ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (job_id, company, title, url, loc, desc, datetime.now().isoformat(), auto_score, ai_summary, key_reqs, uid)
         )
         add_timeline(conn, job_id, "Imported from WhatsApp forward")
         added_count += 1
@@ -513,24 +611,26 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
 @app.route("/api/job/<job_id>/resume", methods=["GET"])
 def get_resume(job_id):
     conn = get_conn(DB_PATH)
-    row = conn.execute("SELECT resume_content FROM tailored_resumes WHERE job_id = ?", (job_id,)).fetchone()
+    uid = get_user_id()
+    row = conn.execute("SELECT resume_content FROM tailored_resumes WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
     
     if row:
         resume = row["resume_content"]
     else:
         # Fetch job details to generate
-        job = conn.execute("SELECT title, company, description FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+        job = conn.execute("SELECT title, company, description FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if not job:
             conn.close()
             return jsonify({"ok": False, "error": "Job not found"}), 404
             
         from ai_engine import generate_tailored_resume
-        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "")
+        settings = get_user_settings(conn, uid)
+        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"))
         
         # Save to DB cache
         conn.execute(
-            "INSERT OR REPLACE INTO tailored_resumes (job_id, resume_content, created_at) VALUES (?, ?, ?)",
-            (job_id, resume, datetime.now().isoformat())
+            "INSERT OR REPLACE INTO tailored_resumes (job_id, resume_content, created_at, user_id) VALUES (?, ?, ?, ?)",
+            (job_id, resume, datetime.now().isoformat(), uid)
         )
         conn.commit()
         
@@ -541,18 +641,20 @@ def get_resume(job_id):
 @app.route("/resume/<job_id>/print")
 def print_resume(job_id):
     conn = get_conn(DB_PATH)
-    row = conn.execute("SELECT resume_content FROM tailored_resumes WHERE job_id = ?", (job_id,)).fetchone()
+    uid = get_user_id()
+    row = conn.execute("SELECT resume_content FROM tailored_resumes WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
     
     if not row:
-        job = conn.execute("SELECT title, company, description FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+        job = conn.execute("SELECT title, company, description FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if not job:
             conn.close()
             return "Job not found", 404
         from ai_engine import generate_tailored_resume
-        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "")
+        settings = get_user_settings(conn, uid)
+        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"))
         conn.execute(
-            "INSERT OR REPLACE INTO tailored_resumes (job_id, resume_content, created_at) VALUES (?, ?, ?)",
-            (job_id, resume, datetime.now().isoformat())
+            "INSERT OR REPLACE INTO tailored_resumes (job_id, resume_content, created_at, user_id) VALUES (?, ?, ?, ?)",
+            (job_id, resume, datetime.now().isoformat(), uid)
         )
         conn.commit()
     else:

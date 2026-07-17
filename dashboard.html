@@ -15,6 +15,20 @@
   --gn:#3B6D11;--gnl:#EAF3DE;
   --r:12px;
 }
+[data-theme="dark"] {
+  --bg:#121210;
+  --sur:#1e1e1b;
+  --bdr:#2d2c27;
+  --txt:#f2f1eb;
+  --mut:#b0aeb8;
+  --hin:#706e68;
+  --purl:#231f4a;
+  --purt:#8981df;
+  --tll:#113325;
+  --aml:#442805;
+  --rdl:#4c1313;
+  --gnl:#1a3206;
+}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden}
 
@@ -141,6 +155,45 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </style>
 </head>
 <body>
+
+{% if view_mode == 'login' or view_mode == 'signup' %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100vw;">
+  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:380px;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:6px;color:var(--txt);text-align:center;">PM Job Hunter</h2>
+    <p style="font-size:12px;color:var(--hin);text-align:center;margin-bottom:24px;">
+      {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
+    </p>
+    
+    {% if error %}
+    <div style="background:var(--rdl);color:var(--rd);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:16px;border:1px solid rgba(163, 45, 45, 0.2);">
+      ⚠️ {{ error }}
+    </div>
+    {% endif %}
+    
+    <form method="POST" action="/{{ view_mode }}" style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Username</label>
+        <input type="text" name="username" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="Enter username">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Password</label>
+        <input type="password" name="password" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-p" style="padding:12px;font-size:13px;font-weight:600;margin-top:8px;">
+        {% if view_mode == 'login' %}Log In{% else %}Sign Up{% endif %}
+      </button>
+    </form>
+    
+    <div style="margin-top:20px;text-align:center;font-size:12px;color:var(--mut);">
+      {% if view_mode == 'login' %}
+      Don't have an account? <a href="/signup" style="color:var(--pur);text-decoration:none;font-weight:600;">Sign Up</a>
+      {% else %}
+      Already have an account? <a href="/login" style="color:var(--pur);text-decoration:none;font-weight:600;">Log In</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
 <div class="app">
 
 <!-- Sidebar -->
@@ -154,6 +207,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <a class="nl {% if view_mode=='emails' %}on{% endif %}" href="/emails" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
     <span>✉</span> Synced Emails <span class="nc" style="margin-left:auto;background:var(--pur);color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
   </a>
+  <a class="nl" href="javascript:void(0)" onclick="openSettingsModal()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
+    <span>⚙️</span> Profile Settings
+  </a>
+  <a class="nl" href="javascript:void(0)" onclick="toggleTheme()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
+    <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
+  </a>
+
+  <div class="ns">Account</div>
+  <div style="padding:0 16px 8px;font-size:12px;color:var(--mut);display:flex;align-items:center;justify-content:space-between;">
+    <span>👤 {{ session.get('username', 'Admin') }}</span>
+    <a href="/logout" style="color:var(--rd);text-decoration:none;font-weight:600;font-size:11px;">Logout</a>
+  </div>
 
   <div class="ns">Stats</div>
   <div style="padding:0 16px 12px;font-size:12px;color:var(--mut);line-height:2.1">
@@ -193,6 +258,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
     
     <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
+      <input type="text" placeholder="📍 Location..." id="location-search" style="width: 110px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
+      <select id="score-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
+        <option value="0">⭐ Min Score: Any</option>
+        <option value="9">⭐ Min Score: 9+</option>
+        <option value="8">⭐ Min Score: 8+</option>
+        <option value="7">⭐ Min Score: 7+</option>
+        <option value="6">⭐ Min Score: 6+</option>
+      </select>
       <select id="source-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="all">🔍 Source: All</option>
         <option value="linkedin">LinkedIn</option>
@@ -258,7 +331,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         {% elif job.source %}
           {% set source_type = job.source %}
         {% endif %}
-        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
+        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
           <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;">🗑️</button>
           <div class="jt">{{ job.title }}</div>
           <div class="jc" style="display:flex;align-items:center;gap:6px;margin-top:2px;">
@@ -512,6 +585,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </div>
 
 <div id="toast"></div>
+
+<!-- Settings & Profile Modal -->
+<div class="modal-backdrop" id="modal-settings" style="display: none; align-items: center; justify-content: center; z-index: 10000;" onclick="closeSettingsModalOutside(event)">
+  <div class="modal" style="width: 600px; max-height: 80vh; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">⚙️ Profile Settings</h3>
+        <p style="font-size:11px; color:var(--hin);">Configure your AI resume and sync preferences.</p>
+      </div>
+      <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+    </div>
+    
+    <div class="modal-body" style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">AI Resume Content (Markdown or Text)</label>
+        <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:200px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
+      </div>
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">IMAP Email (Gmail)</label>
+          <input type="email" id="settings-imap-email" value="{{ (settings or {}).get('imap_email', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="your.name@gmail.com">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">IMAP App Password</label>
+          <input type="password" id="settings-imap-password" value="{{ (settings or {}).get('imap_password', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="•••• •••• •••• ••••">
+        </div>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API Key (Overrides .env)</label>
+        <input type="password" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="AIzaSy...">
+      </div>
+      
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+        <button class="btn" onclick="closeSettingsModal()">Cancel</button>
+        <button class="btn btn-p" onclick="saveSettings()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 let draggingId = null;
@@ -826,17 +940,23 @@ async function triggerRefresh() {
 function filterBoard() {
   const query = document.getElementById('global-search') ? document.getElementById('global-search').value.toLowerCase().trim() : '';
   const sourceValue = document.getElementById('source-filter') ? document.getElementById('source-filter').value : 'all';
+  const minScore = document.getElementById('score-filter') ? parseFloat(document.getElementById('score-filter').value) : 0;
+  const locQuery = document.getElementById('location-search') ? document.getElementById('location-search').value.toLowerCase().trim() : '';
   
   const cards = document.querySelectorAll('.jcard');
   cards.forEach(card => {
     const title = card.querySelector('.jt').textContent.toLowerCase();
     const company = card.querySelector('.jc').textContent.toLowerCase();
     const cardSource = card.dataset.sourceType;
+    const cardScore = parseFloat(card.dataset.score) || 0;
+    const cardLocation = card.dataset.location ? card.dataset.location.toLowerCase() : '';
     
     const matchesSearch = !query || title.includes(query) || company.includes(query);
     const matchesSource = sourceValue === 'all' || cardSource === sourceValue;
+    const matchesScore = cardScore >= minScore;
+    const matchesLocation = !locQuery || cardLocation.includes(locQuery);
     
-    if (matchesSearch && matchesSource) {
+    if (matchesSearch && matchesSource && matchesScore && matchesLocation) {
       card.style.display = '';
     } else {
       card.style.display = 'none';
@@ -897,6 +1017,79 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2400);
 }
+
+// Settings Modal functions
+function openSettingsModal() {
+  document.getElementById('modal-settings').style.display = 'flex';
+}
+
+function closeSettingsModal() {
+  document.getElementById('modal-settings').style.display = 'none';
+}
+
+function closeSettingsModalOutside(event) {
+  if (event.target === document.getElementById('modal-settings')) {
+    closeSettingsModal();
+  }
+}
+
+async function saveSettings() {
+  const resume = document.getElementById('settings-resume').value;
+  const email = document.getElementById('settings-imap-email').value;
+  const password = document.getElementById('settings-imap-password').value;
+  const key = document.getElementById('settings-gemini-key').value;
+  
+  try {
+    const resp = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume_text: resume,
+        imap_email: email,
+        imap_password: password,
+        gemini_api_key: key
+      })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      toast('Settings saved successfully!');
+      closeSettingsModal();
+    } else {
+      toast('Error saving settings');
+    }
+  } catch (err) {
+    console.error(err);
+    toast('Connection error');
+  }
+}
+
+// Theme Toggle functions
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const target = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', target);
+  localStorage.setItem('theme', target);
+  
+  const icon = document.getElementById('theme-icon');
+  const text = document.getElementById('theme-text');
+  if (icon && text) {
+    icon.textContent = target === 'dark' ? '☀️' : '🌙';
+    text.textContent = target === 'dark' ? 'Light Mode' : 'Dark Mode';
+  }
+}
+
+// Initialise Theme on Load
+(function initTheme() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('theme-icon');
+  const text = document.getElementById('theme-text');
+  if (icon && text) {
+    icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+    text.textContent = saved === 'dark' ? 'Light Mode' : 'Dark Mode';
+  }
+})();
+{% endif %}
 </script>
 </body>
 </html>

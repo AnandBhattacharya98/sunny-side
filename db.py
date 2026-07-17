@@ -15,6 +15,50 @@ def get_conn(db_path: str = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
+def migrate_db(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT UNIQUE,
+            password_hash TEXT,
+            resume_text   TEXT,
+            imap_email    TEXT,
+            imap_password TEXT,
+            gemini_api_key TEXT,
+            created_at    TEXT
+        );
+    """)
+    conn.commit()
+    
+    admin_exists = conn.execute("SELECT 1 FROM users WHERE id = 1").fetchone()
+    if not admin_exists:
+        from datetime import datetime
+        import hashlib
+        import binascii
+        salt = b"default_salt_123"
+        key = hashlib.pbkdf2_hmac("sha256", b"admin", salt, 100000)
+        p_hash = binascii.hexlify(salt + b":" + key).decode("ascii")
+        conn.execute(
+            "INSERT OR IGNORE INTO users (id, username, password_hash, created_at) VALUES (1, ?, ?, ?)",
+            ("admin", p_hash, datetime.now().isoformat())
+        )
+        conn.commit()
+        
+    tables = ["jobs", "contacts", "cover_letters", "application_notes", "application_timeline", "received_emails", "tailored_resumes"]
+    for t in tables:
+        columns = [row[1] for row in conn.execute(f"PRAGMA table_info({t})").fetchall()]
+        if columns and "user_id" not in columns:
+            conn.execute(f"ALTER TABLE {t} ADD COLUMN user_id INTEGER DEFAULT 1;")
+            conn.commit()
+            
+    # Migrate users table columns if needed
+    user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    for col in ["imap_email", "imap_password", "gemini_api_key"]:
+        if col not in user_cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
+            conn.commit()
+
+
 def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.executescript("""
@@ -84,6 +128,7 @@ def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:
         );
     """)
     conn.commit()
+    migrate_db(conn)
     return conn
 
 
@@ -95,8 +140,10 @@ def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
 
 def add_timeline(conn: sqlite3.Connection, job_id: str, event: str) -> None:
     from datetime import datetime
+    row = conn.execute("SELECT user_id FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+    uid = row[0] if row else 1
     conn.execute(
-        "INSERT INTO application_timeline (job_id, event, created_at) VALUES (?, ?, ?)",
-        (job_id, event, datetime.now().isoformat()),
+        "INSERT INTO application_timeline (job_id, event, created_at, user_id) VALUES (?, ?, ?, ?)",
+        (job_id, event, datetime.now().isoformat(), uid),
     )
     conn.commit()

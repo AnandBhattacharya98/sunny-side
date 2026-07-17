@@ -124,15 +124,17 @@ def _local_score(title: str, company: str, description: str) -> dict:
     }
 
 
-def _ai_score(title: str, company: str, description: str) -> dict:
+def _ai_score(title: str, company: str, description: str, resume_text: str = None) -> dict:
     """Claude-powered scoring — used when API key is set."""
+    if not resume_text:
+        resume_text = RESUME_TEXT
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         prompt = f"""Score this PM job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
 CANDIDATE RESUME:
-{RESUME_TEXT}
+{resume_text}
 
 JOB: {title} at {company}
 DESCRIPTION: {description[:2000]}
@@ -172,12 +174,14 @@ def _call_gemini(prompt: str, response_json: bool = False) -> str:
     return res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
-def _gemini_score(title: str, company: str, description: str) -> dict:
+def _gemini_score(title: str, company: str, description: str, resume_text: str = None) -> dict:
+    if not resume_text:
+        resume_text = RESUME_TEXT
     try:
         prompt = f"""Score this PM job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
 CANDIDATE RESUME:
-{RESUME_TEXT}
+{resume_text}
 
 JOB: {title} at {company}
 DESCRIPTION: {description[:2000]}
@@ -196,11 +200,13 @@ Return exactly:
         return result
 
 
-def score_job(title: str, company: str, description: str) -> dict:
+def score_job(title: str, company: str, description: str, resume_text: str = None) -> dict:
+    if not resume_text:
+        resume_text = RESUME_TEXT
     if ANTHROPIC_API_KEY:
-        return _ai_score(title, company, description)
+        return _ai_score(title, company, description, resume_text)
     elif GEMINI_API_KEY:
-        return _gemini_score(title, company, description)
+        return _gemini_score(title, company, description, resume_text)
     return _local_score(title, company, description)
 
 
@@ -245,8 +251,10 @@ I'd love 20 minutes to learn more about the team and share how I've tackled simi
 
 
 def _ai_cover_letter(title: str, company: str, description: str,
-                      contact_name: str, contact_title: str) -> dict:
+                      contact_name: str, contact_title: str, resume_text: str = None) -> dict:
     """Claude-generated cover letter."""
+    if not resume_text:
+        resume_text = RESUME_TEXT
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -255,7 +263,7 @@ Start with impact — not "I am writing to express my interest". Be specific, co
 Reply ONLY with JSON, no markdown.
 
 CANDIDATE:
-{RESUME_TEXT}
+{resume_text}
 
 JOB: {title} at {company}
 CONTACT: {contact_name} ({contact_title})
@@ -277,14 +285,16 @@ Return exactly:
 
 
 def _gemini_cover_letter(title: str, company: str, description: str,
-                         contact_name: str, contact_title: str) -> dict:
+                         contact_name: str, contact_title: str, resume_text: str = None) -> dict:
+    if not resume_text:
+        resume_text = RESUME_TEXT
     try:
         prompt = f"""Write a cover letter for this PM job application. Under 300 words. 
 Start with impact — not "I am writing to express my interest". Be specific, confident, human.
 Reply ONLY with JSON, no markdown.
 
 CANDIDATE:
-{RESUME_TEXT}
+{resume_text}
 
 JOB: {title} at {company}
 CONTACT: {contact_name} ({contact_title})
@@ -302,11 +312,14 @@ Return exactly:
 
 def generate_cover_letter(title: str, company: str, description: str,
                            contact_name: str = "Hiring Team",
-                           contact_title: str = "Recruiter") -> dict:
+                           contact_title: str = "Recruiter",
+                           resume_text: str = None) -> dict:
+    if not resume_text:
+        resume_text = RESUME_TEXT
     if ANTHROPIC_API_KEY:
-        return _ai_cover_letter(title, company, description, contact_name, contact_title)
+        return _ai_cover_letter(title, company, description, contact_name, contact_title, resume_text)
     elif GEMINI_API_KEY:
-        return _gemini_cover_letter(title, company, description, contact_name, contact_title)
+        return _gemini_cover_letter(title, company, description, contact_name, contact_title, resume_text)
     return _local_cover_letter(title, company, description, contact_name, contact_title)
 
 
@@ -393,13 +406,15 @@ _The University of Texas at Dallas | Richardson, Texas | GPA: 3.49/4.00_
 _Dayananda Sagar College of Engineering | Bengaluru, India | 7.45/10.00_
 """
 
-def generate_tailored_resume(job_description: str, job_title: str, company: str) -> str:
+def generate_tailored_resume(job_description: str, job_title: str, company: str, resume_text: str = None) -> str:
     """Generate a tailored resume based on the candidate profile and job description."""
+    if not resume_text:
+        resume_text = FULL_RESUME_MARKDOWN
     prompt = f"""
 You are an expert resume writer. Given the candidate's base resume and the target job description (JD) at {company} for the role of {job_title}, generate a highly tailored professional resume in Markdown format.
 
 Base Resume:
-{FULL_RESUME_MARKDOWN}
+{resume_text}
 
 Target Job Description:
 {job_description}
@@ -420,16 +435,20 @@ Guidelines for tailoring:
     except Exception as e:
         print(f"[AI Resume] Gemini failed: {e}")
         
-    return FULL_RESUME_MARKDOWN
+    return resume_text
 
 
 # ── Process all new jobs ───────────────────────────────────────────────────
 
-def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0) -> list[dict]:
+def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: int = 1) -> list[dict]:
     """Score and generate cover letters for all 'new' jobs in the DB."""
     conn = get_conn(db_path)
+    row = conn.execute("SELECT resume_text FROM users WHERE id = ?", (user_id,)).fetchone()
+    resume_text = row[0] if row else None
+
     jobs = conn.execute(
-        "SELECT job_id, title, company, location, url, description FROM jobs WHERE status = 'new'"
+        "SELECT job_id, title, company, location, url, description FROM jobs WHERE status = 'new' AND user_id = ?",
+        (user_id,)
     ).fetchall()
 
     if ANTHROPIC_API_KEY:
@@ -445,7 +464,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0) -> list[dic
         job_id, title, company, location, url, description = tuple(job)
         print(f"  {title} @ {company}...", end=" ")
 
-        score_data = score_job(title, company, description or "")
+        score_data = score_job(title, company, description or "", resume_text=resume_text)
         score = score_data["score"]
 
         key_reqs_json = json.dumps(score_data.get("key_requirements", []))
@@ -467,7 +486,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0) -> list[dic
         contact_title = contact[1] if contact else "Recruiter"
 
         letter = generate_cover_letter(title, company, description or "",
-                                       contact_name, contact_title)
+                                       contact_name, contact_title, resume_text=resume_text)
         linkedin_note = generate_linkedin_note(contact_name, contact_title, company, title)
 
         conn.execute(
