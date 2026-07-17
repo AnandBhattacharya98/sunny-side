@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -8,8 +8,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root {
-  --bg: #FAF6EE;           /* Warm egg-shell cream */
-  --sur: #FFFFFF;          /* Pure egg white card surface */
+  --bg: #FFFFFF;           /* Pure white background */
+  --sur: #FDFDFD;          /* Clean white card surface */
   --bdr: rgba(42, 35, 21, 0.08); /* Soft chocolate border */
   --txt: #2A2315;          /* Deep warm charcoal/chocolate text */
   --mut: #706550;          /* Muted organic olive-brown */
@@ -55,7 +55,7 @@ nav {
   left: 0;
   right: 0;
   height: 72px;
-  background: rgba(250, 246, 238, 0.8);
+  background: rgba(255, 255, 255, 0.8);
   border-bottom: 1px solid var(--bdr);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -149,9 +149,9 @@ nav {
 .yolk-bg {
   position: absolute;
   border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%;
-  background: radial-gradient(circle at 30% 30%, #FFF2CC 0%, var(--pur) 70%, #FF5E00 100%);
-  filter: blur(40px);
-  opacity: 0.1;
+  background: radial-gradient(circle, rgba(255, 167, 0, 0.12) 0%, rgba(255, 126, 6, 0.04) 50%, transparent 100%);
+  filter: blur(20px);
+  opacity: 0.6;
   z-index: -1;
   animation: drift 20s infinite ease-in-out alternate;
 }
@@ -416,7 +416,7 @@ footer {
 <header class="hero">
   <div class="container">
     <h1>Land your next Role.<br><span class="handwritten">On autopilot.</span></h1>
-    <p>Automate job ingestion from your email, score application fit using Gemini, autogenerate cover letters, and track progress on a premium dashboard.</p>
+    <p>Automate job ingestion from your email, score application fit using AI, autogenerate cover letters, and track progress on a premium dashboard.</p>
     <div style="display:flex; justify-content:center; gap:16px;">
       <a class="btn btn-p" style="padding:14px 32px; font-size:14px;" href="/signup">Get Started Now</a>
       <a class="btn" style="padding:14px 32px; font-size:14px;" href="/login">Sign In</a>
@@ -442,7 +442,7 @@ footer {
         <div class="feature-icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pur)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
         </div>
-        <h3>Gemini-Powered Scoring</h3>
+        <h3>AI-Powered Match Grading</h3>
         <p>Grades job fits from 1 to 10 against your resume. Highlight key requirements instantly and see where you match or fall short.</p>
       </div>
       <div class="feature-card">
@@ -509,7 +509,7 @@ footer {
         </div>
       </div>
       <div class="testimonial-card">
-        <p class="testimonial-quote">"The Gemini fit scoring matches my resume against job descriptions perfectly. I only focus my outreach efforts on jobs with scores above 8.0, saving me endless hours."</p>
+        <p class="testimonial-quote">"The match scoring engine compares my resume against job descriptions perfectly. I only focus my outreach efforts on jobs with scores above 8.0, saving me endless hours."</p>
         <div class="testimonial-author">
           <div class="seeker-avatar">M</div>
           <div class="author-info">

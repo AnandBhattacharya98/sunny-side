@@ -76,7 +76,8 @@ YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
 
 # ── Scoring ────────────────────────────────────────────────────────────────
 
-def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None) -> dict:
+def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None,
+                 w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5) -> dict:
     """Rule-based fallback scoring — no API needed."""
     text = f"{title} {description}".lower()
     score = 5.0
@@ -96,19 +97,21 @@ def _local_score(title: str, company: str, description: str, liked_titles: list 
         elif req_yrs <= PROFILE["years_exp"] + 1:
             score += 0.5
 
-    # Title word overlap adjustments based on liked/disliked jobs
+    # Title word overlap adjustments based on liked/disliked jobs and user weights
     score_adj = 0.0
     title_words = set(re.findall(r"\w+", title.lower()))
     if liked_titles:
         for t in liked_titles:
             overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
             if overlap > 1:
-                score_adj += 0.5 * (overlap - 1)
+                weight = 0.5 * (w_up + w_app)
+                score_adj += 0.5 * (overlap - 1) * weight
     if disliked_titles:
         for t in disliked_titles:
             overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
             if overlap > 1:
-                score_adj -= 0.5 * (overlap - 1)
+                weight = 0.5 * (w_down + w_rej)
+                score_adj += 0.5 * (overlap - 1) * weight
     score += score_adj
 
     score = max(1.0, min(10.0, score))
@@ -193,7 +196,8 @@ def _call_gemini(prompt: str, response_json: bool = False, api_key: str = None) 
 
 
 def _gemini_score(title: str, company: str, description: str, resume_text: str = None, api_key: str = None,
-                  liked_titles: list = None, disliked_titles: list = None) -> dict:
+                  liked_titles: list = None, disliked_titles: list = None,
+                  w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
@@ -203,9 +207,9 @@ CANDIDATE RESUME:
 {resume_text}
 """
         if liked_titles:
-            prompt += f"\nUSER PREFERENCES (Roles the user liked or actively applied to):\n" + "\n".join(f"- {t}" for t in liked_titles[:10])
+            prompt += f"\nUSER PREFERENCES (Roles the user liked or actively applied to; weight thumbs up = {w_up}, weight active stages = {w_app}):\n" + "\n".join(f"- {t}" for t in liked_titles[:10])
         if disliked_titles:
-            prompt += f"\nUSER PREFERENCES (Roles the user disliked or rejected):\n" + "\n".join(f"- {t}" for t in disliked_titles[:10])
+            prompt += f"\nUSER PREFERENCES (Roles the user disliked or rejected; weight thumbs down = {w_down}, weight rejected = {w_rej}):\n" + "\n".join(f"- {t}" for t in disliked_titles[:10])
 
         prompt += f"""\nJOB: {title} at {company}
 DESCRIPTION: {description[:2000]}
@@ -219,7 +223,8 @@ Return exactly:
         return data
     except Exception as e:
         print(f"  [Gemini score fallback] {e}")
-        result = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles)
+        result = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
+                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
         result["fit_summary"] += " (scored locally — Gemini API error)"
         return result
 
@@ -230,8 +235,16 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
 
     liked_titles = []
     disliked_titles = []
+    w_up, w_app, w_down, w_rej = 1.0, 1.0, -1.0, -1.5
     try:
         conn = get_conn(DB_PATH)
+        row = conn.execute("SELECT weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row:
+            w_up = row[0] if row[0] is not None else 1.0
+            w_app = row[1] if row[1] is not None else 1.0
+            w_down = row[2] if row[2] is not None else -1.0
+            w_rej = row[3] if row[3] is not None else -1.5
+
         liked = conn.execute(
             "SELECT DISTINCT title FROM jobs WHERE user_id = ? AND (feedback = 1 OR status IN ('applied', 'shortlisted', 'interviewing', 'offer'))",
             (user_id,)
@@ -253,8 +266,10 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
     key_to_use = api_key or GEMINI_API_KEY
     if key_to_use:
         return _gemini_score(title, company, description, resume_text, api_key=key_to_use,
-                             liked_titles=liked_titles, disliked_titles=disliked_titles)
-    return _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles)
+                             liked_titles=liked_titles, disliked_titles=disliked_titles,
+                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
+    return _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
+                        w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
 
 
 # ── Cover letter ───────────────────────────────────────────────────────────

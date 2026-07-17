@@ -17,7 +17,7 @@ def get_user_id() -> int:
     return session.get("user_id", 1)
 
 def get_user_settings(conn, user_id):
-    row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected FROM users WHERE id = ?", (user_id,)).fetchone()
     if row:
         return dict(row)
     return {}
@@ -60,8 +60,10 @@ def signup():
         
         # Check for uploaded resume file
         resume_text = ""
+        resume_filename = ""
         file = request.files.get("resume_file")
         if file and file.filename:
+            resume_filename = file.filename
             filename = file.filename.lower()
             if filename.endswith(".txt"):
                 try:
@@ -85,9 +87,9 @@ def signup():
             uid = signup_user(conn, username, password)
             conn.execute(
                 """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
-                   name = ?, designation = ?, share_profile = ?
+                   name = ?, designation = ?, share_profile = ?, resume_filename = ?
                    WHERE id = ?""",
-                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, uid)
+                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, uid)
             )
             conn.commit()
             
@@ -102,6 +104,7 @@ def signup():
             session.permanent = True
             session["user_id"] = uid
             session["username"] = username
+            session["is_new_user"] = True
             conn.close()
             return redirect(url_for("index"))
         except Exception as e:
@@ -121,10 +124,12 @@ def update_profile():
     conn = get_conn(DB_PATH)
     conn.execute(
         """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
-           name = ?, designation = ?, share_profile = ?
+           name = ?, designation = ?, share_profile = ?, resume_filename = ?,
+           weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?
            WHERE id = ?""",
         (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), d.get("linkedin_profile", ""),
-         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), uid)
+         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""),
+         float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)), uid)
     )
     conn.commit()
     conn.close()
@@ -184,10 +189,16 @@ def upload_profile_resume():
         return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF or TXT."}), 400
         
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE users SET resume_text = ? WHERE id = ?", (resume_text, uid))
+    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ? WHERE id = ?", (resume_text, file.filename, uid))
     conn.commit()
     conn.close()
-    return jsonify({"ok": True, "resume_text": resume_text})
+    return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": file.filename})
+
+
+@app.route("/api/onboard_skip", methods=["POST"])
+def onboard_skip():
+    session["skip_onboarding"] = True
+    return jsonify({"ok": True})
 
 
 @app.route("/api/onboard_resume", methods=["POST"])
@@ -196,7 +207,9 @@ def onboard_resume():
     file = request.files.get("resume_file")
     
     resume_text = ""
+    resume_filename = "Pasted_Resume.txt"
     if file and file.filename:
+        resume_filename = file.filename
         filename = file.filename.lower()
         if filename.endswith(".txt"):
             resume_text = file.read().decode("utf-8", errors="ignore")
@@ -223,7 +236,7 @@ def onboard_resume():
         return jsonify({"ok": False, "error": "Resume text is empty"}), 400
 
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE users SET resume_text = ? WHERE id = ?", (resume_text, uid))
+    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ? WHERE id = ?", (resume_text, resume_filename, uid))
     conn.commit()
     
     # Load demo jobs if no jobs exist for user
@@ -319,7 +332,7 @@ def index():
         
     # Get user settings to pass to frontend profile form
     settings = get_user_settings(conn, uid)
-    needs_onboarding = not settings.get("resume_text")
+    needs_onboarding = not settings.get("resume_text") and not session.get("skip_onboarding")
     if needs_onboarding:
         stats = _stats(conn)
         conn.close()
@@ -359,9 +372,13 @@ def index():
         "SELECT DISTINCT company FROM jobs WHERE user_id = ? ORDER BY company", (uid,)).fetchall()]
     conn.close()
     
+    is_new_user = session.get("is_new_user", False)
+    if is_new_user:
+        session.pop("is_new_user", None)
+        
     cols = ["whatsapp", "new", "shortlisted", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
-                           companies=companies, settings=settings, view_mode="board")
+                           companies=companies, settings=settings, view_mode="board", is_new_user=is_new_user)
 
 
 @app.route("/emails")
