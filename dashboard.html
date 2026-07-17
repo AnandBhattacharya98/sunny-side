@@ -8,48 +8,60 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#fbfbfb;--sur:rgba(255,255,255,0.85);--bdr:#e4e4e7;--txt:#09090b;--mut:#71717a;--hin:#a1a1aa;
-  --pur:#6366f1;--purl:rgba(99, 102, 241, 0.1);--purt:#4f46e5;
+  --bg:#f9fafb;
+  --sur:rgba(255,255,255,0.85);
+  --bdr:#e5e7eb;
+  --txt:#0f172a;
+  --mut:#475569;
+  --hin:#94a3b8;
+  --pur:#2563eb;         /* Sleek Uizard Blue */
+  --purl:rgba(37, 99, 235, 0.08);
+  --purt:#1d4ed8;
   --tl:#0f766e;--tll:rgba(15, 118, 110, 0.08);
   --am:#b45309;--aml:rgba(180, 83, 9, 0.08);
   --rd:#be123c;--rdl:rgba(190, 18, 60, 0.08);
   --gn:#15803d;--gnl:rgba(21, 128, 61, 0.08);
-  --r:14px;
+  --glow-1: rgba(37, 99, 235, 0.03);
+  --glow-2: rgba(99, 102, 241, 0.02);
+  --r:12px;
 }
 [data-theme="dark"] {
-  --bg:#09090b;
-  --sur:rgba(20,20,23,0.75);
-  --bdr:#27272a;
-  --txt:#fafafa;
-  --mut:#a1a1aa;
-  --hin:#52525b;
-  --pur:#818cf8;
-  --purl:rgba(129, 140, 248, 0.15);
-  --purt:#6366f1;
+  --bg:#060511;           /* Deep dark violet-black */
+  --sur:rgba(15, 14, 30, 0.75); /* Translucent Uizard card background */
+  --bdr:rgba(255, 255, 255, 0.08);
+  --txt:#f8fafc;
+  --mut:#94a3b8;
+  --hin:#475569;
+  --pur:#7c3aed;         /* Modern Violet primary */
+  --purl:rgba(124, 58, 237, 0.15);
+  --purt:#a78bfa;
   --tll:rgba(45, 212, 191, 0.12);
   --aml:rgba(251, 191, 36, 0.12);
   --rdl:rgba(248, 113, 113, 0.12);
   --gnl:rgba(74, 222, 128, 0.12);
+  --glow-1: rgba(124, 58, 237, 0.07);
+  --glow-2: rgba(59, 130, 246, 0.05);
 }
 body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-     background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden;
-     background-image: radial-gradient(var(--bdr) 1px, transparent 1px);
-     background-size: 24px 24px;}
+     background:radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 40%),
+                var(--bg);
+     color:var(--txt);font-size:14px;line-height:1.6;overflow:hidden;}
 
 /* Layout */
 .app{display:grid;grid-template-columns:240px 1fr;height:100vh}
 .sidebar{background:var(--sur);border-right:1px solid var(--bdr);padding:0;
-          height:100vh;overflow-y:auto;display:flex;flex-direction:column;backdrop-filter:blur(16px)}
+          height:100vh;overflow-y:auto;display:flex;flex-direction:column;backdrop-filter:blur(20px)}
 .main{padding:24px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
 /* Sidebar */
-.logo{padding:20px 20px;font-size:15px;font-weight:700;color:var(--txt);
+.logo{padding:20px 20px;font-size:16px;font-weight:700;color:var(--txt);
       border-bottom:1px solid var(--bdr);letter-spacing:-.02em;font-family:'Space Grotesk',sans-serif;
-      background: linear-gradient(135deg, var(--txt), var(--pur)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
+      background: linear-gradient(135deg, #3b82f6, var(--pur)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
 .ns{padding:16px 20px 6px;font-size:10px;font-weight:700;color:var(--hin);
     letter-spacing:.08em;text-transform:uppercase}
 .nl{display:flex;align-items:center;gap:8px;padding:10px 20px;color:var(--mut);
-    text-decoration:none;font-size:13px;transition:all .15s;font-weight:500}
+    text-decoration:none;font-size:13px;transition:all .15s;font-weight:500;border-radius:6px;margin:2px 8px;}
 .nl:hover, .nl.on{background:var(--purl);color:var(--pur)}
 .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--bdr);
                 font-size:11px;color:var(--hin);line-height:1.8}
@@ -58,22 +70,22 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .board-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .board-title{font-size:22px;font-weight:700;color:var(--txt);font-family:'Space Grotesk',sans-serif;letter-spacing:-0.02em;}
 .board{display:flex;gap:16px;flex:1;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-.col{background:rgba(20,20,20,0.01);border:1px solid var(--bdr);border-radius:var(--r);
+.col{background:rgba(255,255,255,0.015);border:1px solid var(--bdr);border-radius:var(--r);
      width:290px;flex-shrink:0;max-height:100%;display:flex;flex-direction:column;padding:14px;
-     backdrop-filter:blur(8px);transition:background 0.2s;}
-[data-theme="dark"] .col{background:rgba(255,255,255,0.01)}
+     backdrop-filter:blur(10px);transition:background 0.2s;}
+[data-theme="dark"] .col{background:rgba(15, 14, 30, 0.35);border-color:rgba(255,255,255,0.04);}
 .col.over{background:var(--purl);border-color:var(--pur)}
 .col-hd{display:flex;justify-content:space-between;align-items:center;font-size:11px;
          font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:14px}
-.col-ct{background:rgba(99, 102, 241, 0.1);color:var(--pur);font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+.col-ct{background:var(--purl);color:var(--pur);font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
 .col-cards{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:150px}
 
 /* Cards */
-.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;
+.jcard{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;
        padding:14px;cursor:grab;transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);user-select:none;position:relative;
-       box-shadow: 0 1px 3px 0 rgba(0,0,0,0.02);backdrop-filter:blur(12px);}
+       box-shadow: 0 4px 20px -2px rgba(0,0,0,0.03);backdrop-filter:blur(20px);}
 .jcard:hover{transform: translateY(-2px); border-color:var(--pur);
-             box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.12), 0 0 12px -3px rgba(99, 102, 241, 0.08);}
+             box-shadow: 0 8px 30px -6px var(--purl), 0 0 16px -3px var(--purl);}
 .jcard:hover .delete-card-btn{opacity:1 !important}
 .jcard:active{cursor:grabbing}
 .jcard.dragging{opacity:.4;box-shadow:0 8px 20px rgba(0,0,0,.15)}
@@ -89,10 +101,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             border-radius:8px;font-size:11px;margin-top:auto}
 
 /* Toolbar & Buttons */
-.btn{padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;
+.btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
      border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .15s;white-space:nowrap;
      font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
-.btn:hover{border-color:var(--pur);color:var(--pur);box-shadow:0 4px 12px rgba(99,102,241,0.1)}
+.btn:hover{border-color:var(--pur);color:var(--pur);box-shadow:0 4px 12px var(--purl)}
 .btn:disabled{opacity:0.6;cursor:not-allowed}
 .btn-p{background:var(--pur);color:#fff;border-color:var(--pur)}
 .btn-p:hover{background:var(--purt);color:#fff;border-color:var(--purt)}
@@ -167,17 +179,17 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <body>
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#fafafa; width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
-  <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:32px; width:100%; max-width:420px; box-shadow:0 1px 3px rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:20px;">
+<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 50%), #060511; width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
+  <div style="background:rgba(15, 14, 30, 0.75); border:1px solid rgba(255, 255, 255, 0.08); border-radius:12px; padding:32px; width:100%; max-width:420px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display:flex; flex-direction:column; gap:20px;">
     <div style="text-align:center;">
-      <h2 style="font-size:24px; font-weight:600; color:#1a1a1a; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Inter', sans-serif;">PM Job Hunter</h2>
-      <p style="font-size:13px; color:#6b7280;">
+      <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">PM Job Hunter</h2>
+      <p style="font-size:13px; color:#94a3b8;">
         {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
       </p>
     </div>
     
     {% if error %}
-    <div style="background:#fef2f2; color:#b91c1c; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid #fee2e2;">
+    <div style="background:rgba(248, 113, 113, 0.12); color:#f87171; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid rgba(248, 113, 113, 0.2);">
       ⚠️ {{ error }}
     </div>
     {% endif %}
@@ -186,79 +198,79 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <!-- Username -->
       <div style="display:flex; flex-direction:column; gap:6px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="font-size:13px; font-weight:500; color:#1a1a1a;">Username</label>
+          <label style="font-size:13px; font-weight:500; color:#f8fafc;">Username</label>
           {% if view_mode == 'signup' %}
-          <span style="font-size:11px; color:#6b7280; font-weight: 500;">Step 1 of 2</span>
+          <span style="font-size:11px; color:#94a3b8; font-weight: 500;">Step 1 of 2</span>
           {% endif %}
         </div>
-        <input type="text" name="username" required style="padding:10px 12px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="Enter username">
+        <input type="text" name="username" required style="padding:10px 12px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="Enter username">
       </div>
       
       <!-- Password -->
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <label style="font-size:13px; font-weight:500; color:#1a1a1a;">Password</label>
+        <label style="font-size:13px; font-weight:500; color:#f8fafc;">Password</label>
         <div style="position:relative; display:flex; align-items:center;">
-          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="••••••••">
+          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="••••••••">
           <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-            <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+            <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
           </button>
         </div>
       </div>
 
       <!-- Collapsible Profile Setup Accordion (Sign Up view only) -->
       {% if view_mode == 'signup' %}
-      <div style="border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: #ffffff; margin-top: 4px;">
-        <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" style="width: 100%; padding: 12px 14px; background: #ffffff; border: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #1a1a1a; outline: none;" id="accordion-toggle-btn">
+      <div style="border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; overflow: hidden; background: rgba(15, 14, 30, 0.5); margin-top: 4px;">
+        <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" style="width: 100%; padding: 12px 14px; background: transparent; border: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #f8fafc; outline: none;" id="accordion-toggle-btn">
           <span style="display:flex; align-items:center; gap:6px;">
             ⚙️ Profile Setup (Optional)
           </span>
-          <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: #6b7280;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: #94a3b8;"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         
-        <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #ffffff; padding: 0 14px;">
-          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #e5e7eb;">
+        <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: transparent; padding: 0 14px;">
+          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
             
             <!-- Resume File Upload / Drag & Drop -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
-              <div id="resume-dropzone" style="border: 1.5px dashed #e5e7eb; border-radius: 6px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;" onclick="document.getElementById('signup-resume-file').click()"
-                   ondragover="event.preventDefault(); this.style.borderColor='#2563eb'; this.style.background='#eff6ff';"
-                   ondragleave="event.preventDefault(); this.style.borderColor='#e5e7eb'; this.style.background='#fafafa';"
-                   ondrop="event.preventDefault(); this.style.borderColor='#e5e7eb'; this.style.background='#fafafa'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #9ca3af;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span style="font-size: 12px; font-weight: 500; color: #374151;" id="dropzone-text">Click or drag & drop to upload</span>
-                <span style="font-size: 11px; color: #6b7280;">Supports PDF, TXT</span>
+              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
+              <div id="resume-dropzone" style="border: 1.5px dashed rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0f0e1c; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;" onclick="document.getElementById('signup-resume-file').click()"
+                   ondragover="event.preventDefault(); this.style.borderColor='#8b5cf6'; this.style.background='rgba(139, 92, 246, 0.08)';"
+                   ondragleave="event.preventDefault(); this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.background='#0f0e1c';"
+                   ondrop="event.preventDefault(); this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.background='#0f0e1c'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span style="font-size: 12px; font-weight: 500; color: #f8fafc;" id="dropzone-text">Click or drag & drop to upload</span>
+                <span style="font-size: 11px; color: #94a3b8;">Supports PDF, TXT</span>
                 <input type="file" id="signup-resume-file" name="resume_file" accept=".pdf,.txt" style="display: none;" onchange="handleFileChange(this)">
               </div>
             </div>
             
             <!-- Paste Resume Text -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Or Paste Resume Text</label>
-              <textarea name="resume_text" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; resize:vertical; min-height:80px; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="Paste resume text details..."></textarea>
+              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Or Paste Resume Text</label>
+              <textarea name="resume_text" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; resize:vertical; min-height:80px; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="Paste resume text details..."></textarea>
             </div>
 
             <!-- LinkedIn Profile URL -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">LinkedIn Profile URL</label>
-              <input type="text" name="linkedin_profile" style="padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="https://linkedin.com/in/username">
+              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">LinkedIn Profile URL</label>
+              <input type="text" name="linkedin_profile" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="https://linkedin.com/in/username">
             </div>
 
             <!-- Email IMAP Settings -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">IMAP Email</label>
-                <input type="email" name="imap_email" style="padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="name@gmail.com">
-                <span style="font-size:10px; color:#9ca3af; line-height:1.2;">Used to auto-scan job emails.</span>
+                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">IMAP Email</label>
+                <input type="email" name="imap_email" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="name@gmail.com">
+                <span style="font-size:10px; color:#94a3b8; line-height:1.2;">Used to auto-scan job emails.</span>
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">IMAP App PW</label>
+                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">IMAP App PW</label>
                 <div style="position:relative; display:flex; align-items:center;">
-                  <input type="password" id="signup-imap-pw" name="imap_password" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="•••• •••• •••• ••••">
+                  <input type="password" id="signup-imap-pw" name="imap_password" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="•••• •••• •••• ••••">
                   <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-                    <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                    <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
                   </button>
                 </div>
               </div>
@@ -266,17 +278,17 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
             <!-- Gemini API Key -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Gemini API Key</label>
+              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Gemini API Key</label>
               <div style="position:relative; display:flex; align-items:center;">
-                <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="AIzaSy...">
+                <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="AIzaSy...">
                 <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-                  <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                  <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
                 </button>
               </div>
             </div>
             
-            <div style="font-size:11px; color:#9ca3af; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
+            <div style="font-size:11px; color:#94a3b8; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
               <span>🔒</span> Stored securely, never shared
             </div>
           </div>
@@ -284,16 +296,16 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       </div>
       {% endif %}
 
-      <button type="submit" style="padding:12px; font-size:13px; font-weight:600; border-radius:6px; border:none; background:#2563eb; color:#ffffff; cursor:pointer; margin-top:8px; width:100%; transition: background-color 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+      <button type="submit" style="padding:12px; font-size:13px; font-weight:600; border-radius:6px; border:none; background: linear-gradient(135deg, #1d82f5, #7c3aed); color:#ffffff; cursor:pointer; margin-top:8px; width:100%; transition: opacity 0.15s; font-family:'Space Grotesk', sans-serif;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
         {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
       </button>
     </form>
     
-    <div style="text-align:center; font-size:13px; color:#6b7280; margin-top:4px;">
+    <div style="text-align:center; font-size:13px; color:#94a3b8; margin-top:4px;">
       {% if view_mode == 'login' %}
-      Don't have an account? <a href="/signup" style="color:#2563eb; text-decoration:none; font-weight:600;">Sign Up</a>
+      Don't have an account? <a href="/signup" style="color:#a78bfa; text-decoration:none; font-weight:600;">Sign Up</a>
       {% else %}
-      Already have an account? <a href="/login" style="color:#2563eb; text-decoration:none; font-weight:600;">Log In</a>
+      Already have an account? <a href="/login" style="color:#a78bfa; text-decoration:none; font-weight:600;">Log In</a>
       {% endif %}
     </div>
   </div>
