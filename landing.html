@@ -4,22 +4,36 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Job Hunter Board — Land Your Next Role on Autopilot</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root {
-  --bg: #060511;           /* Deep dark violet-black */
-  --sur: rgba(15, 14, 30, 0.75); /* Translucent card background */
-  --bdr: rgba(255, 255, 255, 0.08);
-  --txt: #f8fafc;
-  --mut: #94a3b8;
-  --hin: #475569;
-  --pur: #7c3aed;         /* Modern Violet primary */
-  --purl: rgba(124, 58, 237, 0.15);
-  --purt: #a78bfa;
-  --glow-1: rgba(124, 58, 237, 0.08);
-  --glow-2: rgba(59, 130, 246, 0.06);
+  --bg: #FAF6EE;           /* Warm egg-shell cream */
+  --sur: #FFFFFF;          /* Pure egg white card surface */
+  --bdr: rgba(42, 35, 21, 0.08); /* Soft chocolate border */
+  --txt: #2A2315;          /* Deep warm charcoal/chocolate text */
+  --mut: #706550;          /* Muted organic olive-brown */
+  --hin: #A59A84;          /* Soft gray-sand */
+  --pur: #FFA700;          /* Yolk yellow accent */
+  --purl: rgba(255, 167, 0, 0.08);
+  --purt: #E08500;
+  --glow-1: rgba(255, 167, 0, 0.04);
+  --glow-2: rgba(255, 126, 6, 0.03);
 }
+[data-theme="dark"] {
+  --bg: #12100E;           /* Deep dark roasted coffee background */
+  --sur: rgba(30, 27, 23, 0.7); /* Translucent warm dark card */
+  --bdr: rgba(255, 255, 255, 0.05);
+  --txt: #FAF6EE;          /* Warm cream text */
+  --mut: #A59A84;          /* Warm sand */
+  --hin: #5C5446;
+  --pur: #FFA700;          /* Glowing yolk yellow */
+  --purl: rgba(255, 167, 0, 0.15);
+  --purt: #FFC04D;
+  --glow-1: rgba(255, 167, 0, 0.08);
+  --glow-2: rgba(255, 126, 6, 0.05);
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%),
@@ -29,6 +43,9 @@ body {
   font-size: 14px;
   line-height: 1.6;
   overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Nav */
@@ -37,8 +54,8 @@ nav {
   top: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: rgba(6, 5, 17, 0.7);
+  height: 72px;
+  background: rgba(250, 246, 238, 0.8);
   border-bottom: 1px solid var(--bdr);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -47,26 +64,45 @@ nav {
   align-items: center;
   padding: 0 40px;
   z-index: 1000;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+[data-theme="dark"] nav {
+  background: rgba(18, 16, 14, 0.8);
 }
 .logo {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-family: 'Space Grotesk', sans-serif;
-  background: linear-gradient(135deg, #3b82f6, var(--pur));
+  background: linear-gradient(135deg, var(--pur), #FF5E00);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.2s;
+}
+.logo:hover {
+  transform: scale(1.03);
+}
+.logo-yolk {
+  width: 14px;
+  height: 14px;
+  background: #FFA700;
+  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%;
+  display: inline-block;
+  box-shadow: 0 2px 6px rgba(255, 167, 0, 0.4);
 }
 .nav-links {
   display: flex;
-  gap: 24px;
+  gap: 28px;
 }
 .nav-links a {
   color: var(--mut);
   text-decoration: none;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   transition: color 0.15s;
 }
 .nav-links a:hover {
@@ -78,35 +114,56 @@ nav {
   align-items: center;
 }
 .btn {
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border-radius: 20px; /* B-Egg organic rounded pill */
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   border: 1px solid var(--bdr);
   background: var(--sur);
   color: var(--txt);
-  transition: all .15s;
+  transition: all .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   text-decoration: none;
   font-family: 'Space Grotesk', sans-serif;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
 }
 .btn:hover {
+  transform: translateY(-2px);
   border-color: var(--pur);
-  box-shadow: 0 4px 12px var(--purl);
+  box-shadow: 0 6px 16px rgba(255, 167, 0, 0.12);
 }
 .btn-p {
-  background: linear-gradient(135deg, #1d82f5, var(--pur));
+  background: linear-gradient(135deg, var(--pur), #FF7E06);
   color: #fff;
   border: none;
+  box-shadow: 0 4px 12px rgba(255, 167, 0, 0.2);
 }
 .btn-p:hover {
-  opacity: 0.9;
+  box-shadow: 0 6px 20px rgba(255, 167, 0, 0.35);
 }
 
-/* Sections */
+/* Yolk Animation Backgrounds */
+.yolk-bg {
+  position: absolute;
+  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%;
+  background: radial-gradient(circle at 30% 30%, #FFF2CC 0%, var(--pur) 70%, #FF5E00 100%);
+  filter: blur(40px);
+  opacity: 0.1;
+  z-index: -1;
+  animation: drift 20s infinite ease-in-out alternate;
+}
+.yolk-1 { width: 320px; height: 320px; top: 12%; left: -60px; animation-duration: 22s; }
+.yolk-2 { width: 440px; height: 420px; top: 45%; right: -120px; animation-duration: 32s; }
+.yolk-3 { width: 280px; height: 290px; top: 85%; left: 15%; animation-duration: 20s; }
+@keyframes drift {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; }
+  50% { transform: translate(50px, 80px) rotate(90deg) scale(1.15); border-radius: 40% 60% 50% 60% / 60% 40% 60% 40%; }
+  100% { transform: translate(-30px, 40px) rotate(180deg) scale(0.9); border-radius: 60% 50% 40% 50% / 45% 55% 45% 55%; }
+}
+
 .container {
   max-width: 1100px;
   margin: 0 auto;
@@ -115,76 +172,94 @@ nav {
 
 /* Hero Section */
 .hero {
-  padding: 160px 0 80px;
+  padding: 180px 0 100px;
   text-align: center;
   position: relative;
 }
 .hero h1 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 48px;
+  font-size: 54px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: -0.03em;
   margin-bottom: 24px;
-  max-width: 800px;
+  max-width: 850px;
   margin-left: auto;
   margin-right: auto;
-  background: linear-gradient(135deg, #ffffff 40%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--txt);
 }
 .hero p {
-  font-size: 16px;
+  font-size: 17px;
   color: var(--mut);
-  max-width: 600px;
-  margin: 0 auto 32px;
+  max-width: 620px;
+  margin: 0 auto 36px;
+}
+.handwritten {
+  font-family: 'Caveat', cursive;
+  color: #FF5E00;
+  font-size: 1.15em;
+  font-weight: normal;
+  display: inline-block;
+  transform: rotate(-3deg);
+  margin-left: 8px;
 }
 
 /* Feature Grid */
 .features {
-  padding: 80px 0;
+  padding: 90px 0;
+  position: relative;
 }
 .section-header {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 56px;
 }
 .section-header h2 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 12px;
 }
 .section-header p {
   color: var(--mut);
-  font-size: 15px;
+  font-size: 16px;
 }
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: 24px;
 }
 .feature-card {
   background: var(--sur);
   border: 1px solid var(--bdr);
-  border-radius: 12px;
-  padding: 24px;
-  transition: transform 0.25s, border-color 0.25s;
+  border-radius: 24px; /* Organic round edges */
+  padding: 32px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 8px 30px rgba(42, 35, 21, 0.02);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .feature-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-5px) scale(1.02);
   border-color: var(--pur);
+  box-shadow: 0 12px 32px rgba(255, 167, 0, 0.1);
 }
-.feature-icon {
+.feature-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  background: var(--purl);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 24px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .feature-card h3 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 10px;
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 .feature-card p {
   color: var(--mut);
@@ -193,43 +268,52 @@ nav {
 
 /* Seeker Wall */
 .seekers-section {
-  padding: 80px 0;
+  padding: 90px 0;
   border-top: 1px solid var(--bdr);
 }
 .seekers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
 }
 .seeker-card {
   background: var(--sur);
   border: 1px solid var(--bdr);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 24px;
   text-align: center;
   backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.01);
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.seeker-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--pur);
+  box-shadow: 0 8px 24px rgba(255, 167, 0, 0.08);
 }
 .seeker-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1d82f5, var(--pur));
+  width: 54px;
+  height: 54px;
+  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; /* yolk shape */
+  background: linear-gradient(135deg, var(--pur), #FF7E06);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   color: #fff;
-  font-size: 16px;
+  font-size: 18px;
   font-family: 'Space Grotesk', sans-serif;
+  box-shadow: 0 3px 10px rgba(255, 167, 0, 0.3);
 }
 .seeker-name {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--txt);
+  margin-bottom: 2px;
 }
 .seeker-title {
   font-size: 12.5px;
@@ -239,48 +323,57 @@ nav {
 .seeker-link {
   color: var(--pur);
   text-decoration: none;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 4px;
+  transition: color 0.15s;
 }
 .seeker-link:hover {
-  text-decoration: underline;
   color: var(--purt);
+  text-decoration: underline;
 }
 
 /* Testimonials */
 .testimonials {
-  padding: 80px 0;
+  padding: 90px 0;
   border-top: 1px solid var(--bdr);
 }
 .testimonial-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  gap: 28px;
 }
 .testimonial-card {
   background: var(--sur);
   border: 1px solid var(--bdr);
-  border-radius: 12px;
-  padding: 28px;
+  border-radius: 24px;
+  padding: 36px;
   backdrop-filter: blur(12px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.01);
+  position: relative;
+  transition: transform 0.25s;
+}
+.testimonial-card:hover {
+  transform: scale(1.01);
 }
 .testimonial-quote {
-  font-size: 14.5px;
-  line-height: 1.6;
-  margin-bottom: 20px;
+  font-size: 15px;
+  line-height: 1.7;
+  margin-bottom: 24px;
   font-style: italic;
+  color: var(--txt);
 }
 .testimonial-author {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .author-info h4 {
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--txt);
 }
 .author-info p {
   font-size: 12px;
@@ -289,18 +382,26 @@ nav {
 
 /* Footer */
 footer {
-  padding: 40px 0;
+  padding: 48px 0;
   border-top: 1px solid var(--bdr);
   text-align: center;
-  font-size: 12px;
-  color: var(--hin);
+  font-size: 12.5px;
+  color: var(--mut);
 }
 </style>
 </head>
 <body>
 
+<!-- Floating Yolk Background Shapes -->
+<div class="yolk-bg yolk-1"></div>
+<div class="yolk-bg yolk-2"></div>
+<div class="yolk-bg yolk-3"></div>
+
 <nav>
-  <a class="logo" href="/">Job Hunter Board</a>
+  <a class="logo" href="/">
+    <span class="logo-yolk"></span>
+    Job Hunter Board
+  </a>
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#seekers">Seekers Wall</a>
@@ -314,11 +415,11 @@ footer {
 
 <header class="hero">
   <div class="container">
-    <h1>Land your next Role.<br>On autopilot.</h1>
+    <h1>Land your next Role.<br><span class="handwritten">On autopilot.</span></h1>
     <p>Automate job ingestion from your email, score application fit using Gemini, autogenerate cover letters, and track progress on a premium dashboard.</p>
     <div style="display:flex; justify-content:center; gap:16px;">
-      <a class="btn btn-p" style="padding:12px 28px; font-size:14px;" href="/signup">Get Started Now</a>
-      <a class="btn" style="padding:12px 28px; font-size:14px;" href="/login">Sign In</a>
+      <a class="btn btn-p" style="padding:14px 32px; font-size:14px;" href="/signup">Get Started Now</a>
+      <a class="btn" style="padding:14px 32px; font-size:14px;" href="/login">Sign In</a>
     </div>
   </div>
 </header>
@@ -327,21 +428,21 @@ footer {
   <div class="container">
     <div class="section-header">
       <h2>Automated Workflow for Seekers</h2>
-      <p>Stop wasting hours tracking, copy-pasting, and writing emails. Let AI do the heavy lifting.</p>
+      <p>Stop wasting hours tracking. <span class="handwritten" style="font-size:1.3em; color:#FF7E06;">Let AI do the hatching!</span></p>
     </div>
     <div class="feature-grid">
       <div class="feature-card">
-        <div class="feature-icon">✉️</div>
+        <div class="feature-icon-wrapper">✉️</div>
         <h3>Auto Email Scraping</h3>
         <p>Connects securely to your inbox. Automatically extracts jobs you've applied to and auto-syncs confirmation updates directly to your board.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">🤖</div>
+        <div class="feature-icon-wrapper">🤖</div>
         <h3>Gemini-Powered Scoring</h3>
         <p>Grades job fits from 1 to 10 against your resume. Highlight key requirements instantly and see where you match or fall short.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">📝</div>
+        <div class="feature-icon-wrapper">📝</div>
         <h3>One-Click Outbox</h3>
         <p>Autogenerate personalized cover letters and custom LinkedIn connection notes. Ready to copy-paste and outreach instantly.</p>
       </div>
@@ -352,7 +453,7 @@ footer {
 <section class="seekers-section" id="seekers">
   <div class="container">
     <div class="section-header">
-      <h2>Seeking Active Roles</h2>
+      <h2>Seeking Active Roles <span class="handwritten" style="font-size:0.7em; color:var(--pur); display:inline-block; transform:rotate(-4deg); margin-left:8px;">Fresh Candidates</span></h2>
       <p>Candidates currently utilizing Job Hunter Board. Connect or view their profiles.</p>
     </div>
     

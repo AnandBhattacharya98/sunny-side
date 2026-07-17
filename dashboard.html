@@ -4,43 +4,43 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Job Hunter Board — Pipeline Board</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f9fafb;
-  --sur:rgba(255,255,255,0.85);
-  --bdr:#e5e7eb;
-  --txt:#0f172a;
-  --mut:#475569;
-  --hin:#94a3b8;
-  --pur:#2563eb;         /* Sleek Uizard Blue */
-  --purl:rgba(37, 99, 235, 0.08);
-  --purt:#1d4ed8;
+  --bg: #FAF6EE;           /* Warm egg-shell cream */
+  --sur: #FFFFFF;          /* Pure egg white card surface */
+  --bdr: rgba(42, 35, 21, 0.08); /* Soft chocolate border */
+  --txt: #2A2315;          /* Deep warm charcoal/chocolate text */
+  --mut: #706550;          /* Muted organic olive-brown */
+  --hin: #A59A84;          /* Soft gray-sand */
+  --pur: #FFA700;          /* Yolk yellow accent */
+  --purl: rgba(255, 167, 0, 0.08);
+  --purt: #E08500;
   --tl:#0f766e;--tll:rgba(15, 118, 110, 0.08);
   --am:#b45309;--aml:rgba(180, 83, 9, 0.08);
   --rd:#be123c;--rdl:rgba(190, 18, 60, 0.08);
   --gn:#15803d;--gnl:rgba(21, 128, 61, 0.08);
-  --glow-1: rgba(37, 99, 235, 0.03);
-  --glow-2: rgba(99, 102, 241, 0.02);
-  --r:12px;
+  --glow-1: rgba(255, 167, 0, 0.04);
+  --glow-2: rgba(255, 126, 6, 0.03);
+  --r:18px; /* rounder organic edges */
 }
 [data-theme="dark"] {
-  --bg:#060511;           /* Deep dark violet-black */
-  --sur:rgba(15, 14, 30, 0.75); /* Translucent Uizard card background */
-  --bdr:rgba(255, 255, 255, 0.08);
-  --txt:#f8fafc;
-  --mut:#94a3b8;
-  --hin:#475569;
-  --pur:#7c3aed;         /* Modern Violet primary */
-  --purl:rgba(124, 58, 237, 0.15);
-  --purt:#a78bfa;
+  --bg: #12100E;           /* Deep dark roasted coffee background */
+  --sur: rgba(30, 27, 23, 0.7); /* Translucent warm dark card */
+  --bdr: rgba(255, 255, 255, 0.05);
+  --txt: #FAF6EE;          /* Warm cream text */
+  --mut: #A59A84;          /* Warm sand */
+  --hin: #5C5446;
+  --pur: #FFA700;          /* Glowing yolk yellow */
+  --purl: rgba(255, 167, 0, 0.15);
+  --purt: #FFC04D;
   --tll:rgba(45, 212, 191, 0.12);
   --aml:rgba(251, 191, 36, 0.12);
   --rdl:rgba(248, 113, 113, 0.12);
   --gnl:rgba(74, 222, 128, 0.12);
-  --glow-1: rgba(124, 58, 237, 0.07);
-  --glow-2: rgba(59, 130, 246, 0.05);
+  --glow-1: rgba(255, 167, 0, 0.08);
+  --glow-2: rgba(255, 126, 6, 0.05);
 }
 body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      background:radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 40%),
@@ -57,7 +57,9 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 /* Sidebar */
 .logo{padding:20px 20px;font-size:16px;font-weight:700;color:var(--txt);
       border-bottom:1px solid var(--bdr);letter-spacing:-.02em;font-family:'Space Grotesk',sans-serif;
-      background: linear-gradient(135deg, #3b82f6, var(--pur)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;}
+      background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      display:flex; align-items:center; gap:6px; transition:transform 0.15s;}
+.logo:hover{transform:scale(1.02);}
 .ns{padding:16px 20px 6px;font-size:10px;font-weight:700;color:var(--hin);
     letter-spacing:.08em;text-transform:uppercase}
 .nl{display:flex;align-items:center;gap:8px;padding:10px 20px;color:var(--mut);
@@ -101,8 +103,8 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             border-radius:8px;font-size:11px;margin-top:auto}
 
 /* Toolbar & Buttons */
-.btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
-     border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .15s;white-space:nowrap;
+.btn{padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;
+     border:1px solid var(--bdr);background:var(--sur);color:var(--txt);transition:all .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);white-space:nowrap;
      font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
 .btn:hover{border-color:var(--pur);color:var(--pur);box-shadow:0 4px 12px var(--purl)}
 .btn:disabled{opacity:0.6;cursor:not-allowed}
@@ -179,11 +181,14 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <body>
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 50%), #060511; width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
-  <div style="background:rgba(15, 14, 30, 0.75); border:1px solid rgba(255, 255, 255, 0.08); border-radius:12px; padding:32px; width:100%; max-width:420px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display:flex; flex-direction:column; gap:20px;">
+<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
+  <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:24px; padding:32px; width:100%; max-width:420px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display:flex; flex-direction:column; gap:20px;">
     <div style="text-align:center;">
-      <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">Job Hunter Board</h2>
-      <p style="font-size:13px; color:#94a3b8;">
+      <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; justify-content:center; margin-bottom:6px; transition:transform 0.15s;">
+        <span style="width:12px; height:12px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
+        <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; margin: 0;">Job Hunter Board</h2>
+      </a>
+      <p style="font-size:13px; color:var(--mut);">
         {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
       </p>
     </div>
@@ -333,7 +338,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 <!-- Sidebar -->
 <nav class="sidebar">
-  <div class="logo">Job Hunter Board</div>
+  <a class="logo" href="/" style="text-decoration:none; display:flex; align-items:center; gap:6px;">
+    <span class="logo-yolk" style="width:10px; height:10px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
+    Job Hunter Board
+  </a>
 
   <div class="ns">Views</div>
   <a class="nl {% if view_mode=='board' %}on{% endif %}" href="/" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
