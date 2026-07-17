@@ -61,6 +61,12 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "share_profile" not in user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN share_profile INTEGER DEFAULT 0;")
         conn.commit()
+        
+    # Migrate jobs table columns if needed
+    jobs_cols = [row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()]
+    if "feedback" not in jobs_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN feedback INTEGER DEFAULT 0;")
+        conn.commit()
 
 
 def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:

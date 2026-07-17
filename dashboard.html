@@ -289,6 +289,14 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   50% { top: 100%; }
   100% { top: 0%; }
 }
+@keyframes logFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.log-line {
+  animation: logFadeIn 0.3s forwards ease-out;
+  margin-bottom: 4px;
+}
 </style>
 </head>
 <body>
@@ -455,7 +463,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         <span style="width:12px; height:12px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
         <h2 style="font-size:26px; font-weight:700; letter-spacing:-0.02em; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; margin: 0;">Job Hunter Board</h2>
       </a>
-      <h3 style="font-size:18px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt); margin-top:8px;">Hatch Your Pipeline</h3>
+      <h3 style="font-size:18px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt); margin-top:8px;">Build Your Pipeline</h3>
       <p style="font-size:13.5px; color:var(--mut); margin-top:4px;">Upload or paste your resume. Our AI scanner will read your credentials and immediately recommend the best opportunities.</p>
     </div>
 
@@ -496,6 +504,11 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     <div>
       <h3 style="font-size:20px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt);">Scanning Resume...</h3>
       <p style="font-size:13px; color:var(--mut); margin-top:4px;">Gemini is reading your credentials, mapping your experience, and filtering listings.</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div style="width:100%; height:6px; background:var(--bdr); border-radius:3px; overflow:hidden; position:relative; margin-top:-8px;">
+      <div id="onboard-progress-fill" style="width:0%; height:100%; background:var(--pur); transition:width 0.4s ease-out;"></div>
     </div>
 
     <!-- Scanner terminal screen -->
@@ -646,9 +659,26 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     
     <div class="col col-{{ col }}" id="col-{{ col }}"
          ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event,'{{ col }}')">
-      <div class="col-hd" style="margin-bottom: {% if col == 'new' or col == 'whatsapp' %}6px{% else %}12px{% endif %};">
-        <span>{{ column_title }}</span>
+      <div class="col-hd" style="margin-bottom: {% if col == 'new' or col == 'whatsapp' %}6px{% else %}12px{% endif %}; display: flex; align-items: center; justify-content: space-between;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          {{ column_title }}
+          <span class="info-trigger" onclick="toggleColumnInfo('{{ col }}')" style="cursor: pointer; display: inline-flex; align-items: center; color: var(--mut); transition: color 0.15s;" onmouseover="this.style.color='var(--pur)'" onmouseout="this.style.color='var(--mut)'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          </span>
+        </span>
         <span class="col-ct">{{ board[col]|length }}</span>
+      </div>
+      
+      <!-- Info popover box -->
+      <div id="info-box-{{ col }}" class="info-popover" style="display: none; font-size: 11px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 8px; padding: 10px; color: var(--mut); line-height: 1.4; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); animation: logFadeIn 0.2s ease-out;">
+        {{ {
+          'whatsapp': 'Auto-imported from pasted WhatsApp chat message forwards.',
+          'new': 'New job listings scraped from email alerts and pending review.',
+          'shortlisted': 'Roles you are actively interviewing for or shortlisted for.',
+          'applied': 'Jobs you have successfully submitted applications to.',
+          'offer': 'Roles where you have received official job offers.',
+          'rejected': 'Roles where you have been rejected or decided not to proceed.'
+        }.get(col, '') }}
       </div>
       
       {% if col == 'whatsapp' %}
@@ -691,9 +721,20 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             <span>{{ job.company }}</span>
           </div>
           <div class="jdetails" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-            <span class="js {% if score>=8 %}sh{% elif score>=6.5 %}sm{% else %}sl2{% endif %}">
-              {{ '%.1f'|format(score) }}/10
-            </span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="js {% if score>=8 %}sh{% elif score>=6.5 %}sm{% else %}sl2{% endif %}">
+                {{ '%.1f'|format(score) }}/10
+              </span>
+              <!-- Thumbs Up/Down -->
+              <div style="display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
+                <button onclick="submitFeedback(event, '{{ job.job_id }}', 1)" title="Like role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#22c55e'" onmouseout="this.style.color='{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}'">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                </button>
+                <button onclick="submitFeedback(event, '{{ job.job_id }}', -1)" title="Dislike role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}'">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>
+                </button>
+              </div>
+            </div>
             <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;">
               <span class="jc" style="font-size:10px;line-height:1.2;">{{ job.location }}</span>
               <span class="jc" style="font-size:9px;color:var(--hin);margin-top:2px;">
@@ -1701,15 +1742,15 @@ async function startOnboardingParse(event) {
   
   // Start fake terminal logs
   const logs = [
-    "🚀 Initializing parser...",
-    "📂 Opening resume container...",
-    "📄 Reading document layout and text contents...",
-    "🧠 Processing candidate experience and skills...",
-    "🔍 Scanning active Job Hunter Board listings database...",
-    "📊 Evaluating role fit scores via Gemini...",
-    "✨ Scoring matching opportunities...",
-    "💾 Saving candidate profile data...",
-    "🎉 Hatching suggestions..."
+    "[init] Initializing parser...",
+    "[load] Opening resume container...",
+    "[read] Reading document layout and text contents...",
+    "[parse] Processing candidate experience and skills...",
+    "[scan] Scanning active Job Hunter Board listings database...",
+    "[eval] Evaluating role fit scores via Gemini...",
+    "[score] Scoring matching opportunities...",
+    "[save] Saving candidate profile data...",
+    "[done] Generating recommendations..."
   ];
   let logIdx = 0;
   const terminal = document.getElementById('onboard-terminal');
@@ -1718,9 +1759,14 @@ async function startOnboardingParse(event) {
   const logInterval = setInterval(() => {
     if (logIdx < logs.length) {
       const p = document.createElement('div');
+      p.className = 'log-line';
       p.textContent = logs[logIdx];
       terminal.appendChild(p);
       terminal.scrollTop = terminal.scrollHeight;
+      
+      const percent = Math.min(100, Math.round(((logIdx + 1) / logs.length) * 100));
+      document.getElementById('onboard-progress-fill').style.width = percent + '%';
+      
       logIdx++;
     }
   }, 400);
@@ -1787,6 +1833,42 @@ async function startOnboardingParse(event) {
     alert("Connection error: " + error.message);
     document.getElementById('onboard-upload-step').style.display = 'block';
     document.getElementById('onboard-scanning-step').style.display = 'none';
+  }
+}
+
+function toggleColumnInfo(col) {
+  const box = document.getElementById(`info-box-${col}`);
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function submitFeedback(event, jobId, val) {
+  event.stopPropagation();
+  try {
+    toast("Syncing preference & updating scores...");
+    const response = await fetch('/api/jobs/feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        job_id: jobId,
+        feedback: val
+      })
+    });
+    
+    const data = await response.json();
+    if (data.ok) {
+      toast("Preference recorded! Re-scoring inbox...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } else {
+      toast("Failed: " + data.error);
+    }
+  } catch (error) {
+    toast("Connection error");
   }
 }
 </script>

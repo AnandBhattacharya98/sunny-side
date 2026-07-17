@@ -130,6 +130,38 @@ def update_profile():
     conn.close()
     return jsonify({"ok": True})
 
+
+@app.route("/api/jobs/feedback", methods=["POST"])
+def update_job_feedback():
+    uid = get_user_id()
+    d = request.json or {}
+    job_id = d.get("job_id")
+    feedback = d.get("feedback") # 1, -1, or 0
+    
+    if not job_id or feedback is None:
+        return jsonify({"ok": False, "error": "Missing parameters"}), 400
+        
+    conn = get_conn(DB_PATH)
+    conn.execute(
+        "UPDATE jobs SET feedback = ? WHERE job_id = ? AND user_id = ?",
+        (feedback, job_id, uid)
+    )
+    conn.commit()
+    
+    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
+    conn.execute(
+        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+        (uid,)
+    )
+    conn.commit()
+    
+    # Run re-scoring
+    from ai_engine import process_new_jobs
+    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    
+    conn.close()
+    return jsonify({"ok": True})
+
 @app.route("/api/profile/upload", methods=["POST"])
 def upload_profile_resume():
     uid = get_user_id()
@@ -428,7 +460,20 @@ def set_status(job_id):
     uid = get_user_id()
     conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status, job_id, uid))
     add_timeline(conn, job_id, f"Status → {status}")
-    conn.commit(); conn.close()
+    conn.commit()
+    
+    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
+    conn.execute(
+        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+        (uid,)
+    )
+    conn.commit()
+    
+    # Run re-scoring
+    from ai_engine import process_new_jobs
+    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    
+    conn.close()
     return jsonify({"ok": True, "status": status})
 
 

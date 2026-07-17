@@ -76,7 +76,7 @@ YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
 
 # ── Scoring ────────────────────────────────────────────────────────────────
 
-def _local_score(title: str, company: str, description: str) -> dict:
+def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None) -> dict:
     """Rule-based fallback scoring — no API needed."""
     text = f"{title} {description}".lower()
     score = 5.0
@@ -95,6 +95,21 @@ def _local_score(title: str, company: str, description: str) -> dict:
             score -= 1.5
         elif req_yrs <= PROFILE["years_exp"] + 1:
             score += 0.5
+
+    # Title word overlap adjustments based on liked/disliked jobs
+    score_adj = 0.0
+    title_words = set(re.findall(r"\w+", title.lower()))
+    if liked_titles:
+        for t in liked_titles:
+            overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
+            if overlap > 1:
+                score_adj += 0.5 * (overlap - 1)
+    if disliked_titles:
+        for t in disliked_titles:
+            overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
+            if overlap > 1:
+                score_adj -= 0.5 * (overlap - 1)
+    score += score_adj
 
     score = max(1.0, min(10.0, score))
 
@@ -177,7 +192,8 @@ def _call_gemini(prompt: str, response_json: bool = False, api_key: str = None) 
     return res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
-def _gemini_score(title: str, company: str, description: str, resume_text: str = None, api_key: str = None) -> dict:
+def _gemini_score(title: str, company: str, description: str, resume_text: str = None, api_key: str = None,
+                  liked_titles: list = None, disliked_titles: list = None) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
@@ -185,8 +201,13 @@ def _gemini_score(title: str, company: str, description: str, resume_text: str =
 
 CANDIDATE RESUME:
 {resume_text}
+"""
+        if liked_titles:
+            prompt += f"\nUSER PREFERENCES (Roles the user liked or actively applied to):\n" + "\n".join(f"- {t}" for t in liked_titles[:10])
+        if disliked_titles:
+            prompt += f"\nUSER PREFERENCES (Roles the user disliked or rejected):\n" + "\n".join(f"- {t}" for t in disliked_titles[:10])
 
-JOB: {title} at {company}
+        prompt += f"""\nJOB: {title} at {company}
 DESCRIPTION: {description[:2000]}
 
 Return exactly:
@@ -198,21 +219,42 @@ Return exactly:
         return data
     except Exception as e:
         print(f"  [Gemini score fallback] {e}")
-        result = _local_score(title, company, description)
+        result = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles)
         result["fit_summary"] += " (scored locally — Gemini API error)"
         return result
 
 
-def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None) -> dict:
+def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None, user_id: int = 1) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
+
+    liked_titles = []
+    disliked_titles = []
+    try:
+        conn = get_conn(DB_PATH)
+        liked = conn.execute(
+            "SELECT DISTINCT title FROM jobs WHERE user_id = ? AND (feedback = 1 OR status IN ('applied', 'shortlisted', 'interviewing', 'offer'))",
+            (user_id,)
+        ).fetchall()
+        liked_titles = [r[0] for r in liked if r[0]]
+        
+        disliked = conn.execute(
+            "SELECT DISTINCT title FROM jobs WHERE user_id = ? AND (feedback = -1 OR status = 'rejected')",
+            (user_id,)
+        ).fetchall()
+        disliked_titles = [r[0] for r in disliked if r[0]]
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching liked/disliked jobs: {e}")
+
     if ANTHROPIC_API_KEY:
         return _ai_score(title, company, description, resume_text)
     
     key_to_use = api_key or GEMINI_API_KEY
     if key_to_use:
-        return _gemini_score(title, company, description, resume_text, api_key=key_to_use)
-    return _local_score(title, company, description)
+        return _gemini_score(title, company, description, resume_text, api_key=key_to_use,
+                             liked_titles=liked_titles, disliked_titles=disliked_titles)
+    return _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles)
 
 
 # ── Cover letter ───────────────────────────────────────────────────────────
@@ -474,7 +516,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
         job_id, title, company, location, url, description = tuple(job)
         print(f"  {title} @ {company}...", end=" ")
 
-        score_data = score_job(title, company, description or "", resume_text=resume_text, api_key=api_key)
+        score_data = score_job(title, company, description or "", resume_text=resume_text, api_key=api_key, user_id=user_id)
         score = score_data["score"]
 
         key_reqs_json = json.dumps(score_data.get("key_requirements", []))
