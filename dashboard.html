@@ -177,7 +177,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Password</label>
-        <input type="password" name="password" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="••••••••">
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="••••••••">
+          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+        </div>
       </div>
       <button type="submit" class="btn btn-p" style="padding:12px;font-size:13px;font-weight:600;margin-top:8px;">
         {% if view_mode == 'login' %}Log In{% else %}Sign Up{% endif %}
@@ -610,13 +613,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">IMAP App Password</label>
-          <input type="password" id="settings-imap-password" value="{{ (settings or {}).get('imap_password', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="•••• •••• •••• ••••">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" id="settings-imap-password" value="{{ (settings or {}).get('imap_password', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="•••• •••• •••• ••••">
+            <button type="button" onclick="togglePasswordVisibility('settings-imap-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+          </div>
         </div>
       </div>
       
       <div style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API Key (Overrides .env)</label>
-        <input type="password" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="AIzaSy...">
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="AIzaSy...">
+          <button type="button" onclick="togglePasswordVisibility('settings-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+        </div>
       </div>
       
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
@@ -1089,6 +1098,17 @@ function toggleTheme() {
     text.textContent = saved === 'dark' ? 'Light Mode' : 'Dark Mode';
   }
 })();
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
 {% endif %}
 </script>
 </body>
