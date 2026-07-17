@@ -103,7 +103,7 @@ def signup():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for("index"))
 
 @app.route("/api/profile", methods=["POST"])
 def update_profile():
@@ -147,6 +147,66 @@ def upload_profile_resume():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "resume_text": resume_text})
+
+
+@app.route("/api/onboard_resume", methods=["POST"])
+def onboard_resume():
+    uid = get_user_id()
+    file = request.files.get("resume_file")
+    
+    resume_text = ""
+    if file and file.filename:
+        filename = file.filename.lower()
+        if filename.endswith(".txt"):
+            resume_text = file.read().decode("utf-8", errors="ignore")
+        elif filename.endswith(".pdf"):
+            import pypdf
+            try:
+                reader = pypdf.PdfReader(file)
+                resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
+        else:
+            return jsonify({"ok": False, "error": "Unsupported file format"}), 400
+    else:
+        # Fallback to form field or JSON body
+        resume_text = request.form.get("resume_text", "").strip()
+        if not resume_text:
+            try:
+                d = request.json or {}
+                resume_text = d.get("resume_text", "").strip()
+            except Exception:
+                pass
+
+    if not resume_text:
+        return jsonify({"ok": False, "error": "Resume text is empty"}), 400
+
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET resume_text = ? WHERE id = ?", (resume_text, uid))
+    conn.commit()
+    
+    # Load demo jobs if no jobs exist for user
+    job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
+    if job_count == 0:
+        from scraper import seed_demo_jobs
+        seed_demo_jobs(conn, user_id=uid)
+        conn.commit()
+
+    # Re-score all jobs for this user
+    from ai_engine import process_new_jobs
+    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    
+    suggestions = conn.execute(
+        """SELECT title, company, location, ai_score, ai_summary 
+           FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL 
+           ORDER BY ai_score DESC LIMIT 3""", (uid,)
+    ).fetchall()
+    
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "suggestions": [dict(s) for s in suggestions]
+    })
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -216,6 +276,14 @@ def index():
         conn.close()
         return render_template("landing.html", seekers=[dict(u) for u in users])
         
+    # Get user settings to pass to frontend profile form
+    settings = get_user_settings(conn, uid)
+    needs_onboarding = not settings.get("resume_text")
+    if needs_onboarding:
+        stats = _stats(conn)
+        conn.close()
+        return render_template("dashboard.html", settings=settings, view_mode="onboarding", stats=stats)
+        
     # Fetch all active jobs (ignore archived)
     raw_jobs = conn.execute("SELECT * FROM jobs WHERE user_id = ? AND status != 'archived' ORDER BY COALESCE(ai_score,0) DESC", (uid,)).fetchall()
     
@@ -248,16 +316,11 @@ def index():
     stats = _stats(conn)
     companies = [r[0] for r in conn.execute(
         "SELECT DISTINCT company FROM jobs WHERE user_id = ? ORDER BY company", (uid,)).fetchall()]
-    
-    # Get user settings to pass to frontend profile form
-    settings = get_user_settings(conn, uid)
-    needs_onboarding = not settings.get("resume_text")
     conn.close()
     
     cols = ["whatsapp", "new", "shortlisted", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
-                           companies=companies, settings=settings, view_mode="board",
-                           needs_onboarding=needs_onboarding)
+                           companies=companies, settings=settings, view_mode="board")
 
 
 @app.route("/emails")

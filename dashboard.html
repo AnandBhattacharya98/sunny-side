@@ -176,13 +176,119 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
        padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;
        transition:opacity .2s;pointer-events:none;z-index:9999}
 #toast.show{opacity:1}
+
+/* B-Egg Onboarding, Parsing, & Forms */
+.auth-input {
+  padding:10px 12px;
+  border-radius:20px;
+  border:1px solid var(--bdr);
+  background:var(--bg);
+  color:var(--txt);
+  font-size:13px;
+  outline:none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width:100%;
+}
+.auth-input:focus {
+  border-color: var(--pur);
+  box-shadow: 0 0 0 3px var(--purl);
+}
+.auth-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+}
+.auth-card {
+  background:var(--sur);
+  border:1px solid var(--bdr);
+  border-radius:24px;
+  padding:32px;
+  width:100%;
+  max-width:440px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+.accordion-wrapper {
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sur);
+  margin-top: 4px;
+}
+.accordion-toggle {
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txt);
+  outline: none;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.dropzone-box {
+  border: 1.5px dashed var(--bdr);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.dropzone-box:hover {
+  border-color: var(--pur);
+  background: var(--purl);
+}
+@keyframes pulseYolk {
+  0% { transform: scale(0.95); border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; }
+  100% { transform: scale(1.08); border-radius: 40% 60% 50% 60% / 60% 40% 60% 40%; }
+}
+.terminal-box {
+  background: #0f0e1c;
+  border: 1px solid var(--bdr);
+  border-radius: 16px;
+  padding: 16px;
+  font-family: monospace;
+  font-size: 11.5px;
+  color: #4ade80; /* hacker green */
+  height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+.scan-bar {
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--pur), transparent);
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: scan 2.5s infinite ease-in-out;
+}
+@keyframes scan {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
 </style>
 </head>
 <body>
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
 <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
-  <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:24px; padding:32px; width:100%; max-width:420px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display:flex; flex-direction:column; gap:20px;">
+  <div class="auth-card">
     <div style="text-align:center;">
       <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; justify-content:center; margin-bottom:6px; transition:transform 0.15s;">
         <span style="width:12px; height:12px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
@@ -194,8 +300,9 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     </div>
     
     {% if error %}
-    <div style="background:rgba(248, 113, 113, 0.12); color:#f87171; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid rgba(248, 113, 113, 0.2);">
-      ⚠️ {{ error }}
+    <div style="background:rgba(248, 113, 113, 0.12); color:#f87171; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid rgba(248, 113, 113, 0.2); display:flex; align-items:center; gap:6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f87171; flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+      {{ error }}
     </div>
     {% endif %}
     
@@ -203,97 +310,96 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <!-- Username -->
       <div style="display:flex; flex-direction:column; gap:6px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="font-size:13px; font-weight:500; color:#f8fafc;">Username</label>
+          <label class="auth-label">Username</label>
           {% if view_mode == 'signup' %}
-          <span style="font-size:11px; color:#94a3b8; font-weight: 500;">Step 1 of 2</span>
+          <span style="font-size:11px; color:var(--mut); font-weight: 600;">Step 1 of 2</span>
           {% endif %}
         </div>
-        <input type="text" name="username" required style="padding:10px 12px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="Enter username">
+        <input type="text" name="username" required class="auth-input" placeholder="Enter username">
       </div>
       
       <!-- Password -->
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <label style="font-size:13px; font-weight:500; color:#f8fafc;">Password</label>
+        <label class="auth-label">Password</label>
         <div style="position:relative; display:flex; align-items:center;">
-          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="••••••••">
-          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-            <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+          <input type="password" id="auth-password" name="password" required class="auth-input" placeholder="••••••••">
+          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:12px; color:var(--mut); font-weight:700;">
+            Show
           </button>
         </div>
       </div>
 
       <!-- Collapsible Profile Setup Accordion (Sign Up view only) -->
       {% if view_mode == 'signup' %}
-      <div style="border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; overflow: hidden; background: rgba(15, 14, 30, 0.5); margin-top: 4px;">
-        <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" style="width: 100%; padding: 12px 14px; background: transparent; border: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #f8fafc; outline: none;" id="accordion-toggle-btn">
+      <div class="accordion-wrapper">
+        <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" class="accordion-toggle" id="accordion-toggle-btn">
           <span style="display:flex; align-items:center; gap:6px;">
-            ⚙️ Profile Setup (Optional)
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pur);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Profile Setup (Optional)
           </span>
-          <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: #94a3b8;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: var(--mut);"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         
         <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: transparent; padding: 0 14px;">
-          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--bdr);">
             
             <!-- Name & Designation -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Full Name</label>
-                <input type="text" name="name" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Anand Bhattacharya">
+                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Full Name</label>
+                <input type="text" name="name" class="auth-input" style="padding:8px 12px;" placeholder="Anand Bhattacharya">
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Designation / Title</label>
-                <input type="text" name="designation" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Software Engineer">
+                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
+                <input type="text" name="designation" class="auth-input" style="padding:8px 12px;" placeholder="Software Engineer">
               </div>
             </div>
 
             <!-- Show on landing page checkbox -->
             <div style="display:flex; align-items:center; gap:8px;">
               <input type="checkbox" id="signup-share-profile" name="share_profile" checked style="width:16px;height:16px;cursor:pointer;">
-              <label for="signup-share-profile" style="font-size:12px; color:#f8fafc; cursor:pointer;">Show my profile on landing page seekers wall</label>
+              <label for="signup-share-profile" style="font-size:12px; color:var(--txt); cursor:pointer;">Show my profile on landing page seekers wall</label>
             </div>
             
             <!-- Resume File Upload / Drag & Drop -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
-              <div id="resume-dropzone" style="border: 1.5px dashed rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0f0e1c; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;" onclick="document.getElementById('signup-resume-file').click()"
-                   ondragover="event.preventDefault(); this.style.borderColor='#8b5cf6'; this.style.background='rgba(139, 92, 246, 0.08)';"
-                   ondragleave="event.preventDefault(); this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.background='#0f0e1c';"
-                   ondrop="event.preventDefault(); this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.background='#0f0e1c'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #94a3b8;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span style="font-size: 12px; font-weight: 500; color: #f8fafc;" id="dropzone-text">Click or drag & drop to upload</span>
-                <span style="font-size: 11px; color: #94a3b8;">Supports PDF, TXT</span>
+              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
+              <div id="resume-dropzone" class="dropzone-box" style="padding: 14px;" onclick="document.getElementById('signup-resume-file').click()"
+                   ondragover="event.preventDefault(); this.style.borderColor='var(--pur)'; this.style.background='var(--purl)';"
+                   ondragleave="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)';"
+                   ondrop="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--mut);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span style="font-size: 12px; font-weight: 700; color: var(--txt);" id="dropzone-text">Click or drag & drop to upload</span>
+                <span style="font-size: 11px; color: var(--mut);">Supports PDF, TXT</span>
                 <input type="file" id="signup-resume-file" name="resume_file" accept=".pdf,.txt" style="display: none;" onchange="handleFileChange(this)">
               </div>
             </div>
             
             <!-- Paste Resume Text -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Or Paste Resume Text</label>
-              <textarea name="resume_text" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; resize:vertical; min-height:80px; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="Paste resume text details..."></textarea>
+              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Or Paste Resume Text</label>
+              <textarea name="resume_text" class="auth-input" style="border-radius:12px; resize:vertical; min-height:80px;" placeholder="Paste resume text details..."></textarea>
             </div>
 
             <!-- LinkedIn Profile URL -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">LinkedIn Profile URL</label>
-              <input type="text" name="linkedin_profile" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="https://linkedin.com/in/username">
+              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">LinkedIn Profile URL</label>
+              <input type="text" name="linkedin_profile" class="auth-input" style="padding:8px 12px;" placeholder="https://linkedin.com/in/username">
             </div>
 
             <!-- Email IMAP Settings -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">IMAP Email</label>
-                <input type="email" name="imap_email" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="name@gmail.com">
-                <span style="font-size:10px; color:#94a3b8; line-height:1.2;">Used to auto-scan job emails.</span>
+                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">IMAP Email</label>
+                <input type="email" name="imap_email" class="auth-input" style="padding:8px 12px;" placeholder="name@gmail.com">
+                <span style="font-size:10px; color:var(--mut); line-height:1.2;">Used to auto-scan job emails.</span>
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">IMAP App PW</label>
+                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">IMAP App PW</label>
                 <div style="position:relative; display:flex; align-items:center;">
-                  <input type="password" id="signup-imap-pw" name="imap_password" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="•••• •••• •••• ••••">
-                  <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-                    <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                    <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  <input type="password" id="signup-imap-pw" name="imap_password" class="auth-input" style="padding:8px 32px 8px 12px;" placeholder="•••• •••• •••• ••••">
+                  <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:11px; color:var(--mut); font-weight:700;">
+                    Show
                   </button>
                 </div>
               </div>
@@ -301,36 +407,117 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
             <!-- Gemini API Key -->
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Gemini API Key</label>
+              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Gemini API Key</label>
               <div style="position:relative; display:flex; align-items:center;">
-                <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'" placeholder="AIzaSy...">
-                <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
-                  <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                  <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#94a3b8;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                <input type="password" id="signup-gemini-key" name="gemini_api_key" class="auth-input" style="padding:8px 32px 8px 12px;" placeholder="AIzaSy...">
+                <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:11px; color:var(--mut); font-weight:700;">
+                  Show
                 </button>
               </div>
             </div>
             
-            <div style="font-size:11px; color:#94a3b8; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
-              <span>🔒</span> Stored securely, never shared
+            <div style="font-size:11px; color:var(--mut); text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:12px;height:12px;margin-right:4px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Stored securely, never shared
             </div>
           </div>
         </div>
       </div>
       {% endif %}
 
-      <button type="submit" style="padding:12px; font-size:13px; font-weight:600; border-radius:6px; border:none; background: linear-gradient(135deg, #1d82f5, #7c3aed); color:#ffffff; cursor:pointer; margin-top:8px; width:100%; transition: opacity 0.15s; font-family:'Space Grotesk', sans-serif;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+      <button type="submit" class="btn btn-p" style="padding:12px; font-size:13px; font-weight:700; border-radius:24px; width:100%; margin-top:8px;">
         {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
       </button>
     </form>
     
-    <div style="text-align:center; font-size:13px; color:#94a3b8; margin-top:4px;">
+    <div style="text-align:center; font-size:13px; color:var(--mut); margin-top:4px;">
       {% if view_mode == 'login' %}
-      Don't have an account? <a href="/signup" style="color:#a78bfa; text-decoration:none; font-weight:600;">Sign Up</a>
+      Don't have an account? <a href="/signup" style="color:var(--pur); text-decoration:none; font-weight:700;">Sign Up</a>
       {% else %}
-      Already have an account? <a href="/login" style="color:#a78bfa; text-decoration:none; font-weight:600;">Log In</a>
+      Already have an account? <a href="/login" style="color:var(--pur); text-decoration:none; font-weight:700;">Log In</a>
       {% endif %}
     </div>
+  </div>
+</div>
+{% elif view_mode == 'onboarding' %}
+<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
+  <!-- Upload Zone -->
+  <div id="onboard-upload-step" class="auth-card" style="max-width:600px; gap:24px;">
+    <div style="text-align:center;">
+      <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; justify-content:center; margin-bottom:12px; transition:transform 0.15s;">
+        <span style="width:12px; height:12px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
+        <h2 style="font-size:26px; font-weight:700; letter-spacing:-0.02em; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; margin: 0;">Job Hunter Board</h2>
+      </a>
+      <h3 style="font-size:18px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt); margin-top:8px;">Hatch Your Pipeline</h3>
+      <p style="font-size:13.5px; color:var(--mut); margin-top:4px;">Upload or paste your resume. Our AI scanner will read your credentials and immediately recommend the best opportunities.</p>
+    </div>
+
+    <form onsubmit="startOnboardingParse(event)" style="display:flex; flex-direction:column; gap:20px;">
+      <!-- Drag and Drop Resume -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label class="auth-label">Upload Resume Document</label>
+        <div id="onboard-dropzone" class="dropzone-box" onclick="document.getElementById('onboard-resume-file').click()"
+             ondragover="event.preventDefault(); this.style.borderColor='var(--pur)'; this.style.background='var(--purl)';"
+             ondragleave="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)';"
+             ondrop="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)'; const input = document.getElementById('onboard-resume-file'); input.files = event.dataTransfer.files; handleOnboardFileChange(input);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pur); margin-bottom:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span style="font-size:13px; font-weight:700; color:var(--txt);" id="onboard-dropzone-text">Click or drag & drop to upload</span>
+          <span style="font-size:11px; color:var(--mut);">Supports PDF or TXT up to 10MB</span>
+          <input type="file" id="onboard-resume-file" accept=".pdf,.txt" style="display:none;" onchange="handleOnboardFileChange(this)">
+        </div>
+      </div>
+
+      <div style="text-align:center; font-size:12px; color:var(--hin); font-weight:600; text-transform:uppercase;">Or</div>
+
+      <!-- Paste Area -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label class="auth-label">Paste Resume Content</label>
+        <textarea id="onboard-resume-text" class="auth-input" style="height:120px; font-family:inherit; resize:vertical; border-radius:12px;" placeholder="Paste resume text details..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-p" style="padding:14px; font-size:14px; border-radius:24px;">Upload and Parse Resume</button>
+    </form>
+  </div>
+
+  <!-- Scanning / Parsing State -->
+  <div id="onboard-scanning-step" class="auth-card" style="max-width:600px; display:none; gap:24px; text-align:center;">
+    <div style="position:relative; width:80px; height:80px; margin:0 auto;">
+      <!-- Glowing pulsing yolk loader -->
+      <div style="width:100%; height:100%; background:radial-gradient(circle at 30% 30%, #FFF2CC 0%, var(--pur) 70%, #FF5E00 100%); border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 8px 24px rgba(255, 167, 0, 0.4); animation: pulseYolk 1.5s infinite ease-in-out alternate;"></div>
+    </div>
+    
+    <div>
+      <h3 style="font-size:20px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt);">Scanning Resume...</h3>
+      <p style="font-size:13px; color:var(--mut); margin-top:4px;">Gemini is reading your credentials, mapping your experience, and filtering listings.</p>
+    </div>
+
+    <!-- Scanner terminal screen -->
+    <div class="terminal-box" style="text-align:left; border-radius:16px;">
+      <div class="scan-bar"></div>
+      <div id="onboard-terminal" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; height:100%;">
+        <div>[info] Initializing scan engine...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggested Jobs State -->
+  <div id="onboard-suggested-step" class="auth-card" style="max-width:650px; display:none; gap:24px;">
+    <div style="text-align:center;">
+      <div style="width:40px; height:40px; background:var(--purl); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; color:var(--pur);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      </div>
+      <h3 style="font-size:22px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt);">Resume Parsed Successfully!</h3>
+      <p style="font-size:13.5px; color:var(--mut); margin-top:4px;">We've found matching opportunities scored against your skills and experience.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <label class="auth-label" style="font-size:11px; text-transform:uppercase; color:var(--mut); letter-spacing:0.05em;">Top Suggested Jobs</label>
+      <div id="onboard-suggestions-grid" style="display:flex; flex-direction:column; gap:12px;">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <button onclick="window.location.reload()" class="btn btn-p" style="padding:14px; font-size:14px; border-radius:24px;">Proceed to My Dashboard</button>
   </div>
 </div>
 {% else %}
@@ -345,26 +532,33 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
   <div class="ns">Views</div>
   <a class="nl {% if view_mode=='board' %}on{% endif %}" href="/" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
-    <span>📋</span> Pipeline Board
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="9"></line><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>
+    Pipeline Board
   </a>
   <a class="nl {% if view_mode=='emails' %}on{% endif %}" href="/emails" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
-    <span>✉</span> Synced Emails <span class="nc" style="margin-left:auto;background:var(--pur);color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+    Synced Emails <span class="nc" style="margin-left:auto;background:var(--pur);color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
   </a>
   <a class="nl" href="javascript:void(0)" onclick="openSettingsModal()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
-    <span>⚙️</span> Profile Settings
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    Profile Settings
   </a>
   {% if session.get('username') == 'admin' %}
   <a class="nl {% if view_mode=='users' %}on{% endif %}" href="/users" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
-    <span>👥</span> User Management
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    User Management
   </a>
   {% endif %}
   <a class="nl" href="javascript:void(0)" onclick="toggleTheme()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
-    <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
+    <span id="theme-icon" style="display:inline-flex; align-items:center; justify-content:center;"></span> <span id="theme-text">Dark Mode</span>
   </a>
 
   <div class="ns">Account</div>
   <div style="padding:0 16px 8px;font-size:12px;color:var(--mut);display:flex;align-items:center;justify-content:space-between;">
-    <span>👤 {{ session.get('username', 'Admin') }}</span>
+    <span style="display:flex; align-items:center; gap:4px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      {{ session.get('username', 'Admin') }}
+    </span>
     <a href="/logout" style="color:var(--rd);text-decoration:none;font-weight:600;font-size:11px;">Logout</a>
   </div>
 
@@ -383,10 +577,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       Last Scraped:<br><strong>{{ stats.last_updated }}</strong>
     </div>
     <button class="btn" style="width:100%;margin-bottom:12px;background:#25d366;color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;" onclick="openWhatsappModal()">
-      <span>💬</span> WhatsApp Import
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> WhatsApp Import
     </button>
     <button class="btn btn-p refresh-btn" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px" onclick="triggerRefresh()">
-      <span>↺</span> Refresh Now
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh Now
     </button>
     <div style="font-size:11px;color:var(--hin);line-height:1.4">
       Or run <code style="background:var(--bdr);padding:1px 5px;border-radius:4px;word-break:break-all">python main.py --run-now</code> in terminal.
@@ -400,22 +594,21 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   <div class="board-header" style="gap: 16px;">
     <h2 class="board-title" style="flex-shrink: 0; margin-bottom: 0;">Application Pipeline</h2>
     
-    <!-- Single global search bar in the middle -->
-    <div style="flex: 1; display: flex; justify-content: center; max-width: 460px;">
-      <input type="text" placeholder="🔍 Search company or job title..." id="global-search" style="width: 100%; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
+    <div style="max-width: 320px; flex: 1;">
+      <input type="text" placeholder="Search company or job title..." id="global-search" style="width: 100%; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
     </div>
     
     <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
-      <input type="text" placeholder="📍 Location..." id="location-search" style="width: 110px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
+      <input type="text" placeholder="Location..." id="location-search" style="width: 110px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
       <select id="score-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
-        <option value="0">⭐ Min Score: Any</option>
-        <option value="9">⭐ Min Score: 9+</option>
-        <option value="8">⭐ Min Score: 8+</option>
-        <option value="7">⭐ Min Score: 7+</option>
-        <option value="6">⭐ Min Score: 6+</option>
+        <option value="0">Min Score: Any</option>
+        <option value="9">Min Score: 9+</option>
+        <option value="8">Min Score: 8+</option>
+        <option value="7">Min Score: 7+</option>
+        <option value="6">Min Score: 6+</option>
       </select>
       <select id="source-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
-        <option value="all">🔍 Source: All</option>
+        <option value="all">Source: All</option>
         <option value="linkedin">LinkedIn</option>
         <option value="naukri">Naukri</option>
         <option value="indeed">Indeed</option>
@@ -482,7 +675,9 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           {% set source_type = job.source %}
         {% endif %}
         <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
-          <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;">🗑️</button>
+          <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;display:flex;align-items:center;justify-content:center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+          </button>
           <div class="jt">{{ job.title }}</div>
           <div class="jc" style="display:flex;align-items:center;gap:6px;margin-top:2px;">
             <img src="https://www.google.com/s2/favicons?sz=32&domain={{ source_domain }}" alt="" style="width:12px;height:12px;object-fit:contain;border-radius:2px;flex-shrink:0;">
@@ -573,7 +768,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Password</label>
           <div style="position:relative; display:flex; align-items:center;">
             <input type="password" id="invite-password" name="password" required style="padding:8px 30px 8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none; width:100%;" placeholder="••••••••">
-            <button type="button" onclick="togglePasswordVisibility('invite-password', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; font-size:13px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:2px;">👁️</button>
+            <button type="button" onclick="togglePasswordVisibility('invite-password', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; font-size:12px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:2px;">Show</button>
           </div>
         </div>
         <button type="submit" class="btn btn-p" style="padding:9px; font-size:12px; font-weight:600; margin-top:4px;">Create Account</button>
@@ -782,7 +977,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <div class="modal-backdrop" id="modal-whatsapp" style="display: none; align-items: center; justify-content: center; z-index: 10000;">
   <div class="modal-window" style="max-width: 500px; padding: 24px;">
     <div class="modal-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-      <h3 class="modal-title">💬 WhatsApp Job Importer</h3>
+      <h3 class="modal-title" style="display:flex; align-items:center; gap:6px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        WhatsApp Job Importer
+      </h3>
       <button class="modal-close" onclick="closeWhatsappModal()">&times;</button>
     </div>
     
@@ -798,11 +996,11 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     </div>
     
     <div style="border-top:1px solid var(--bdr); padding-top:12px;">
-      <span style="font-size:11px; font-weight:600; color:var(--txt); display:block; margin-bottom:4px;">🚀 One-Click Browser Shortcut (Bookmarklet)</span>
+      <span style="font-size:11px; font-weight:600; color:var(--txt); display:block; margin-bottom:4px;">One-Click Browser Shortcut (Bookmarklet)</span>
       <span style="font-size:10px; color:var(--mut); line-height:1.4; display:block; margin-bottom:8px;">
         Drag this button to your bookmarks bar. On WhatsApp Web, select text/chat and click it to auto-sync:
       </span>
-      <a href="javascript:(function(){const text=window.getSelection().toString()||document.body.innerText;fetch('http://localhost:5050/api/whatsapp/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(res=>res.json()).then(data=>alert('Synced '+data.count+' jobs from WhatsApp!')).catch(err=>alert('Error: '+err.message));})();" class="btn" style="display:inline-block; font-size:10px; padding:6px 12px; background:var(--pur); color:#fff; text-decoration:none; border-radius:4px; text-align:center;">📥 Sync to board</a>
+      <a href="javascript:(function(){const text=window.getSelection().toString()||document.body.innerText;fetch('http://localhost:5050/api/whatsapp/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(res=>res.json()).then(data=>alert('Synced '+data.count+' jobs from WhatsApp!')).catch(err=>alert('Error: '+err.message));})();" class="btn" style="display:inline-block; font-size:10px; padding:6px 12px; background:var(--pur); color:#fff; text-decoration:none; border-radius:4px; text-align:center;">Sync to board</a>
     </div>
   </div>
 </div>
@@ -825,7 +1023,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">AI Resume Content (Markdown or Text)</label>
         <div style="display:flex; gap:10px; margin-bottom:4px;">
           <input type="file" id="desktop-resume-file" accept=".pdf,.txt" style="display:none;" onchange="uploadResumeFile(this)">
-          <button type="button" class="btn btn-g" onclick="document.getElementById('desktop-resume-file').click()" style="display:flex; align-items:center; gap:6px; font-size:11px; padding:6px 12px;">📂 Upload Resume from Desktop (.pdf, .txt)</button>
+          <button type="button" class="btn btn-g" onclick="document.getElementById('desktop-resume-file').click()" style="display:flex; align-items:center; gap:6px; font-size:11px; padding:6px 12px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Upload Resume from Desktop (.pdf, .txt)
+          </button>
           <span id="resume-upload-status" style="font-size:11px; color:var(--hin); display:flex; align-items:center;"></span>
         </div>
         <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:160px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
@@ -861,7 +1062,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">IMAP App Password</label>
           <div style="position:relative; display:flex; align-items:center;">
             <input type="password" id="settings-imap-password" value="{{ (settings or {}).get('imap_password', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="•••• •••• •••• ••••">
-            <button type="button" onclick="togglePasswordVisibility('settings-imap-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+            <button type="button" onclick="togglePasswordVisibility('settings-imap-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:12px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">Show</button>
           </div>
         </div>
       </div>
@@ -870,7 +1071,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API Key (Overrides .env)</label>
         <div style="position:relative; display:flex; align-items:center;">
           <input type="password" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="AIzaSy...">
-          <button type="button" onclick="togglePasswordVisibility('settings-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+          <button type="button" onclick="togglePasswordVisibility('settings-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:12px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">Show</button>
         </div>
       </div>
       
@@ -1358,6 +1559,9 @@ async function uploadResumeFile(input) {
 }
 
 // Theme Toggle functions
+const sunSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+const moonSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme');
   const target = current === 'dark' ? 'light' : 'dark';
@@ -1367,7 +1571,7 @@ function toggleTheme() {
   const icon = document.getElementById('theme-icon');
   const text = document.getElementById('theme-text');
   if (icon && text) {
-    icon.textContent = target === 'dark' ? '☀️' : '🌙';
+    icon.innerHTML = target === 'dark' ? sunSvg : moonSvg;
     text.textContent = target === 'dark' ? 'Light Mode' : 'Dark Mode';
   }
 }
@@ -1379,7 +1583,7 @@ function toggleTheme() {
   const icon = document.getElementById('theme-icon');
   const text = document.getElementById('theme-text');
   if (icon && text) {
-    icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+    icon.innerHTML = saved === 'dark' ? sunSvg : moonSvg;
     text.textContent = saved === 'dark' ? 'Light Mode' : 'Dark Mode';
   }
 })();
@@ -1420,7 +1624,7 @@ function togglePasswordVisibility(inputId, btn) {
       openSvg.style.display = 'none';
       closedSvg.style.display = 'inline-block';
     } else {
-      btn.textContent = '🙈';
+      btn.textContent = 'Hide';
     }
   } else {
     input.type = 'password';
@@ -1428,7 +1632,7 @@ function togglePasswordVisibility(inputId, btn) {
       openSvg.style.display = 'inline-block';
       closedSvg.style.display = 'none';
     } else {
-      btn.textContent = '👁️';
+      btn.textContent = 'Show';
     }
   }
 }
@@ -1460,6 +1664,122 @@ function handleFileChange(input) {
     if (accordion && accordion.style.maxHeight !== '0px') {
       accordion.style.maxHeight = accordion.scrollHeight + 'px';
     }
+  }
+}
+
+function handleOnboardFileChange(input) {
+  const textSpan = document.getElementById('onboard-dropzone-text');
+  if (input.files && input.files.length) {
+    textSpan.textContent = "Selected: " + input.files[0].name;
+    textSpan.style.color = "var(--pur)";
+  } else {
+    textSpan.textContent = "Click or drag & drop to upload";
+    textSpan.style.color = "var(--txt)";
+  }
+}
+
+async function startOnboardingParse(event) {
+  event.preventDefault();
+  const fileInput = document.getElementById('onboard-resume-file');
+  const textInput = document.getElementById('onboard-resume-text');
+  
+  if (!fileInput.files.length && !textInput.value.trim()) {
+    alert("Please upload a file or paste your resume details first.");
+    return;
+  }
+  
+  // Transition to scanning screen
+  document.getElementById('onboard-upload-step').style.display = 'none';
+  document.getElementById('onboard-scanning-step').style.display = 'block';
+  
+  // Start fake terminal logs
+  const logs = [
+    "🚀 Initializing parser...",
+    "📂 Opening resume container...",
+    "📄 Reading document layout and text contents...",
+    "🧠 Processing candidate experience and skills...",
+    "🔍 Scanning active Job Hunter Board listings database...",
+    "📊 Evaluating role fit scores via Gemini...",
+    "✨ Scoring matching opportunities...",
+    "💾 Saving candidate profile data...",
+    "🎉 Hatching suggestions..."
+  ];
+  let logIdx = 0;
+  const terminal = document.getElementById('onboard-terminal');
+  terminal.innerHTML = "";
+  
+  const logInterval = setInterval(() => {
+    if (logIdx < logs.length) {
+      const p = document.createElement('div');
+      p.textContent = logs[logIdx];
+      terminal.appendChild(p);
+      terminal.scrollTop = terminal.scrollHeight;
+      logIdx++;
+    }
+  }, 400);
+  
+  // Make AJAX call to /api/onboard_resume
+  const formData = new FormData();
+  if (fileInput.files.length) {
+    formData.append('resume_file', fileInput.files[0]);
+  } else {
+    formData.append('resume_text', textInput.value);
+  }
+  
+  try {
+    const response = await fetch('/api/onboard_resume', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    
+    clearInterval(logInterval);
+    
+    if (data.ok) {
+      // Transition to Suggested Jobs screen
+      document.getElementById('onboard-scanning-step').style.display = 'none';
+      document.getElementById('onboard-suggested-step').style.display = 'block';
+      
+      const grid = document.getElementById('onboard-suggestions-grid');
+      grid.innerHTML = "";
+      
+      data.suggestions.forEach(job => {
+        const card = document.createElement('div');
+        card.style.background = 'var(--sur)';
+        card.style.border = '1px solid var(--bdr)';
+        card.style.borderRadius = '16px';
+        card.style.padding = '20px';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '8px';
+        card.style.transition = 'transform 0.2s';
+        card.className = 'suggested-job-card';
+        
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <h4 style="font-size:16px; font-weight:700; color:var(--txt); margin:0;">${job.title}</h4>
+              <p style="font-size:13px; color:var(--mut); margin:2px 0 0 0;">${job.company} &bull; ${job.location}</p>
+            </div>
+            <span style="font-size:12px; font-weight:700; background:var(--purl); color:var(--pur); padding:4px 10px; border-radius:12px; white-space:nowrap;">
+              ${job.ai_score ? job.ai_score.toFixed(1) : '8.5'} / 10
+            </span>
+          </div>
+          <p style="font-size:12.5px; color:var(--mut); line-height:1.5; margin:8px 0 0 0;">${job.ai_summary || ''}</p>
+        `;
+        grid.appendChild(card);
+      });
+    } else {
+      alert("Parsing failed: " + (data.error || "unknown error"));
+      // reset
+      document.getElementById('onboard-upload-step').style.display = 'block';
+      document.getElementById('onboard-scanning-step').style.display = 'none';
+    }
+  } catch (error) {
+    clearInterval(logInterval);
+    alert("Connection error: " + error.message);
+    document.getElementById('onboard-upload-step').style.display = 'block';
+    document.getElementById('onboard-scanning-step').style.display = 'none';
   }
 }
 </script>
