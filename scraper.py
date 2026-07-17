@@ -202,26 +202,36 @@ DEMO_JOBS = [
 ]
 
 
-def _insert_job(conn, job: dict) -> bool:
+def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     """Returns True if inserted (new), False if already existed."""
-    if job_exists(conn, job["job_id"]):
+    # Ensure job_id is unique per user
+    jid = job["job_id"]
+    suffix = f"_u{user_id}"
+    if not jid.endswith(suffix):
+        jid = f"{jid}{suffix}"
+    
+    # Mutate the dictionary so callers get the updated job_id
+    job["job_id"] = jid
+    
+    if job_exists(conn, jid):
         return False
     conn.execute(
         """INSERT OR IGNORE INTO jobs
-           (job_id, title, company, location, url, description, source, posted_at, scraped_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (job_id, title, company, location, url, description, source, posted_at, scraped_at, user_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            job["job_id"], job["title"], job["company"],
+            jid, job["title"], job["company"],
             job.get("location", "India"), job["url"],
             job.get("description", ""), job["source"],
             job.get("posted_at", ""), datetime.now().isoformat(),
+            user_id
         ),
     )
     conn.commit()
     return True
 
 
-def scrape_naukri(conn, max_pages: int = 2) -> list[dict]:
+def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1) -> list[dict]:
     new_jobs = []
     for page in range(1, max_pages + 1):
         url = (
@@ -252,7 +262,7 @@ def scrape_naukri(conn, max_pages: int = 2) -> list[dict]:
                     "description": _fetch_description(job_url),
                     "posted_at": "",
                 }
-                if _insert_job(conn, job):
+                if _insert_job(conn, job, user_id=user_id):
                     new_jobs.append(job)
                 time.sleep(0.8)
         except Exception as e:
@@ -262,7 +272,7 @@ def scrape_naukri(conn, max_pages: int = 2) -> list[dict]:
     return new_jobs
 
 
-def scrape_linkedin_jobs(conn) -> list[dict]:
+def scrape_linkedin_jobs(conn, user_id: int = 1) -> list[dict]:
     url = (
         "https://www.linkedin.com/jobs/search?"
         "keywords=Product+Manager&location=India&f_TPR=r86400&position=1&pageNum=0"
@@ -291,7 +301,7 @@ def scrape_linkedin_jobs(conn) -> list[dict]:
                 "description": _fetch_description(job_url),
                 "posted_at": "",
             }
-            if _insert_job(conn, job):
+            if _insert_job(conn, job, user_id=user_id):
                 new_jobs.append(job)
             time.sleep(1)
     except Exception as e:
@@ -300,7 +310,7 @@ def scrape_linkedin_jobs(conn) -> list[dict]:
     return new_jobs
 
 
-def scrape_company_pages(conn) -> list[dict]:
+def scrape_company_pages(conn, user_id: int = 1) -> list[dict]:
     new_jobs = []
     for cfg in COMPANY_CAREER_PAGES:
         try:
@@ -326,7 +336,7 @@ def scrape_company_pages(conn) -> list[dict]:
                     "url": href, "source": "direct", "description": "",
                     "posted_at": "",
                 }
-                if _insert_job(conn, job):
+                if _insert_job(conn, job, user_id=user_id):
                     new_jobs.append(job)
             time.sleep(1.5)
         except Exception as e:
@@ -335,11 +345,11 @@ def scrape_company_pages(conn) -> list[dict]:
     return new_jobs
 
 
-def seed_demo_jobs(conn) -> list[dict]:
+def seed_demo_jobs(conn, user_id: int = 1) -> list[dict]:
     """Load demo jobs so the app works with no internet / no keys."""
     new_jobs = []
     for job in DEMO_JOBS:
-        if _insert_job(conn, job):
+        if _insert_job(conn, job, user_id=user_id):
             new_jobs.append(job)
     print(f"  Demo seed: {len(new_jobs)} jobs loaded")
     return new_jobs
@@ -359,19 +369,19 @@ def _fetch_description(url: str) -> str:
     return ""
 
 
-def run_all_scrapers(db_path: str = DB_PATH) -> list[dict]:
+def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
     conn = init_db(db_path)
     all_new = []
-    print("\n[Scraping job listings...]")
+    print(f"\n[Scraping job listings for user {user_id}...]")
 
     # Always seed demo data first so app has something to show
-    demo = seed_demo_jobs(conn)
+    demo = seed_demo_jobs(conn, user_id=user_id)
     all_new += demo
 
     # Then try live sources — failures are silent, demo data is the fallback
-    all_new += scrape_naukri(conn)
-    all_new += scrape_linkedin_jobs(conn)
-    all_new += scrape_company_pages(conn)
+    all_new += scrape_naukri(conn, user_id=user_id)
+    all_new += scrape_linkedin_jobs(conn, user_id=user_id)
+    all_new += scrape_company_pages(conn, user_id=user_id)
 
     conn.close()
     print(f"  Total new jobs this run: {len(all_new)}\n")

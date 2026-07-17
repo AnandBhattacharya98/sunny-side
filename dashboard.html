@@ -167,42 +167,133 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <body>
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
-<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100vw;padding:40px 0;">
-  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:380px;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
-    <h2 style="font-size:20px;font-weight:600;margin-bottom:6px;color:var(--txt);text-align:center;">PM Job Hunter</h2>
-    <p style="font-size:12px;color:var(--hin);text-align:center;margin-bottom:24px;">
-      {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
-    </p>
+<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#fafafa; width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
+  <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:32px; width:100%; max-width:420px; box-shadow:0 1px 3px rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:20px;">
+    <div style="text-align:center;">
+      <h2 style="font-size:24px; font-weight:600; color:#1a1a1a; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Inter', sans-serif;">PM Job Hunter</h2>
+      <p style="font-size:13px; color:#6b7280;">
+        {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
+      </p>
+    </div>
     
     {% if error %}
-    <div style="background:var(--rdl);color:var(--rd);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:16px;border:1px solid rgba(163, 45, 45, 0.2);">
+    <div style="background:#fef2f2; color:#b91c1c; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid #fee2e2;">
       ⚠️ {{ error }}
     </div>
     {% endif %}
     
-    <form method="POST" action="/{{ view_mode }}" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Username</label>
-        <input type="text" name="username" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="Enter username">
+    <form method="POST" action="/{{ view_mode }}" {% if view_mode == 'signup' %}enctype="multipart/form-data"{% endif %} style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Username -->
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="font-size:13px; font-weight:500; color:#1a1a1a;">Username</label>
+          {% if view_mode == 'signup' %}
+          <span style="font-size:11px; color:#6b7280; font-weight: 500;">Step 1 of 2</span>
+          {% endif %}
+        </div>
+        <input type="text" name="username" required style="padding:10px 12px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="Enter username">
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Password</label>
+      
+      <!-- Password -->
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="font-size:13px; font-weight:500; color:#1a1a1a;">Password</label>
         <div style="position:relative; display:flex; align-items:center;">
-          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="••••••••">
-          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+          <input type="password" id="auth-password" name="password" required style="padding:10px 40px 10px 12px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="••••••••">
+          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+            <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+          </button>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-p" style="padding:12px;font-size:13px;font-weight:600;margin-top:8px;">
-        {% if view_mode == 'login' %}Log In{% else %}Sign Up{% endif %}
+      <!-- Collapsible Profile Setup Accordion (Sign Up view only) -->
+      {% if view_mode == 'signup' %}
+      <div style="border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: #ffffff; margin-top: 4px;">
+        <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" style="width: 100%; padding: 12px 14px; background: #ffffff; border: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #1a1a1a; outline: none;" id="accordion-toggle-btn">
+          <span style="display:flex; align-items:center; gap:6px;">
+            ⚙️ Profile Setup (Optional)
+          </span>
+          <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: #6b7280;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        
+        <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #ffffff; padding: 0 14px;">
+          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #e5e7eb;">
+            
+            <!-- Resume File Upload / Drag & Drop -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
+              <div id="resume-dropzone" style="border: 1.5px dashed #e5e7eb; border-radius: 6px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;" onclick="document.getElementById('signup-resume-file').click()"
+                   ondragover="event.preventDefault(); this.style.borderColor='#2563eb'; this.style.background='#eff6ff';"
+                   ondragleave="event.preventDefault(); this.style.borderColor='#e5e7eb'; this.style.background='#fafafa';"
+                   ondrop="event.preventDefault(); this.style.borderColor='#e5e7eb'; this.style.background='#fafafa'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #9ca3af;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span style="font-size: 12px; font-weight: 500; color: #374151;" id="dropzone-text">Click or drag & drop to upload</span>
+                <span style="font-size: 11px; color: #6b7280;">Supports PDF, TXT</span>
+                <input type="file" id="signup-resume-file" name="resume_file" accept=".pdf,.txt" style="display: none;" onchange="handleFileChange(this)">
+              </div>
+            </div>
+            
+            <!-- Paste Resume Text -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Or Paste Resume Text</label>
+              <textarea name="resume_text" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; resize:vertical; min-height:80px; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="Paste resume text details..."></textarea>
+            </div>
+
+            <!-- LinkedIn Profile URL -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">LinkedIn Profile URL</label>
+              <input type="text" name="linkedin_profile" style="padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="https://linkedin.com/in/username">
+            </div>
+
+            <!-- Email IMAP Settings -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">IMAP Email</label>
+                <input type="email" name="imap_email" style="padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="name@gmail.com">
+                <span style="font-size:10px; color:#9ca3af; line-height:1.2;">Used to auto-scan job emails.</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">IMAP App PW</label>
+                <div style="position:relative; display:flex; align-items:center;">
+                  <input type="password" id="signup-imap-pw" name="imap_password" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="•••• •••• •••• ••••">
+                  <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+                    <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gemini API Key -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Gemini API Key</label>
+              <div style="position:relative; display:flex; align-items:center;">
+                <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:8px 32px 8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#ffffff; color:#1a1a1a; font-size:13px; outline:none; width:100%; transition: border-color 0.15s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e5e7eb'" placeholder="AIzaSy...">
+                <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+                  <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#6b7280;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div style="font-size:11px; color:#9ca3af; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
+              <span>🔒</span> Stored securely, never shared
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="submit" style="padding:12px; font-size:13px; font-weight:600; border-radius:6px; border:none; background:#2563eb; color:#ffffff; cursor:pointer; margin-top:8px; width:100%; transition: background-color 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+        {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
       </button>
     </form>
     
-    <div style="margin-top:20px;text-align:center;font-size:12px;color:var(--mut);">
+    <div style="text-align:center; font-size:13px; color:#6b7280; margin-top:4px;">
       {% if view_mode == 'login' %}
-      Don't have an account? <a href="/signup" style="color:var(--pur);text-decoration:none;font-weight:600;">Sign Up</a>
+      Don't have an account? <a href="/signup" style="color:#2563eb; text-decoration:none; font-weight:600;">Sign Up</a>
       {% else %}
-      Already have an account? <a href="/login" style="color:var(--pur);text-decoration:none;font-weight:600;">Log In</a>
+      Already have an account? <a href="/login" style="color:#2563eb; text-decoration:none; font-weight:600;">Log In</a>
       {% endif %}
     </div>
   </div>
@@ -1304,12 +1395,55 @@ async function deleteUser(userId, username) {
 <script>
 function togglePasswordVisibility(inputId, btn) {
   const input = document.getElementById(inputId);
+  const openSvg = btn.querySelector('.eye-open');
+  const closedSvg = btn.querySelector('.eye-closed');
+  
   if (input.type === 'password') {
     input.type = 'text';
-    btn.textContent = '🙈';
+    if (openSvg && closedSvg) {
+      openSvg.style.display = 'none';
+      closedSvg.style.display = 'inline-block';
+    } else {
+      btn.textContent = '🙈';
+    }
   } else {
     input.type = 'password';
-    btn.textContent = '👁️';
+    if (openSvg && closedSvg) {
+      openSvg.style.display = 'inline-block';
+      closedSvg.style.display = 'none';
+    } else {
+      btn.textContent = '👁️';
+    }
+  }
+}
+
+function toggleAccordion(elementId, chevronId) {
+  const content = document.getElementById(elementId);
+  const chevron = document.getElementById(chevronId);
+  const btn = document.getElementById('accordion-toggle-btn');
+  if (content.style.maxHeight === '0px' || !content.style.maxHeight) {
+    content.style.maxHeight = content.scrollHeight + 'px';
+    chevron.style.transform = 'rotate(180deg)';
+    btn.style.borderBottomColor = '#e5e7eb';
+  } else {
+    content.style.maxHeight = '0px';
+    chevron.style.transform = 'rotate(0deg)';
+    btn.style.borderBottomColor = 'transparent';
+  }
+}
+
+function handleFileChange(input) {
+  const dropzoneText = document.getElementById('dropzone-text');
+  const dropzone = document.getElementById('resume-dropzone');
+  if (input.files && input.files.length > 0) {
+    const file = input.files[0];
+    dropzoneText.textContent = `Selected: ${file.name}`;
+    dropzone.style.borderColor = '#2563eb';
+    dropzone.style.background = '#eff6ff';
+    const accordion = document.getElementById('profile-setup-accordion');
+    if (accordion && accordion.style.maxHeight !== '0px') {
+      accordion.style.maxHeight = accordion.scrollHeight + 'px';
+    }
   }
 }
 </script>

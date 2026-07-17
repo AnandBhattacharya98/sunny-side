@@ -164,16 +164,31 @@ def extract_job_info_from_email(subject: str, body: str, sender: str) -> tuple[s
         
     return company, title
 
-def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
+def sync_job_statuses_from_email(db_path: str = DB_PATH, user_id: int | None = None) -> int:
     """Connect to IMAP and synchronize statuses in the database."""
-    if not IMAP_EMAIL or not IMAP_PASSWORD:
-        print("[Email Sync] Skipping: IMAP_EMAIL or IMAP_PASSWORD not configured in .env.")
+    imap_server = IMAP_SERVER
+    imap_email = IMAP_EMAIL
+    imap_password = IMAP_PASSWORD
+
+    if user_id is not None:
+        conn = get_conn(db_path)
+        row = conn.execute("SELECT imap_email, imap_password FROM users WHERE id = ?", (user_id,)).fetchone()
+        conn.close()
+        if row:
+            if row["imap_email"]:
+                imap_email = row["imap_email"]
+            if row["imap_password"]:
+                imap_password = row["imap_password"]
+
+    if not imap_email or not imap_password:
+        prefix = f"[Email Sync (User {user_id})]" if user_id else "[Email Sync]"
+        print(f"{prefix} Skipping: credentials not configured.")
         return 0
         
-    print(f"\n[Email Sync] Connecting to {IMAP_SERVER} as {IMAP_EMAIL}...")
+    print(f"\n[Email Sync] Connecting to {imap_server} as {imap_email}...")
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(IMAP_EMAIL, IMAP_PASSWORD)
+        mail = imaplib.IMAP4_SSL(imap_server)
+        mail.login(imap_email, imap_password)
         # Select All Mail to scan all folders/categories (Promotions, Updates, etc.) in Gmail
         try:
             status, _ = mail.select('"[Gmail]/All Mail"', readonly=True)
@@ -199,9 +214,15 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
 
     # Load tracked companies from our SQLite DB
     conn = get_conn(db_path)
-    tracked_jobs = conn.execute(
-        "SELECT job_id, company, title, status FROM jobs WHERE status NOT IN ('archived', 'rejected', 'offer')"
-    ).fetchall()
+    if user_id is not None:
+        tracked_jobs = conn.execute(
+            "SELECT job_id, company, title, status, user_id FROM jobs WHERE user_id = ? AND status NOT IN ('archived', 'rejected', 'offer')",
+            (user_id,)
+        ).fetchall()
+    else:
+        tracked_jobs = conn.execute(
+            "SELECT job_id, company, title, status, user_id FROM jobs WHERE status NOT IN ('archived', 'rejected', 'offer')"
+        ).fetchall()
     
     if not tracked_jobs:
         print("[Email Sync] No active jobs in database to match.")
@@ -236,7 +257,7 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
         
         # Match against our tracked jobs/companies
         matched = False
-        for job_id, company, title, current_status in tracked_jobs:
+        for job_id, company, title, current_status, job_user_id in tracked_jobs:
             company_clean = company.lower().strip()
             
             # Check if email is from the company's direct domain
@@ -261,9 +282,9 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
                             (new_status, job_id)
                         )
                         conn.execute(
-                            """INSERT INTO received_emails (job_id, sender, subject, body, received_at)
-                               VALUES (?, ?, ?, ?, ?)""",
-                            (job_id, sender, subject, body, datetime.now().isoformat())
+                            """INSERT INTO received_emails (job_id, sender, subject, body, received_at, user_id)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            (job_id, sender, subject, body, datetime.now().isoformat(), job_user_id)
                         )
                         add_timeline(
                             conn, 
@@ -282,10 +303,16 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
                 extracted_company, extracted_title = extract_job_info_from_email(subject, body, sender)
                 if extracted_company:
                     # Check if already tracked in the database to prevent duplicate creation
-                    existing_job = conn.execute(
-                        "SELECT job_id FROM jobs WHERE LOWER(company) = ? AND LOWER(title) = ?",
-                        (extracted_company.lower(), extracted_title.lower())
-                    ).fetchone()
+                    if user_id is not None:
+                        existing_job = conn.execute(
+                            "SELECT job_id FROM jobs WHERE user_id = ? AND LOWER(company) = ? AND LOWER(title) = ?",
+                            (user_id, extracted_company.lower(), extracted_title.lower())
+                        ).fetchone()
+                    else:
+                        existing_job = conn.execute(
+                            "SELECT job_id FROM jobs WHERE LOWER(company) = ? AND LOWER(title) = ?",
+                            (extracted_company.lower(), extracted_title.lower())
+                        ).fetchone()
                     
                     if not existing_job:
                         import uuid
@@ -295,14 +322,14 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
                         
                         print(f"  [Auto-Discover!] Creating new applied job: {extracted_company} - {extracted_title} (Score: {auto_score})")
                         conn.execute(
-                            """INSERT INTO jobs (job_id, company, title, status, url, location, description, scraped_at, ai_score)
-                               VALUES (?, ?, ?, 'applied', '', 'Remote', 'Automatically discovered via email application confirmation.', ?, ?)""",
-                            (job_id, extracted_company, extracted_title, datetime.now().isoformat(), auto_score)
+                            """INSERT INTO jobs (job_id, company, title, status, url, location, description, scraped_at, ai_score, user_id)
+                               VALUES (?, ?, ?, 'applied', '', 'Remote', 'Automatically discovered via email application confirmation.', ?, ?, ?)""",
+                            (job_id, extracted_company, extracted_title, datetime.now().isoformat(), auto_score, user_id or 1)
                         )
                         conn.execute(
-                            """INSERT INTO received_emails (job_id, sender, subject, body, received_at)
-                               VALUES (?, ?, ?, ?, ?)""",
-                            (job_id, sender, subject, body, datetime.now().isoformat())
+                            """INSERT INTO received_emails (job_id, sender, subject, body, received_at, user_id)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            (job_id, sender, subject, body, datetime.now().isoformat(), user_id or 1)
                         )
                         add_timeline(
                             conn,
@@ -313,10 +340,7 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH) -> int:
                         updates_count += 1
                         
                         # Update our local tracked list reference to prevent duplicate triggers
-                        tracked_jobs = [
-                            (j_id, co, t, new_status if j_id == job_id else st)
-                            for j_id, co, t, st in tracked_jobs
-                        ]
+                        tracked_jobs.append((job_id, extracted_company, extracted_title, 'applied', user_id or 1))
 
     conn.close()
     try:

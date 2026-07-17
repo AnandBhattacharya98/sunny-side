@@ -116,14 +116,18 @@ def find_contacts(company: str) -> list[dict]:
 
 
 def _store_contacts(conn, job_id: str, contacts: list[dict]) -> None:
+    # Fetch user_id for this job
+    row = conn.execute("SELECT user_id FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+    uid = row[0] if row else 1
+    
     # Clear old contacts for this job first
     conn.execute("DELETE FROM contacts WHERE job_id=?", (job_id,))
     for c in contacts:
         conn.execute(
-            """INSERT INTO contacts (job_id, name, title, linkedin_url, email, found_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO contacts (job_id, name, title, linkedin_url, email, found_at, user_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (job_id, c["name"], c["title"], c["linkedin_url"],
-             c.get("email", ""), datetime.now().isoformat()),
+             c.get("email", ""), datetime.now().isoformat(), uid),
         )
     conn.commit()
 

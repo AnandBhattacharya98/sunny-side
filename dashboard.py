@@ -50,9 +50,42 @@ def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        linkedin_profile = request.form.get("linkedin_profile", "").strip()
+        imap_email = request.form.get("imap_email", "").strip()
+        imap_password = request.form.get("imap_password", "").strip()
+        gemini_api_key = request.form.get("gemini_api_key", "").strip()
+        
+        # Check for uploaded resume file
+        resume_text = ""
+        file = request.files.get("resume_file")
+        if file and file.filename:
+            filename = file.filename.lower()
+            if filename.endswith(".txt"):
+                try:
+                    resume_text = file.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
+            elif filename.endswith(".pdf"):
+                import pypdf
+                try:
+                    reader = pypdf.PdfReader(file)
+                    resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+                except Exception as e:
+                    print(f"Error parsing PDF: {e}")
+                    resume_text = ""
+        
+        if not resume_text:
+            resume_text = request.form.get("resume_text", "").strip()
+
         conn = get_conn(DB_PATH)
         try:
             uid = signup_user(conn, username, password)
+            conn.execute(
+                """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ? 
+                   WHERE id = ?""",
+                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, uid)
+            )
+            conn.commit()
             session.permanent = True
             session["user_id"] = uid
             session["username"] = username
@@ -467,7 +500,7 @@ def refresh_listings():
     
     try:
         uid = get_user_id()
-        run_all_scrapers(DB_PATH)
+        run_all_scrapers(DB_PATH, user_id=uid)
         
         conn = get_conn(DB_PATH)
         conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
@@ -479,7 +512,7 @@ def refresh_listings():
         
         # Sync application statuses from user's email
         from email_scraper import sync_job_statuses_from_email
-        sync_job_statuses_from_email(DB_PATH)
+        sync_job_statuses_from_email(DB_PATH, user_id=uid)
         conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
         conn.commit()
         
