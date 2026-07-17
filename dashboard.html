@@ -157,8 +157,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
-<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100vw;">
-  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:380px;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100vw;padding:40px 0;">
+  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:{% if view_mode == 'signup' %}460px{% else %}380px{% endif %};box-shadow:0 8px 30px rgba(0,0,0,0.08);transition:width 0.2s;">
     <h2 style="font-size:20px;font-weight:600;margin-bottom:6px;color:var(--txt);text-align:center;">PM Job Hunter</h2>
     <p style="font-size:12px;color:var(--hin);text-align:center;margin-bottom:24px;">
       {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
@@ -170,7 +170,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
     {% endif %}
     
-    <form method="POST" action="/{{ view_mode }}" style="display:flex;flex-direction:column;gap:16px;">
+    <form method="POST" action="/{{ view_mode }}" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:16px;">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Username</label>
         <input type="text" name="username" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="Enter username">
@@ -182,8 +182,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
           <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
         </div>
       </div>
+      
+      {% if view_mode == 'signup' %}
+      <div style="border-top: 1px solid var(--bdr); margin-top: 8px; padding-top: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <h4 style="font-size: 11px; font-weight: 700; color: var(--pur); text-transform: uppercase; letter-spacing: 0.05em;">Profile Setup (Optional)</h4>
+        
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
+          <input type="file" name="resume_file" accept=".pdf,.txt" style="font-size:12px; color:var(--txt); background:var(--bg); padding:8px; border-radius:6px; border:1px dashed var(--bdr); cursor:pointer;">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">LinkedIn Profile URL</label>
+          <input type="text" name="linkedin_profile" style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="https://linkedin.com/in/yourname">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">IMAP Email</label>
+            <input type="email" name="imap_email" style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="your.name@gmail.com">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">IMAP App PW</label>
+            <div style="position:relative; display:flex; align-items:center;">
+              <input type="password" id="signup-imap-pw" name="imap_password" style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="•••• •••• •••• ••••">
+              <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Gemini API Key</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="AIzaSy...">
+            <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <button type="submit" class="btn btn-p" style="padding:12px;font-size:13px;font-weight:600;margin-top:8px;">
-        {% if view_mode == 'login' %}Log In{% else %}Sign Up{% endif %}
+        {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
       </button>
     </form>
     
@@ -306,7 +345,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
         <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 1</span>
         <h4 style="font-size:12px; font-weight:600; color:var(--txt);">Upload Resume</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Paste your raw resume text under Profile Settings. AI uses it to score matching jobs.</p>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Directly upload a PDF/TXT resume or paste your text details under Settings. AI scores matches for you.</p>
         <button class="btn btn-p" onclick="openSettingsModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Open Settings</button>
       </div>
       
@@ -322,7 +361,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
         <span style="font-size:10px; font-weight:700; color:var(--hin); text-transform:uppercase; letter-spacing:0.05em;">Step 3</span>
         <h4 style="font-size:12px; font-weight:600; color:var(--txt);">WhatsApp Sync</h4>
-        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Use WhatsApp modal, paste chats or select messages. AI parses titles/URLs instantly.</p>
+        <p style="font-size:11px; color:var(--mut); line-height:1.4;">Open the import modal, paste forwarded chat messages directly, or drag selection bookmarklet.</p>
         <button class="btn btn-g" onclick="openWhatsappModal()" style="margin-top:auto; font-size:10px; padding:4px 10px; width:fit-content;">Import Chats</button>
       </div>
       
@@ -727,7 +766,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="modal-body" style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
       <div style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">AI Resume Content (Markdown or Text)</label>
-        <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:200px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
+        <div style="display:flex; gap:10px; margin-bottom:4px;">
+          <input type="file" id="desktop-resume-file" accept=".pdf,.txt" style="display:none;" onchange="uploadResumeFile(this)">
+          <button type="button" class="btn btn-g" onclick="document.getElementById('desktop-resume-file').click()" style="display:flex; align-items:center; gap:6px; font-size:11px; padding:6px 12px;">📂 Upload Resume from Desktop (.pdf, .txt)</button>
+          <span id="resume-upload-status" style="font-size:11px; color:var(--hin); display:flex; align-items:center;"></span>
+        </div>
+        <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:160px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">LinkedIn Profile URL</label>
+        <input type="text" id="settings-linkedin" value="{{ (settings or {}).get('linkedin_profile', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="https://linkedin.com/in/yourname">
       </div>
       
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
@@ -1171,6 +1220,7 @@ async function saveSettings() {
   const email = document.getElementById('settings-imap-email').value;
   const password = document.getElementById('settings-imap-password').value;
   const key = document.getElementById('settings-gemini-key').value;
+  const linkedin = document.getElementById('settings-linkedin').value;
   
   try {
     const resp = await fetch('/api/profile', {
@@ -1180,7 +1230,8 @@ async function saveSettings() {
         resume_text: resume,
         imap_email: email,
         imap_password: password,
-        gemini_api_key: key
+        gemini_api_key: key,
+        linkedin_profile: linkedin
       })
     });
     const data = await resp.json();
@@ -1192,6 +1243,37 @@ async function saveSettings() {
     }
   } catch (err) {
     console.error(err);
+    toast('Connection error');
+  }
+}
+
+async function uploadResumeFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const status = document.getElementById('resume-upload-status');
+  status.textContent = '⌛ Uploading...';
+  
+  const formData = new FormData();
+  formData.append('resume_file', file);
+  
+  try {
+    const resp = await fetch('/api/profile/upload', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      document.getElementById('settings-resume').value = data.resume_text;
+      status.textContent = '✅ Uploaded successfully!';
+      toast('Resume file parsed and uploaded!');
+    } else {
+      status.textContent = '❌ Upload failed';
+      toast(`Error: ${data.error}`);
+    }
+  } catch (err) {
+    console.error(err);
+    status.textContent = '❌ Connection error';
     toast('Connection error');
   }
 }

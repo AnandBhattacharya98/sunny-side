@@ -50,9 +50,39 @@ def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        linkedin_profile = request.form.get("linkedin_profile", "").strip()
+        imap_email = request.form.get("imap_email", "").strip()
+        imap_password = request.form.get("imap_password", "").strip()
+        gemini_api_key = request.form.get("gemini_api_key", "").strip()
+        
+        # Check for uploaded resume file
+        resume_text = ""
+        file = request.files.get("resume_file")
+        if file and file.filename:
+            filename = file.filename.lower()
+            if filename.endswith(".txt"):
+                resume_text = file.read().decode("utf-8", errors="ignore")
+            elif filename.endswith(".pdf"):
+                import pypdf
+                try:
+                    reader = pypdf.PdfReader(file)
+                    resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+                except Exception as e:
+                    print(f"Error parsing PDF: {e}")
+                    resume_text = ""
+        
+        if not resume_text:
+            resume_text = request.form.get("resume_text", "").strip()
+            
         conn = get_conn(DB_PATH)
         try:
             uid = signup_user(conn, username, password)
+            conn.execute(
+                """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?
+                   WHERE id = ?""",
+                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, uid)
+            )
+            conn.commit()
             session.permanent = True
             session["user_id"] = uid
             session["username"] = username
@@ -74,13 +104,40 @@ def update_profile():
     uid = get_user_id()
     conn = get_conn(DB_PATH)
     conn.execute(
-        """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ? 
+        """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ? 
            WHERE id = ?""",
-        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), uid)
+        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), d.get("linkedin_profile", ""), uid)
     )
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+@app.route("/api/profile/upload", methods=["POST"])
+def upload_profile_resume():
+    uid = get_user_id()
+    file = request.files.get("resume_file")
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "No file uploaded"}), 400
+        
+    filename = file.filename.lower()
+    resume_text = ""
+    if filename.endswith(".txt"):
+        resume_text = file.read().decode("utf-8", errors="ignore")
+    elif filename.endswith(".pdf"):
+        import pypdf
+        try:
+            reader = pypdf.PdfReader(file)
+            resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
+    else:
+        return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF or TXT."}), 400
+        
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET resume_text = ? WHERE id = ?", (resume_text, uid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "resume_text": resume_text})
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
