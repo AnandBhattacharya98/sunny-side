@@ -168,7 +168,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 {% if view_mode == 'login' or view_mode == 'signup' %}
 <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);width:100vw;padding:40px 0;">
-  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:{% if view_mode == 'signup' %}460px{% else %}380px{% endif %};box-shadow:0 8px 30px rgba(0,0,0,0.08);transition:width 0.2s;">
+  <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:32px;width:380px;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
     <h2 style="font-size:20px;font-weight:600;margin-bottom:6px;color:var(--txt);text-align:center;">PM Job Hunter</h2>
     <p style="font-size:12px;color:var(--hin);text-align:center;margin-bottom:24px;">
       {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
@@ -180,7 +180,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     </div>
     {% endif %}
     
-    <form method="POST" action="/{{ view_mode }}" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:16px;">
+    <form method="POST" action="/{{ view_mode }}" style="display:flex;flex-direction:column;gap:16px;">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Username</label>
         <input type="text" name="username" required style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="Enter username">
@@ -192,47 +192,9 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
         </div>
       </div>
-      
-      {% if view_mode == 'signup' %}
-      <div style="border-top: 1px solid var(--bdr); margin-top: 8px; padding-top: 16px; display: flex; flex-direction: column; gap: 14px;">
-        <h4 style="font-size: 11px; font-weight: 700; color: var(--pur); text-transform: uppercase; letter-spacing: 0.05em;">Profile Setup (Optional)</h4>
-        
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
-          <input type="file" name="resume_file" accept=".pdf,.txt" style="font-size:12px; color:var(--txt); background:var(--bg); padding:8px; border-radius:6px; border:1px dashed var(--bdr); cursor:pointer;">
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">LinkedIn Profile URL</label>
-          <input type="text" name="linkedin_profile" style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="https://linkedin.com/in/yourname">
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">IMAP Email</label>
-            <input type="email" name="imap_email" style="padding:10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;" placeholder="your.name@gmail.com">
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">IMAP App PW</label>
-            <div style="position:relative; display:flex; align-items:center;">
-              <input type="password" id="signup-imap-pw" name="imap_password" style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="•••• •••• •••• ••••">
-              <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;">Gemini API Key</label>
-          <div style="position:relative; display:flex; align-items:center;">
-            <input type="password" id="signup-gemini-key" name="gemini_api_key" style="padding:10px 40px 10px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg);color:var(--txt);font-size:13px;outline:none;width:100%;" placeholder="AIzaSy...">
-            <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:14px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">👁️</button>
-          </div>
-        </div>
-      </div>
-      {% endif %}
 
       <button type="submit" class="btn btn-p" style="padding:12px;font-size:13px;font-weight:600;margin-top:8px;">
-        {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
+        {% if view_mode == 'login' %}Log In{% else %}Sign Up{% endif %}
       </button>
     </form>
     
@@ -1315,17 +1277,6 @@ function toggleTheme() {
   }
 })();
 
-function togglePasswordVisibility(inputId, btn) {
-  const input = document.getElementById(inputId);
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.textContent = '🙈';
-  } else {
-    input.type = 'password';
-    btn.textContent = '👁️';
-  }
-}
-
 async function deleteUser(userId, username) {
   if (!confirm(`Are you absolutely sure you want to delete user "${username}" and all their application data? This action cannot be undone.`)) {
     return;
@@ -1348,6 +1299,19 @@ async function deleteUser(userId, username) {
   }
 }
 {% endif %}
+</script>
+
+<script>
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
 </script>
 </body>
 </html>
