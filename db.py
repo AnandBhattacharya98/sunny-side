@@ -54,10 +54,13 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             
     # Migrate users table columns if needed
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
-    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile"]:
+    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile", "name", "designation"]:
         if col not in user_cols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
             conn.commit()
+    if "share_profile" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN share_profile INTEGER DEFAULT 0;")
+        conn.commit()
 
 
 def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:

@@ -158,9 +158,12 @@ Return exactly:
         return result
 
 
-def _call_gemini(prompt: str, response_json: bool = False) -> str:
+def _call_gemini(prompt: str, response_json: bool = False, api_key: str = None) -> str:
     import requests
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    key_to_use = api_key or GEMINI_API_KEY
+    if not key_to_use:
+        raise ValueError("No Gemini API key configured. Provide it in profile settings or set GEMINI_API_KEY env.")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key_to_use}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
@@ -174,7 +177,7 @@ def _call_gemini(prompt: str, response_json: bool = False) -> str:
     return res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
-def _gemini_score(title: str, company: str, description: str, resume_text: str = None) -> dict:
+def _gemini_score(title: str, company: str, description: str, resume_text: str = None, api_key: str = None) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
@@ -189,7 +192,7 @@ DESCRIPTION: {description[:2000]}
 Return exactly:
 {{"score": <0-10 float>, "fit_summary": "<2 sentences>", "key_requirements": ["<req1>","<req2>","<req3>"]}}"""
 
-        raw = _call_gemini(prompt, response_json=True)
+        raw = _call_gemini(prompt, response_json=True, api_key=api_key)
         data = json.loads(raw)
         data["mode"] = "gemini"
         return data
@@ -200,13 +203,15 @@ Return exactly:
         return result
 
 
-def score_job(title: str, company: str, description: str, resume_text: str = None) -> dict:
+def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     if ANTHROPIC_API_KEY:
         return _ai_score(title, company, description, resume_text)
-    elif GEMINI_API_KEY:
-        return _gemini_score(title, company, description, resume_text)
+    
+    key_to_use = api_key or GEMINI_API_KEY
+    if key_to_use:
+        return _gemini_score(title, company, description, resume_text, api_key=key_to_use)
     return _local_score(title, company, description)
 
 
@@ -285,7 +290,7 @@ Return exactly:
 
 
 def _gemini_cover_letter(title: str, company: str, description: str,
-                         contact_name: str, contact_title: str, resume_text: str = None) -> dict:
+                         contact_name: str, contact_title: str, resume_text: str = None, api_key: str = None) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
@@ -303,7 +308,7 @@ DESCRIPTION: {description[:1800]}
 Return exactly:
 {{"subject": "<subject line>", "body": "<full cover letter>"}}"""
 
-        raw = _call_gemini(prompt, response_json=True)
+        raw = _call_gemini(prompt, response_json=True, api_key=api_key)
         return json.loads(raw)
     except Exception as e:
         print(f"  [Gemini cover letter fallback] {e}")
@@ -313,20 +318,22 @@ Return exactly:
 def generate_cover_letter(title: str, company: str, description: str,
                            contact_name: str = "Hiring Team",
                            contact_title: str = "Recruiter",
-                           resume_text: str = None) -> dict:
+                           resume_text: str = None, api_key: str = None) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT
     if ANTHROPIC_API_KEY:
         return _ai_cover_letter(title, company, description, contact_name, contact_title, resume_text)
-    elif GEMINI_API_KEY:
-        return _gemini_cover_letter(title, company, description, contact_name, contact_title, resume_text)
+    
+    key_to_use = api_key or GEMINI_API_KEY
+    if key_to_use:
+        return _gemini_cover_letter(title, company, description, contact_name, contact_title, resume_text, api_key=key_to_use)
     return _local_cover_letter(title, company, description, contact_name, contact_title)
 
 
 # ── LinkedIn note ──────────────────────────────────────────────────────────
 
 def generate_linkedin_note(contact_name: str, contact_title: str,
-                            company: str, job_title: str) -> str:
+                            company: str, job_title: str, api_key: str = None) -> str:
     first = contact_name.split()[0] if contact_name and contact_name != "Hiring Team" else "there"
     if ANTHROPIC_API_KEY:
         try:
@@ -343,10 +350,12 @@ def generate_linkedin_note(contact_name: str, contact_title: str,
             return msg.content[0].text.strip()
         except Exception:
             pass
-    elif GEMINI_API_KEY:
+            
+    key_to_use = api_key or GEMINI_API_KEY
+    if key_to_use:
         try:
             prompt = f"Write a LinkedIn connection note (under 280 chars) from a PM applying for {job_title} at {company} to {contact_name} ({contact_title}). Warm, specific, not salesy. Return only the note text."
-            return _call_gemini(prompt, response_json=False)
+            return _call_gemini(prompt, response_json=False, api_key=key_to_use)
         except Exception:
             pass
             
@@ -443,8 +452,9 @@ Guidelines for tailoring:
 def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: int = 1) -> list[dict]:
     """Score and generate cover letters for all 'new' jobs in the DB."""
     conn = get_conn(db_path)
-    row = conn.execute("SELECT resume_text FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (user_id,)).fetchone()
     resume_text = row[0] if row else None
+    api_key = row[1] if row else None
 
     jobs = conn.execute(
         "SELECT job_id, title, company, location, url, description FROM jobs WHERE status = 'new' AND user_id = ?",
@@ -453,7 +463,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
 
     if ANTHROPIC_API_KEY:
         mode = "AI (Claude)"
-    elif GEMINI_API_KEY:
+    elif api_key or GEMINI_API_KEY:
         mode = "AI (Gemini)"
     else:
         mode = "local rules (add API keys for AI)"
@@ -464,7 +474,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
         job_id, title, company, location, url, description = tuple(job)
         print(f"  {title} @ {company}...", end=" ")
 
-        score_data = score_job(title, company, description or "", resume_text=resume_text)
+        score_data = score_job(title, company, description or "", resume_text=resume_text, api_key=api_key)
         score = score_data["score"]
 
         key_reqs_json = json.dumps(score_data.get("key_requirements", []))
@@ -480,24 +490,24 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
             continue
 
         contact = conn.execute(
-            "SELECT name, title FROM contacts WHERE job_id=? LIMIT 1", (job_id,)
+            "SELECT name, title FROM contacts WHERE job_id=? AND user_id=? LIMIT 1", (job_id, user_id)
         ).fetchone()
         contact_name = contact[0] if contact else "Hiring Team"
         contact_title = contact[1] if contact else "Recruiter"
 
         letter = generate_cover_letter(title, company, description or "",
-                                       contact_name, contact_title, resume_text=resume_text)
-        linkedin_note = generate_linkedin_note(contact_name, contact_title, company, title)
+                                       contact_name, contact_title, resume_text=resume_text, api_key=api_key)
+        linkedin_note = generate_linkedin_note(contact_name, contact_title, company, title, api_key=api_key)
 
         conn.execute(
             """INSERT OR REPLACE INTO cover_letters
-               (job_id, subject, body, linkedin_note, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
+               (job_id, subject, body, linkedin_note, created_at, user_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             (job_id, letter["subject"], letter["body"],
-             linkedin_note, datetime.now().isoformat()),
+             linkedin_note, datetime.now().isoformat(), user_id),
         )
         conn.execute(
-            "UPDATE jobs SET status='ready' WHERE job_id=?", (job_id,)
+            "UPDATE jobs SET status='ready' WHERE job_id=? AND user_id=?", (job_id, user_id)
         )
         conn.commit()
 

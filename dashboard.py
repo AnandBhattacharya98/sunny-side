@@ -17,14 +17,14 @@ def get_user_id() -> int:
     return session.get("user_id", 1)
 
 def get_user_settings(conn, user_id):
-    row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile FROM users WHERE id = ?", (user_id,)).fetchone()
     if row:
         return dict(row)
     return {}
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static"]
+    allowed_endpoints = ["login", "signup", "static", "index"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             return redirect(url_for("login"))
@@ -50,6 +50,9 @@ def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        name = request.form.get("name", "").strip() or username.capitalize()
+        designation = request.form.get("designation", "").strip() or "Product Seeker"
+        share_profile = 1 if request.form.get("share_profile") else 0
         linkedin_profile = request.form.get("linkedin_profile", "").strip()
         imap_email = request.form.get("imap_email", "").strip()
         imap_password = request.form.get("imap_password", "").strip()
@@ -81,9 +84,10 @@ def signup():
         try:
             uid = signup_user(conn, username, password)
             conn.execute(
-                """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ? 
+                """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
+                   name = ?, designation = ?, share_profile = ?
                    WHERE id = ?""",
-                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, uid)
+                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, uid)
             )
             conn.commit()
             session.permanent = True
@@ -107,9 +111,11 @@ def update_profile():
     uid = get_user_id()
     conn = get_conn(DB_PATH)
     conn.execute(
-        """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ? 
+        """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
+           name = ?, designation = ?, share_profile = ?
            WHERE id = ?""",
-        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), d.get("linkedin_profile", ""), uid)
+        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), d.get("linkedin_profile", ""),
+         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), uid)
     )
     conn.commit()
     conn.close()
@@ -201,8 +207,15 @@ def _full_job(conn, job_id):
 @app.route("/")
 def index():
     conn = get_conn(DB_PATH)
-    uid = get_user_id()
-    
+    uid = session.get("user_id")
+    if not uid:
+        # Fetch consenting seekers for landing page wall (excluding admin)
+        users = conn.execute(
+            "SELECT name, designation, linkedin_profile FROM users WHERE share_profile = 1 AND username != 'admin' ORDER BY id DESC"
+        ).fetchall()
+        conn.close()
+        return render_template("landing.html", seekers=[dict(u) for u in users])
+        
     # Fetch all active jobs (ignore archived)
     raw_jobs = conn.execute("SELECT * FROM jobs WHERE user_id = ? AND status != 'archived' ORDER BY COALESCE(ai_score,0) DESC", (uid,)).fetchall()
     
@@ -386,9 +399,9 @@ def regenerate(job_id):
     ct = contact[1] if contact else "Recruiter"
 
     settings = get_user_settings(conn, uid)
-    score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"))
-    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"))
-    li_note    = generate_linkedin_note(cn, ct, j["company"], j["title"])
+    score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+    li_note    = generate_linkedin_note(cn, ct, j["company"], j["title"], api_key=settings.get("gemini_api_key"))
 
     conn.execute("UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=? WHERE job_id=? AND user_id=?",
                  (score_data["score"], score_data["fit_summary"],
@@ -708,7 +721,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
         # Calculate real score if description and title are present
         try:
             settings = get_user_settings(conn, uid)
-            score_data = score_job(title, company, desc, resume_text=settings.get("resume_text"))
+            score_data = score_job(title, company, desc, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
             auto_score = score_data.get("score", 7.0)
             ai_summary = score_data.get("summary", "Imported from WhatsApp.")
             key_reqs = json.dumps(score_data.get("key_requirements", []))

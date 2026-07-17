@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PM Job Hunter — Pipeline Board</title>
+<title>Job Hunter Board — Pipeline Board</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -182,7 +182,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 50%), #060511; width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
   <div style="background:rgba(15, 14, 30, 0.75); border:1px solid rgba(255, 255, 255, 0.08); border-radius:12px; padding:32px; width:100%; max-width:420px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display:flex; flex-direction:column; gap:20px;">
     <div style="text-align:center;">
-      <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">PM Job Hunter</h2>
+      <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">Job Hunter Board</h2>
       <p style="font-size:13px; color:#94a3b8;">
         {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
       </p>
@@ -230,6 +230,24 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         
         <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: transparent; padding: 0 14px;">
           <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            
+            <!-- Name & Designation -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Full Name</label>
+                <input type="text" name="name" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Anand Bhattacharya">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">Designation / Title</label>
+                <input type="text" name="designation" style="padding:8px 10px; border-radius:6px; border:1px solid rgba(255, 255, 255, 0.08); background:#0f0e1c; color:#f8fafc; font-size:13px; outline:none;" placeholder="Product Manager">
+              </div>
+            </div>
+
+            <!-- Show on landing page checkbox -->
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="signup-share-profile" name="share_profile" checked style="width:16px;height:16px;cursor:pointer;">
+              <label for="signup-share-profile" style="font-size:12px; color:#f8fafc; cursor:pointer;">Show my profile on landing page seekers wall</label>
+            </div>
             
             <!-- Resume File Upload / Drag & Drop -->
             <div style="display:flex; flex-direction:column; gap:6px;">
@@ -315,7 +333,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 <!-- Sidebar -->
 <nav class="sidebar">
-  <div class="logo">PM Job Hunter</div>
+  <div class="logo">Job Hunter Board</div>
 
   <div class="ns">Views</div>
   <a class="nl {% if view_mode=='board' %}on{% endif %}" href="/" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
@@ -849,6 +867,22 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:160px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
       </div>
 
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Full Name</label>
+          <input type="text" id="settings-name" value="{{ (settings or {}).get('name', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Anand Bhattacharya">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
+          <input type="text" id="settings-designation" value="{{ (settings or {}).get('designation', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Product Manager">
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+        <input type="checkbox" id="settings-share-profile" {% if (settings or {}).get('share_profile') %}checked{% endif %} style="width: 16px; height: 16px; cursor: pointer;">
+        <label for="settings-share-profile" style="font-size:13px; color:var(--txt); cursor: pointer; font-weight: 500;">Show my profile on landing page wall</label>
+      </div>
+
       <div style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">LinkedIn Profile URL</label>
         <input type="text" id="settings-linkedin" value="{{ (settings or {}).get('linkedin_profile', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="https://linkedin.com/in/yourname">
@@ -1296,6 +1330,9 @@ async function saveSettings() {
   const password = document.getElementById('settings-imap-password').value;
   const key = document.getElementById('settings-gemini-key').value;
   const linkedin = document.getElementById('settings-linkedin').value;
+  const name = document.getElementById('settings-name').value;
+  const designation = document.getElementById('settings-designation').value;
+  const shareProfile = document.getElementById('settings-share-profile').checked ? 1 : 0;
   
   try {
     const resp = await fetch('/api/profile', {
@@ -1306,7 +1343,10 @@ async function saveSettings() {
         imap_email: email,
         imap_password: password,
         gemini_api_key: key,
-        linkedin_profile: linkedin
+        linkedin_profile: linkedin,
+        name: name,
+        designation: designation,
+        share_profile: shareProfile
       })
     });
     const data = await resp.json();

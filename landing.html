@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Job Hunter Board — Land Your Next Role on Autopilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --bg: #060511;           /* Deep dark violet-black */
+  --sur: rgba(15, 14, 30, 0.75); /* Translucent card background */
+  --bdr: rgba(255, 255, 255, 0.08);
+  --txt: #f8fafc;
+  --mut: #94a3b8;
+  --hin: #475569;
+  --pur: #7c3aed;         /* Modern Violet primary */
+  --purl: rgba(124, 58, 237, 0.15);
+  --purt: #a78bfa;
+  --glow-1: rgba(124, 58, 237, 0.08);
+  --glow-2: rgba(59, 130, 246, 0.06);
+}
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%),
+              radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%),
+              var(--bg);
+  color: var(--txt);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Nav */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: rgba(6, 5, 17, 0.7);
+  border-bottom: 1px solid var(--bdr);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 40px;
+  z-index: 1000;
+}
+.logo {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-family: 'Space Grotesk', sans-serif;
+  background: linear-gradient(135deg, #3b82f6, var(--pur));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-decoration: none;
+}
+.nav-links {
+  display: flex;
+  gap: 24px;
+}
+.nav-links a {
+  color: var(--mut);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover {
+  color: var(--txt);
+}
+.nav-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--bdr);
+  background: var(--sur);
+  color: var(--txt);
+  transition: all .15s;
+  text-decoration: none;
+  font-family: 'Space Grotesk', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn:hover {
+  border-color: var(--pur);
+  box-shadow: 0 4px 12px var(--purl);
+}
+.btn-p {
+  background: linear-gradient(135deg, #1d82f5, var(--pur));
+  color: #fff;
+  border: none;
+}
+.btn-p:hover {
+  opacity: 0.9;
+}
+
+/* Sections */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Hero Section */
+.hero {
+  padding: 160px 0 80px;
+  text-align: center;
+  position: relative;
+}
+.hero h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  background: linear-gradient(135deg, #ffffff 40%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p {
+  font-size: 16px;
+  color: var(--mut);
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+
+/* Feature Grid */
+.features {
+  padding: 80px 0;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.section-header h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.section-header p {
+  color: var(--mut);
+  font-size: 15px;
+}
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.feature-card {
+  background: var(--sur);
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  padding: 24px;
+  transition: transform 0.25s, border-color 0.25s;
+  backdrop-filter: blur(16px);
+}
+.feature-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--pur);
+}
+.feature-icon {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+.feature-card h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.feature-card p {
+  color: var(--mut);
+  font-size: 13.5px;
+}
+
+/* Seeker Wall */
+.seekers-section {
+  padding: 80px 0;
+  border-top: 1px solid var(--bdr);
+}
+.seekers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.seeker-card {
+  background: var(--sur);
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.seeker-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1d82f5, var(--pur));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  font-size: 16px;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.seeker-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--txt);
+}
+.seeker-title {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.4;
+}
+.seeker-link {
+  color: var(--pur);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.seeker-link:hover {
+  text-decoration: underline;
+  color: var(--purt);
+}
+
+/* Testimonials */
+.testimonials {
+  padding: 80px 0;
+  border-top: 1px solid var(--bdr);
+}
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.testimonial-card {
+  background: var(--sur);
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  padding: 28px;
+  backdrop-filter: blur(12px);
+}
+.testimonial-quote {
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-style: italic;
+}
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.author-info h4 {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.author-info p {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+/* Footer */
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--bdr);
+  text-align: center;
+  font-size: 12px;
+  color: var(--hin);
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/">Job Hunter Board</a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#seekers">Seekers Wall</a>
+    <a href="#testimonials">Testimonials</a>
+  </div>
+  <div class="nav-actions">
+    <a class="btn" href="/login">Log In</a>
+    <a class="btn btn-p" href="/signup">Start Free Pipeline</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Land your next Product Role.<br>On autopilot.</h1>
+    <p>Automate job ingestion from your email, score application fit using Gemini, autogenerate cover letters, and track progress on a premium dashboard.</p>
+    <div style="display:flex; justify-content:center; gap:16px;">
+      <a class="btn btn-p" style="padding:12px 28px; font-size:14px;" href="/signup">Get Started Now</a>
+      <a class="btn" style="padding:12px 28px; font-size:14px;" href="/login">Sign In</a>
+    </div>
+  </div>
+</header>
+
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-header">
+      <h2>Automated Workflow for Seekers</h2>
+      <p>Stop wasting hours tracking, copy-pasting, and writing emails. Let AI do the heavy lifting.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">✉️</div>
+        <h3>Auto Email Scraping</h3>
+        <p>Connects securely to your inbox. Automatically extracts jobs you've applied to and auto-syncs confirmation updates directly to your board.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>Gemini-Powered Scoring</h3>
+        <p>Grades job fits from 1 to 10 against your resume. Highlight key requirements instantly and see where you match or fall short.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>One-Click Outbox</h3>
+        <p>Autogenerate personalized cover letters and custom LinkedIn connection notes. Ready to copy-paste and outreach instantly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="seekers-section" id="seekers">
+  <div class="container">
+    <div class="section-header">
+      <h2>Seeking Active Roles</h2>
+      <p>Candidates currently utilizing Job Hunter Board. Connect or view their profiles.</p>
+    </div>
+    
+    {% if seekers %}
+    <div class="seekers-grid">
+      {% for seeker in seekers %}
+      <div class="seeker-card">
+        <div class="seeker-avatar">
+          {{ seeker.name[0] if seeker.name else '?' }}
+        </div>
+        <div>
+          <div class="seeker-name">{{ seeker.name or 'Job Hunter' }}</div>
+          <div class="seeker-title">{{ seeker.designation or 'Product Seeker' }}</div>
+        </div>
+        {% if seeker.linkedin_profile %}
+        <a class="seeker-link" href="{{ seeker.linkedin_profile }}" target="_blank">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          LinkedIn
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:40px; background:var(--sur); border:1px dashed var(--bdr); border-radius:12px; color:var(--mut);">
+      <p>No seekers on the wall yet. Be the first to join by giving consent in your Profile Settings!</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="testimonials" id="testimonials">
+  <div class="container">
+    <div class="section-header">
+      <h2>Praise from Product Managers</h2>
+      <p>Discover how candidates save time and target their search with AI insights.</p>
+    </div>
+    <div class="testimonial-grid">
+      <div class="testimonial-card">
+        <p class="testimonial-quote">"This completely changed how I track applications. The IMAP email integration scrapes Naukri, LinkedIn, and Instahyre updates directly. I don't have to input anything manually anymore."</p>
+        <div class="testimonial-author">
+          <div class="seeker-avatar">S</div>
+          <div class="author-info">
+            <h4>Sarah M.</h4>
+            <p>Product Manager @ TechCorp</p>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <p class="testimonial-quote">"The Gemini fit scoring matches my resume against job descriptions perfectly. I only focus my outreach efforts on jobs with scores above 8.0, saving me endless hours."</p>
+        <div class="testimonial-author">
+          <div class="seeker-avatar">M</div>
+          <div class="author-info">
+            <h4>Mark D.</h4>
+            <p>Technical PM @ WebScale</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>&copy; 2026 Job Hunter Board. 🔒 Stored securely, never shared.</p>
+  </div>
+</footer>
+
+</body>
+</html>
