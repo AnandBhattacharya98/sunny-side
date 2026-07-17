@@ -90,6 +90,15 @@ def signup():
                 (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, uid)
             )
             conn.commit()
+            
+            # If resume is provided on signup, seed and score demo jobs
+            if resume_text:
+                from scraper import seed_demo_jobs
+                seed_demo_jobs(conn, user_id=uid)
+                conn.commit()
+                from ai_engine import process_new_jobs
+                process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+
             session.permanent = True
             session["user_id"] = uid
             session["username"] = username
