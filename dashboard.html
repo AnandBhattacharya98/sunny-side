@@ -1091,6 +1091,18 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           </button>
           <span id="resume-upload-status" style="font-size:11px; color:var(--hin); display:flex; align-items:center;"></span>
         </div>
+
+        <!-- Settings parsing animation loader -->
+        <div id="settings-scanning-container" style="display:none; text-align:center; padding:15px; border:1px solid var(--bdr); border-radius:16px; margin-bottom:10px; background:var(--sur); flex-direction:column; gap:8px; align-items:center;">
+          <div style="position:relative; width:40px; height:40px; margin:0 auto;">
+            <div style="width:100%; height:100%; background:radial-gradient(circle at 30% 30%, #FFF2CC 0%, var(--pur) 70%, #FF5E00 100%); border-radius:50%; box-shadow:0 4px 12px rgba(255, 167, 0, 0.3); animation: pulseYolk 1.5s infinite ease-in-out alternate;"></div>
+          </div>
+          <div>
+            <span style="font-size:12px; font-weight:700; color:var(--txt); display:block;" id="settings-scan-status-text">Uploading resume...</span>
+            <span style="font-size:11px; color:var(--mut); display:block; margin-top:2px;">Analyzing skills and matching fit...</span>
+          </div>
+        </div>
+
         <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:120px; border-radius:12px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
       </div>
 
@@ -1129,6 +1141,18 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         </div>
       </div>
       
+      <!-- IMAP app password guidelines -->
+      <div style="background:var(--purl); border:1px solid var(--bdr); border-radius:12px; padding:12px; margin-top:2px;">
+        <span style="font-size:11px; font-weight:700; color:var(--txt); text-transform:uppercase; display:block; margin-bottom:4px;">How to enable Gmail IMAP sync</span>
+        <ol style="font-size:11px; color:var(--mut); padding-left:14px; margin:0; line-height:1.4;">
+          <li>Go to Google Account Settings &rarr; Security.</li>
+          <li>Turn on 2-Step Verification if not active.</li>
+          <li>Search for "App Passwords" in your account.</li>
+          <li>Create a new app password naming it "Job Hunter Board".</li>
+          <li>Copy the 16-character code and paste it above.</li>
+        </ol>
+      </div>
+      
       <div style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API Key (Overrides .env)</label>
         <div style="position:relative; display:flex; align-items:center;">
@@ -1150,20 +1174,20 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <p style="font-size:11.5px; color:var(--mut); line-height:1.4;">Adjust how active feedback and pipeline columns weigh AI recommendation scores.</p>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut);">Thumbs Up Weight (Positive feedback)</label>
-              <input type="number" step="0.1" min="0" max="3" id="settings-w-up" value="{{ (settings or {}).get('weight_thumbs_up', 1.0) }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
+              <label style="font-size:11px; font-weight:600; color:var(--mut);">Thumbs Up Weight [0 to 10]</label>
+              <input type="number" min="0" max="10" id="settings-w-up" value="{{ (settings or {}).get('weight_thumbs_up', 1.0)|round|int }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut);">Applied Stage Weight (Active applications)</label>
-              <input type="number" step="0.1" min="0" max="3" id="settings-w-app" value="{{ (settings or {}).get('weight_applied', 1.0) }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
+              <label style="font-size:11px; font-weight:600; color:var(--mut);">Applied Stage Weight [0 to 10]</label>
+              <input type="number" min="0" max="10" id="settings-w-app" value="{{ (settings or {}).get('weight_applied', 1.0)|round|int }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut);">Thumbs Down Weight (Negative feedback)</label>
-              <input type="number" step="0.1" min="-3" max="0" id="settings-w-down" value="{{ (settings or {}).get('weight_thumbs_down', -1.0) }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
+              <label style="font-size:11px; font-weight:600; color:var(--mut);">Thumbs Down Weight [-10 to 0]</label>
+              <input type="number" min="-10" max="0" id="settings-w-down" value="{{ (settings or {}).get('weight_thumbs_down', -1.0)|round|int }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut);">Rejected Stage Weight (Rejected roles)</label>
-              <input type="number" step="0.1" min="-3" max="0" id="settings-w-rej" value="{{ (settings or {}).get('weight_rejected', -1.5) }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
+              <label style="font-size:11px; font-weight:600; color:var(--mut);">Rejected Stage Weight [-10 to 0]</label>
+              <input type="number" min="-10" max="0" id="settings-w-rej" value="{{ (settings or {}).get('weight_rejected', -1.5)|round|int }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
             </div>
           </div>
         </div>
@@ -1179,7 +1203,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 <!-- Deletion Confirmation Modal -->
 <div id="delete-confirm-modal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 20000;" onclick="closeDeleteConfirmModal()">
-  <div class="modal-window" style="max-width: 400px; padding: 24px; text-align: center;" onclick="event.stopPropagation()">
+  <div class="modal-window" style="max-width: 400px; padding: 24px; text-align: center; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);" onclick="event.stopPropagation()">
     <h3 style="font-size: 16px; font-weight: 700; color: var(--txt); margin-bottom: 8px; font-family: 'Space Grotesk', sans-serif;">Delete Account?</h3>
     <p style="font-size: 13px; color: var(--mut); line-height: 1.5; margin-bottom: 20px;">Are you absolutely sure you want to delete user <strong id="delete-confirm-username"></strong> and all associated pipeline data? This action is permanent and cannot be undone.</p>
     <div style="display: flex; gap: 12px; justify-content: center;">
@@ -1606,10 +1630,10 @@ async function saveSettings() {
   const designation = document.getElementById('settings-designation').value;
   const shareProfile = document.getElementById('settings-share-profile').checked ? 1 : 0;
   
-  const wUp = parseFloat(document.getElementById('settings-w-up').value) || 1.0;
-  const wApp = parseFloat(document.getElementById('settings-w-app').value) || 1.0;
-  const wDown = parseFloat(document.getElementById('settings-w-down').value) || -1.0;
-  const wRej = parseFloat(document.getElementById('settings-w-rej').value) || -1.5;
+  const wUp = parseInt(document.getElementById('settings-w-up').value, 10) || 1;
+  const wApp = parseInt(document.getElementById('settings-w-app').value, 10) || 1;
+  const wDown = parseInt(document.getElementById('settings-w-down').value, 10) || -1;
+  const wRej = parseInt(document.getElementById('settings-w-rej').value, 10) || -2;
   
   try {
     const resp = await fetch('/api/profile', {
@@ -1648,11 +1672,25 @@ async function uploadResumeFile(input) {
   const file = input.files[0];
   if (!file) return;
   
-  const status = document.getElementById('resume-upload-status');
-  status.textContent = 'Uploading...';
+  const uploadContainer = document.getElementById('settings-resume-upload-container');
+  const scanningContainer = document.getElementById('settings-scanning-container');
+  const statusText = document.getElementById('settings-scan-status-text');
+  
+  uploadContainer.style.display = 'none';
+  scanningContainer.style.display = 'flex';
+  statusText.textContent = 'Uploading resume...';
   
   const formData = new FormData();
   formData.append('resume_file', file);
+  
+  const logs = ["Parsing credentials...", "Mapping experience...", "Resolving roles...", "Finalizing scoring..."];
+  let logIdx = 0;
+  const logInterval = setInterval(() => {
+    if (logIdx < logs.length) {
+      statusText.textContent = logs[logIdx];
+      logIdx++;
+    }
+  }, 600);
   
   try {
     const resp = await fetch('/api/profile/upload', {
@@ -1660,20 +1698,23 @@ async function uploadResumeFile(input) {
       body: formData
     });
     const data = await resp.json();
+    clearInterval(logInterval);
+    scanningContainer.style.display = 'none';
+    
     if (data.ok) {
       document.getElementById('settings-resume').value = data.resume_text;
       document.getElementById('settings-resume-filename').textContent = data.resume_filename;
       document.getElementById('settings-resume-file-container').style.display = 'block';
-      document.getElementById('settings-resume-upload-container').style.display = 'none';
-      status.textContent = 'Uploaded successfully!';
-      toast('Resume file parsed and uploaded!');
+      toast('Resume file parsed and uploaded successfully!');
     } else {
-      status.textContent = 'Upload failed';
+      uploadContainer.style.display = 'flex';
       toast(`Error: ${data.error}`);
     }
   } catch (err) {
+    clearInterval(logInterval);
+    scanningContainer.style.display = 'none';
+    uploadContainer.style.display = 'flex';
     console.error(err);
-    status.textContent = 'Connection error';
     toast('Connection error');
   }
 }
@@ -2095,6 +2136,7 @@ class Walkthrough {
 
 window.addEventListener('DOMContentLoaded', () => {
   {% if is_new_user %}
+  localStorage.removeItem('walkthrough_completed');
   window.walkthrough = new Walkthrough();
   window.walkthrough.start();
   {% endif %}

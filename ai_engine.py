@@ -21,6 +21,21 @@ load_dotenv(dotenv_path=os.path.join(base_dir, ".env"))
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+def get_fallback_gemini_key() -> str:
+    key = os.getenv("GEMINI_API_KEY", "")
+    if key:
+        return key
+    try:
+        from db import get_conn, DB_PATH
+        conn = get_conn(DB_PATH)
+        row = conn.execute("SELECT gemini_api_key FROM users WHERE id = 1").fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return ""
+
 # ── Your profile — edit this section ──────────────────────────────────────
 PROFILE = {
     "name": os.getenv("YOUR_NAME", "Anand Bhattacharya"),
@@ -77,12 +92,30 @@ YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
 # ── Scoring ────────────────────────────────────────────────────────────────
 
 def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None,
-                 w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5) -> dict:
+                 w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5, resume_text: str = None) -> dict:
     """Rule-based fallback scoring — no API needed."""
     text = f"{title} {description}".lower()
     score = 5.0
 
-    for kw, weight in POSITIVE_SIGNALS.items():
+    # Build dynamic positive signals based on resume content keywords
+    custom_signals = dict(POSITIVE_SIGNALS)
+    if resume_text and len(resume_text.strip()) > 50:
+        first_part = resume_text[:600].lower()
+        roles = ["software engineer", "frontend", "backend", "full stack", "data scientist", "product manager", "designer", "analyst", "developer", "marketing", "sales", "consultant"]
+        for r in roles:
+            if r in first_part:
+                custom_signals[r] = 1.5
+        
+        words = re.findall(r"\b[a-zA-Z]{4,15}\b", first_part)
+        stops = {"with", "that", "this", "from", "have", "about", "their", "there", "which", "would", "could", "should"}
+        words = [w for w in words if w not in stops]
+        from collections import Counter
+        common = Counter(words).most_common(8)
+        for word, count in common:
+            if word not in custom_signals:
+                custom_signals[word] = 0.5
+
+    for kw, weight in custom_signals.items():
         if kw in text:
             score += weight
     for kw, weight in NEGATIVE_SIGNALS.items():
@@ -178,7 +211,7 @@ Return exactly:
 
 def _call_gemini(prompt: str, response_json: bool = False, api_key: str = None) -> str:
     import requests
-    key_to_use = api_key or GEMINI_API_KEY
+    key_to_use = api_key or get_fallback_gemini_key()
     if not key_to_use:
         raise ValueError("No Gemini API key configured. Provide it in profile settings or set GEMINI_API_KEY env.")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key_to_use}"
@@ -201,7 +234,7 @@ def _gemini_score(title: str, company: str, description: str, resume_text: str =
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
-        prompt = f"""Score this PM job for fit with this candidate. Reply ONLY with JSON, no markdown.
+        prompt = f"""Score this job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
 CANDIDATE RESUME:
 {resume_text}
@@ -224,7 +257,7 @@ Return exactly:
     except Exception as e:
         print(f"  [Gemini score fallback] {e}")
         result = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
+                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
         result["fit_summary"] += " (scored locally — Gemini API error)"
         return result
 
@@ -263,13 +296,13 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
     if ANTHROPIC_API_KEY:
         return _ai_score(title, company, description, resume_text)
     
-    key_to_use = api_key or GEMINI_API_KEY
+    key_to_use = api_key or get_fallback_gemini_key()
     if key_to_use:
         return _gemini_score(title, company, description, resume_text, api_key=key_to_use,
                              liked_titles=liked_titles, disliked_titles=disliked_titles,
                              w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
     return _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                        w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
+                        w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
 
 
 # ── Cover letter ───────────────────────────────────────────────────────────
@@ -320,7 +353,7 @@ def _ai_cover_letter(title: str, company: str, description: str,
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt = f"""Write a cover letter for this PM job application. Under 300 words. 
+        prompt = f"""Write a cover letter for this job application. Under 300 words. 
 Start with impact — not "I am writing to express my interest". Be specific, confident, human.
 Reply ONLY with JSON, no markdown.
 
@@ -351,7 +384,7 @@ def _gemini_cover_letter(title: str, company: str, description: str,
     if not resume_text:
         resume_text = RESUME_TEXT
     try:
-        prompt = f"""Write a cover letter for this PM job application. Under 300 words. 
+        prompt = f"""Write a cover letter for this job application. Under 300 words. 
 Start with impact — not "I am writing to express my interest". Be specific, confident, human.
 Reply ONLY with JSON, no markdown.
 
@@ -400,7 +433,7 @@ def generate_linkedin_note(contact_name: str, contact_title: str,
                 model="claude-sonnet-4-6",
                 max_tokens=80,
                 messages=[{"role": "user", "content":
-                    f"Write a LinkedIn connection note (under 280 chars) from a PM applying for "
+                    f"Write a LinkedIn connection note (under 280 chars) from a candidate applying for "
                     f"{job_title} at {company} to {contact_name} ({contact_title}). "
                     f"Warm, specific, not salesy. Return only the note text."}],
             )
@@ -408,10 +441,10 @@ def generate_linkedin_note(contact_name: str, contact_title: str,
         except Exception:
             pass
             
-    key_to_use = api_key or GEMINI_API_KEY
+    key_to_use = api_key or get_fallback_gemini_key()
     if key_to_use:
         try:
-            prompt = f"Write a LinkedIn connection note (under 280 chars) from a PM applying for {job_title} at {company} to {contact_name} ({contact_title}). Warm, specific, not salesy. Return only the note text."
+            prompt = f"Write a LinkedIn connection note (under 280 chars) from a candidate applying for {job_title} at {company} to {contact_name} ({contact_title}). Warm, specific, not salesy. Return only the note text."
             return _call_gemini(prompt, response_json=False, api_key=key_to_use)
         except Exception:
             pass
@@ -496,7 +529,8 @@ Guidelines for tailoring:
 6. Do not include any introductory remarks or meta-commentary; output ONLY the Markdown resume.
 """
     try:
-        if GEMINI_API_KEY:
+        fallback_key = get_fallback_gemini_key()
+        if fallback_key:
             return _call_gemini(prompt)
     except Exception as e:
         print(f"[AI Resume] Gemini failed: {e}")
@@ -520,7 +554,7 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
 
     if ANTHROPIC_API_KEY:
         mode = "AI (Claude)"
-    elif api_key or GEMINI_API_KEY:
+    elif api_key or get_fallback_gemini_key():
         mode = "AI (Gemini)"
     else:
         mode = "local rules (add API keys for AI)"
