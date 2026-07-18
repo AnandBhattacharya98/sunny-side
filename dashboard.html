@@ -297,6 +297,65 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   animation: logFadeIn 0.3s forwards ease-out;
   margin-bottom: 4px;
 }
+
+/* Mobile Responsive Styling */
+@media (max-width: 768px) {
+  .app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 260px !important;
+    height: 100vh !important;
+    z-index: 10000 !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15) !important;
+  }
+  .main {
+    padding: 16px !important;
+    height: calc(100vh - 60px) !important;
+    margin-top: 60px !important;
+    overflow-y: auto !important;
+  }
+  .mobile-header {
+    display: flex !important;
+  }
+  .board-col {
+    min-width: 290px !important;
+    max-width: 290px !important;
+  }
+  .board-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .board-header > div {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .board-header input, .board-header select {
+    width: 100% !important;
+  }
+  .stats-strip {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .stats-item {
+    flex: 1 1 calc(50% - 8px) !important;
+    min-width: 120px !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -558,6 +617,18 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 </div>
 {% else %}
 <div class="app">
+
+<!-- Mobile Sidebar Overlay Mask -->
+<div id="mobile-sidebar-overlay" onclick="toggleMobileSidebar()" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); z-index:9998;"></div>
+
+<!-- Mobile Header -->
+<div class="mobile-header" style="display:none; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--sur); border-bottom:1px solid var(--bdr); position:fixed; top:0; left:0; width:100%; height:60px; z-index:9999; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);">
+  <button onclick="toggleMobileSidebar()" style="background:none; border:none; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+  </button>
+  <span style="font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:700; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Job Hunter Board</span>
+  <div style="width:32px;"></div>
+</div>
 
 <!-- Sidebar -->
 <nav class="sidebar">
@@ -2282,6 +2353,32 @@ async function submitFeedback(event, jobId, val) {
     toast("Connection error");
   }
 }
+
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('mobile-sidebar-overlay');
+  if (sidebar.classList.contains('open')) {
+    sidebar.classList.remove('open');
+    overlay.style.display = 'none';
+  } else {
+    sidebar.classList.add('open');
+    overlay.style.display = 'block';
+  }
+}
+
+// Auto-close sidebar on link clicks inside mobile view
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.sidebar a').forEach(link => {
+    link.addEventListener('click', () => {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        if (overlay) overlay.style.display = 'none';
+      }
+    });
+  });
+});
 </script>
 </body>
 </html>
