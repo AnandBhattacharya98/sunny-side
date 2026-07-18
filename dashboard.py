@@ -112,6 +112,43 @@ def signup():
             return render_template("dashboard.html", view_mode="signup", error=str(e))
     return render_template("dashboard.html", view_mode="signup")
 
+@app.route("/api/auth/social", methods=["POST"])
+def auth_social():
+    d = request.json
+    provider = d.get("provider")
+    email = d.get("email")
+    name = d.get("name")
+    
+    if not email or not name:
+        return jsonify({"ok": False, "error": "Missing social credentials"}), 400
+        
+    username = email.split("@")[0] + "_" + provider
+    
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT id, username FROM users WHERE username = ?", (username,)).fetchone()
+        if row:
+            uid = row[0]
+            is_new = False
+        else:
+            import uuid
+            password = str(uuid.uuid4())
+            uid = signup_user(conn, username, password)
+            conn.execute("UPDATE users SET name = ?, share_profile = 1 WHERE id = ?", (name, uid))
+            conn.commit()
+            is_new = True
+            
+        session.permanent = True
+        session["user_id"] = uid
+        session["username"] = username
+        session["is_new_user"] = is_new
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/logout")
 def logout():
     session.clear()
