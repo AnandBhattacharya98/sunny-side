@@ -9,6 +9,9 @@ from auth import signup_user, login_user
 app = Flask(__name__, template_folder='.')
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "pm_job_hunter_super_secret_key_123")
 
+# Initialize database on startup (crucial for Gunicorn/Render deployments)
+init_db(DB_PATH)
+
 # Set session cookies lifetime to be long so login stays active
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
