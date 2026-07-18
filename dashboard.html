@@ -2088,13 +2088,19 @@ class Walkthrough {
     tooltip.style.flexDirection = 'column';
     tooltip.style.gap = '8px';
     
-    let top = rect.bottom + window.scrollY + 10;
-    let left = rect.left + window.scrollX;
-    if (top + 200 > window.innerHeight) {
-      top = rect.top + window.scrollY - 180;
-    }
-    if (left + 300 > window.innerWidth) {
-      left = window.innerWidth - 320;
+    let top, left;
+    if (step.element === '.sidebar' || step.element === '.sidebar-footer') {
+      top = rect.top + window.scrollY + 120;
+      left = rect.right + window.scrollX + 20;
+    } else {
+      top = rect.bottom + window.scrollY + 10;
+      left = rect.left + window.scrollX;
+      if (top + 200 > window.innerHeight + window.scrollY) {
+        top = rect.top + window.scrollY - 180;
+      }
+      if (left + 300 > window.innerWidth) {
+        left = window.innerWidth - 320;
+      }
     }
     tooltip.style.top = `${Math.max(10, top)}px`;
     tooltip.style.left = `${Math.max(10, left)}px`;
@@ -2108,8 +2114,8 @@ class Walkthrough {
       </div>
     `;
     
-    overlay.appendChild(tooltip);
     document.body.appendChild(overlay);
+    document.body.appendChild(tooltip);
     this.activeElement = target;
   }
   
@@ -2126,6 +2132,8 @@ class Walkthrough {
   removeOverlay() {
     const existing = document.getElementById('walkthrough-overlay');
     if (existing) existing.remove();
+    const tooltip = document.getElementById('walkthrough-tooltip');
+    if (tooltip) tooltip.remove();
     if (this.activeElement) {
       this.activeElement.style.position = '';
       this.activeElement.style.zIndex = '';
