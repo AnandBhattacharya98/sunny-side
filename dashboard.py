@@ -27,7 +27,7 @@ def get_user_settings(conn, user_id):
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             return redirect(url_for("login"))
