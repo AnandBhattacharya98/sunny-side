@@ -360,9 +360,59 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 </head>
 <body>
 
-{% if view_mode == 'login' or view_mode == 'signup' %}
+{% if view_mode == 'login' or view_mode == 'signup' or view_mode == 'mock_auth' %}
 <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
   <div class="auth-card">
+    {% if view_mode == 'mock_auth' %}
+    <div style="text-align:center; border-bottom:1px solid var(--bdr); padding-bottom:12px; margin-bottom:16px;">
+      {% if provider == 'google' %}
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px; display:inline-block;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      <h3 style="font-size:18px; font-weight:700; color:var(--txt); font-family:'Space Grotesk', sans-serif; margin:0;">Sign in with Google</h3>
+      {% else %}
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="#0077B5" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px; display:inline-block;"><path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9H7.12v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7H9.33V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/></svg>
+      <h3 style="font-size:18px; font-weight:700; color:var(--txt); font-family:'Space Grotesk', sans-serif; margin:0;">Sign in with LinkedIn</h3>
+      {% endif %}
+      <p style="font-size:12px; color:var(--mut); margin:4px 0 0 0;">to continue to Job Hunter Board (Dev Mode)</p>
+    </div>
+
+    <form method="POST" action="/auth/mock/callback" style="display:flex; flex-direction:column; gap:16px;">
+      <input type="hidden" name="provider" value="{{ provider }}">
+      
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase; text-align: left;">Select a test profile:</label>
+        
+        <button type="submit" onclick="document.getElementById('mock-email').value='anandbhattacharya98@gmail.com'; document.getElementById('mock-name').value='Anand Bhattacharya';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
+          <strong style="color:var(--txt);">Anand Bhattacharya</strong>
+          <span style="font-size:11px; color:var(--mut);">anandbhattacharya98@gmail.com</span>
+        </button>
+        
+        <button type="submit" onclick="document.getElementById('mock-email').value='guest@gmail.com'; document.getElementById('mock-name').value='Guest User';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
+          <strong style="color:var(--txt);">Guest User</strong>
+          <span style="font-size:11px; color:var(--mut);">guest@gmail.com</span>
+        </button>
+      </div>
+
+      <div style="text-align:center; font-size:10px; color:var(--hin); font-weight:600; text-transform:uppercase;">Or customize profile</div>
+
+      <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
+        <label class="auth-label">Custom Full Name</label>
+        <input type="text" id="mock-name" name="name" class="auth-input" placeholder="e.g. Anand Bhattacharya">
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
+        <label class="auth-label">Custom Email Address</label>
+        <input type="email" id="mock-email" name="email" class="auth-input" placeholder="e.g. name@gmail.com">
+      </div>
+
+      <button type="submit" class="btn btn-p" style="padding:12px; font-size:13px; font-weight:700; border-radius:24px; width:100%; margin-top:8px;">
+        Authorize & Sign In
+      </button>
+      
+      <a href="/login" class="btn" style="text-align:center; background:none; border:1px solid var(--bdr); border-radius:24px; padding:10px; font-size:12px; font-weight:600; color:var(--mut); text-decoration:none;">
+        Back to Login
+      </a>
+    </form>
+    {% else %}
     <div style="text-align:center;">
       <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; justify-content:center; margin-bottom:6px; transition:transform 0.15s;">
         <span style="width:12px; height:12px; background:#FFA700; border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 2px 4px rgba(255, 167, 0, 0.4);"></span>
@@ -524,6 +574,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       Already have an account? <a href="/login" style="color:var(--pur); text-decoration:none; font-weight:700;">Log In</a>
       {% endif %}
     </div>
+    {% endif %}
   </div>
 </div>
 {% elif view_mode == 'onboarding' %}

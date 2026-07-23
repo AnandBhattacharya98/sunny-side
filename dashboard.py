@@ -27,7 +27,7 @@ def get_user_settings(conn, user_id):
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             return redirect(url_for("login"))
@@ -146,7 +146,7 @@ def handle_social_login(provider, email, name):
 def auth_google():
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
-        return "Please configure GOOGLE_CLIENT_ID in your environment/.env", 400
+        return render_template("dashboard.html", view_mode="mock_auth", provider="google")
     redirect_uri = url_for("auth_google_callback", _external=True)
     google_auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -201,7 +201,7 @@ def auth_google_callback():
 def auth_linkedin():
     client_id = os.getenv("LINKEDIN_CLIENT_ID")
     if not client_id:
-        return "Please configure LINKEDIN_CLIENT_ID in your environment/.env", 400
+        return render_template("dashboard.html", view_mode="mock_auth", provider="linkedin")
     redirect_uri = url_for("auth_linkedin_callback", _external=True)
     linkedin_auth_url = (
         f"https://www.linkedin.com/oauth/v2/authorization?"
@@ -250,6 +250,18 @@ def auth_linkedin_callback():
         return "Failed to retrieve email from LinkedIn profile", 400
         
     return handle_social_login("linkedin", email, name)
+
+
+@app.route("/auth/mock/callback", methods=["POST"])
+def auth_mock_callback():
+    provider = request.form.get("provider")
+    email = request.form.get("email")
+    name = request.form.get("name")
+    
+    if not email or not name:
+        return "Missing email or name", 400
+        
+    return handle_social_login(provider, email, name)
 
 
 @app.route("/logout")
