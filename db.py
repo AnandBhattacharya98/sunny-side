@@ -7,12 +7,124 @@ import sqlite3
 import os
 
 DB_PATH = os.getenv("DB_PATH", "jobs.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+IS_POSTGRES = bool(DATABASE_URL)
+
+if IS_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+
+    class PgCursorWrapper:
+        def __init__(self, cursor):
+            self.cursor = cursor
+            self._lastrowid = None
+
+        def execute(self, query, params=None):
+            if params is not None:
+                query = query.replace('?', '%s')
+            
+            query = query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+            query = query.replace("integer primary key autoincrement", "serial primary key")
+            query = query.replace("REAL", "DOUBLE PRECISION")
+            query = query.replace("real", "DOUBLE PRECISION")
+            
+            if "INSERT OR IGNORE INTO users" in query:
+                query = query.replace("INSERT OR IGNORE INTO users", "INSERT INTO users") + " ON CONFLICT (id) DO NOTHING"
+            elif "INSERT OR IGNORE INTO jobs" in query:
+                query = query.replace("INSERT OR IGNORE INTO jobs", "INSERT INTO jobs") + " ON CONFLICT (job_id) DO NOTHING"
+            elif "INSERT OR IGNORE INTO cover_letters" in query:
+                query = query.replace("INSERT OR IGNORE INTO cover_letters", "INSERT INTO cover_letters") + " ON CONFLICT (job_id) DO NOTHING"
+            elif "INSERT OR IGNORE INTO tailored_resumes" in query:
+                query = query.replace("INSERT OR IGNORE INTO tailored_resumes", "INSERT INTO tailored_resumes") + " ON CONFLICT (job_id) DO NOTHING"
+            elif "INSERT OR IGNORE" in query:
+                query = query.replace("INSERT OR IGNORE", "INSERT")
+
+            if "PRAGMA table_info" in query:
+                import re
+                match = re.search(r"table_info\((.*?)\)", query)
+                if match:
+                    table_name = match.group(1).replace("'", "").replace('"', '').strip()
+                    query = f"SELECT 0, column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                    params = None
+
+            is_insert_user = "INSERT INTO users" in query
+            if is_insert_user and "RETURNING id" not in query:
+                query += " RETURNING id"
+
+            if params is not None:
+                self.cursor.execute(query, params)
+            else:
+                self.cursor.execute(query)
+
+            if is_insert_user:
+                try:
+                    row = self.cursor.fetchone()
+                    if row:
+                        self._lastrowid = row[0]
+                except Exception:
+                    pass
+
+            return self
+
+        def fetchone(self):
+            try:
+                row = self.cursor.fetchone()
+                if row is not None:
+                    return dict(row)
+            except Exception:
+                pass
+            return None
+
+        def fetchall(self):
+            try:
+                rows = self.cursor.fetchall()
+                return [dict(r) for r in rows]
+            except Exception:
+                return []
+
+        @property
+        def lastrowid(self):
+            return self._lastrowid
+
+        def __iter__(self):
+            return iter(self.fetchall())
+
+        def __getattr__(self, name):
+            return getattr(self.cursor, name)
+
+    class PgConnectionWrapper:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def cursor(self):
+            return PgCursorWrapper(self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
+
+        def execute(self, query, params=None):
+            cur = self.cursor()
+            cur.execute(query, params)
+            return cur
+
+        def commit(self):
+            self.conn.commit()
+
+        def rollback(self):
+            self.conn.rollback()
+
+        def close(self):
+            self.conn.close()
+
+        def __getattr__(self, name):
+            return getattr(self.conn, name)
 
 
-def get_conn(db_path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_conn(db_path: str = DB_PATH):
+    if IS_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL)
+        return PgConnectionWrapper(conn)
+    else:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 def migrate_db(conn: sqlite3.Connection) -> None:
