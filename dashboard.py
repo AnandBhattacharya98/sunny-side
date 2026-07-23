@@ -486,6 +486,7 @@ def _full_job(conn, job_id):
 def index():
     conn = get_conn(DB_PATH)
     uid = session.get("user_id")
+    print(f"DEBUG: index route called. session user_id = {uid}")
     if not uid:
         # Fetch consenting seekers for landing page wall (excluding admin)
         users = conn.execute(
