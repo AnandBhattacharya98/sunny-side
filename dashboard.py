@@ -144,6 +144,8 @@ def handle_social_login(provider, email, name):
 
 @app.route("/auth/google")
 def auth_google():
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
         return render_template("dashboard.html", view_mode="mock_auth", provider="google")
@@ -160,6 +162,8 @@ def auth_google():
 
 @app.route("/auth/google/callback")
 def auth_google_callback():
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     code = request.args.get("code")
     if not code:
         return "Authorization code missing", 400
@@ -199,6 +203,8 @@ def auth_google_callback():
 
 @app.route("/auth/linkedin")
 def auth_linkedin():
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     client_id = os.getenv("LINKEDIN_CLIENT_ID")
     if not client_id:
         return render_template("dashboard.html", view_mode="mock_auth", provider="linkedin")
@@ -215,6 +221,8 @@ def auth_linkedin():
 
 @app.route("/auth/linkedin/callback")
 def auth_linkedin_callback():
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     code = request.args.get("code")
     if not code:
         return "Authorization code missing", 400
