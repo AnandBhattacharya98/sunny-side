@@ -6,6 +6,12 @@ SQLITE_PATH = "jobs.db"
 POSTGRES_URL = "postgresql://neondb_owner:npg_a7M8BSvNyrmR@ep-flat-fire-az7b1wpw.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 
 def migrate():
+    # Set DATABASE_URL so db.py initializes PG connection correctly
+    os.environ["DATABASE_URL"] = POSTGRES_URL
+    from db import init_db
+    print("Initializing PostgreSQL schemas on Neon...")
+    init_db()
+
     if not os.path.exists(SQLITE_PATH):
         print(f"Local SQLite database '{SQLITE_PATH}' not found! Make sure you are in the workspace folder.")
         return

@@ -14,6 +14,23 @@ if IS_POSTGRES:
     import psycopg2
     import psycopg2.extras
 
+    class DictRowWrapper:
+        def __init__(self, tuple_data, keys):
+            self.tuple_data = tuple_data
+            self.keys = keys
+            self.dict_data = dict(zip(keys, tuple_data))
+
+        def __getitem__(self, key):
+            if isinstance(key, int):
+                return self.tuple_data[key]
+            return self.dict_data[key]
+
+        def keys(self):
+            return self.keys
+
+        def get(self, key, default=None):
+            return self.dict_data.get(key, default)
+
     class PgCursorWrapper:
         def __init__(self, cursor):
             self.cursor = cursor
@@ -70,7 +87,8 @@ if IS_POSTGRES:
             try:
                 row = self.cursor.fetchone()
                 if row is not None:
-                    return dict(row)
+                    keys = [desc[0] for desc in self.cursor.description]
+                    return DictRowWrapper(tuple(row), keys)
             except Exception:
                 pass
             return None
@@ -78,9 +96,12 @@ if IS_POSTGRES:
         def fetchall(self):
             try:
                 rows = self.cursor.fetchall()
-                return [dict(r) for r in rows]
+                if rows:
+                    keys = [desc[0] for desc in self.cursor.description]
+                    return [DictRowWrapper(tuple(r), keys) for r in rows]
             except Exception:
-                return []
+                pass
+            return []
 
         @property
         def lastrowid(self):
@@ -103,6 +124,11 @@ if IS_POSTGRES:
             cur = self.cursor()
             cur.execute(query, params)
             return cur
+
+        def executescript(self, script_str):
+            cur = self.cursor()
+            cur.execute(script_str)
+            self.commit()
 
         def commit(self):
             self.conn.commit()
@@ -127,7 +153,7 @@ def get_conn(db_path: str = DB_PATH):
         return conn
 
 
-def migrate_db(conn: sqlite3.Connection) -> None:
+def migrate_db(conn) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,8 +217,8 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
-def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+def init_db(db_path: str = DB_PATH):
+    conn = get_conn(db_path)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS jobs (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,

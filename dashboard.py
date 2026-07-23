@@ -115,18 +115,8 @@ def signup():
             return render_template("dashboard.html", view_mode="signup", error=str(e))
     return render_template("dashboard.html", view_mode="signup")
 
-@app.route("/api/auth/social", methods=["POST"])
-def auth_social():
-    d = request.json
-    provider = d.get("provider")
-    email = d.get("email")
-    name = d.get("name")
-    
-    if not email or not name:
-        return jsonify({"ok": False, "error": "Missing social credentials"}), 400
-        
+def handle_social_login(provider, email, name):
     username = email.split("@")[0] + "_" + provider
-    
     conn = get_conn(DB_PATH)
     try:
         row = conn.execute("SELECT id, username FROM users WHERE username = ?", (username,)).fetchone()
@@ -146,10 +136,120 @@ def auth_social():
         session["username"] = username
         session["is_new_user"] = is_new
         conn.close()
-        return jsonify({"ok": True})
+        return redirect(url_for("index"))
     except Exception as e:
         conn.close()
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return f"Social authentication error: {str(e)}", 500
+
+
+@app.route("/auth/google")
+def auth_google():
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not client_id:
+        return "Please configure GOOGLE_CLIENT_ID in your environment/.env", 400
+    redirect_uri = url_for("auth_google_callback", _external=True)
+    google_auth_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"response_type=code&"
+        f"scope=openid%20email%20profile"
+    )
+    return redirect(google_auth_url)
+
+
+@app.route("/auth/google/callback")
+def auth_google_callback():
+    code = request.args.get("code")
+    if not code:
+        return "Authorization code missing", 400
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    redirect_uri = url_for("auth_google_callback", _external=True)
+    
+    import requests
+    token_resp = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code"
+        }
+    )
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        return f"Failed to retrieve access token: {token_data}", 400
+        
+    user_resp = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    user_info = user_resp.json()
+    email = user_info.get("email")
+    name = user_info.get("name", email.split("@")[0])
+    
+    if not email:
+        return "Failed to retrieve email from Google profile", 400
+        
+    return handle_social_login("google", email, name)
+
+
+@app.route("/auth/linkedin")
+def auth_linkedin():
+    client_id = os.getenv("LINKEDIN_CLIENT_ID")
+    if not client_id:
+        return "Please configure LINKEDIN_CLIENT_ID in your environment/.env", 400
+    redirect_uri = url_for("auth_linkedin_callback", _external=True)
+    linkedin_auth_url = (
+        f"https://www.linkedin.com/oauth/v2/authorization?"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"response_type=code&"
+        f"scope=openid%20profile%20email"
+    )
+    return redirect(linkedin_auth_url)
+
+
+@app.route("/auth/linkedin/callback")
+def auth_linkedin_callback():
+    code = request.args.get("code")
+    if not code:
+        return "Authorization code missing", 400
+    client_id = os.getenv("LINKEDIN_CLIENT_ID")
+    client_secret = os.getenv("LINKEDIN_CLIENT_SECRET")
+    redirect_uri = url_for("auth_linkedin_callback", _external=True)
+    
+    import requests
+    token_resp = requests.post(
+        "https://www.linkedin.com/oauth/v2/accessToken",
+        data={
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code"
+        }
+    )
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        return f"Failed to retrieve access token: {token_data}", 400
+        
+    user_resp = requests.get(
+        "https://api.linkedin.com/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    user_info = user_resp.json()
+    email = user_info.get("email")
+    name = user_info.get("name") or (user_info.get("given_name", "") + " " + user_info.get("family_name", "")).strip() or email.split("@")[0]
+    
+    if not email:
+        return "Failed to retrieve email from LinkedIn profile", 400
+        
+    return handle_social_login("linkedin", email, name)
 
 
 @app.route("/logout")
