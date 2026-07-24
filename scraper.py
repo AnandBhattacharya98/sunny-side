@@ -199,6 +199,53 @@ DEMO_JOBS = [
         "source": "demo",
         "posted_at": datetime.now().strftime("%Y-%m-%d"),
     },
+    {
+        "job_id": "demo_stripe_mle_009",
+        "title": "Machine Learning Engineer — Risk & Fraud",
+        "company": "Stripe",
+        "location": "San Francisco, CA / Remote",
+        "url": "https://stripe.com/jobs",
+        "description": (
+            "Build and deploy real-time fraud detection and risk models. "
+            "Scale Stripe's transaction scoring pipeline processing billions of dollars daily. "
+            "Requirements: 3+ years experience with PyTorch/TensorFlow, Python, Spark, and MLOps platforms. "
+            "Experience with streaming architectures using Kafka/Flink is a strong plus. "
+            "You will optimize ML model inference latency to run under 50ms at consumer-scale throughput."
+        ),
+        "source": "demo",
+        "posted_at": datetime.now().strftime("%Y-%m-%d"),
+    },
+    {
+        "job_id": "demo_pinterest_mle_010",
+        "title": "Machine Learning Engineer — Recommendation Systems",
+        "company": "Pinterest",
+        "location": "San Francisco, CA",
+        "url": "https://careers.pinterest.com",
+        "description": (
+            "Develop candidate-generation and ranking models for home feed recommendations. "
+            "Work on large-scale recommendation systems, NLP text classifiers (using BERT/Transformers), "
+            "and A/B experimentation frameworks. "
+            "Skills required: Python, PyTorch, SQL, Docker, and TensorFlow Serving. "
+            "You will deploy deep learning models serving 100M+ active users."
+        ),
+        "source": "demo",
+        "posted_at": datetime.now().strftime("%Y-%m-%d"),
+    },
+    {
+        "job_id": "demo_adobe_ds_011",
+        "title": "Data Scientist / ML Developer",
+        "company": "Adobe",
+        "location": "San Jose, CA",
+        "url": "https://adobe.com/careers",
+        "description": (
+            "Build subscription churn prediction and marketing analytics models. "
+            "Work on ML pipelines utilizing gradient-boosted trees, Python, SQL, and pandas. "
+            "Automate data workflows, design KPI dashboards, and present findings to leadership. "
+            "Experience in statistics, experimental design, and predictive modeling required."
+        ),
+        "source": "demo",
+        "posted_at": datetime.now().strftime("%Y-%m-%d"),
+    },
 ]
 
 
