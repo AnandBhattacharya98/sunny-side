@@ -21,7 +21,7 @@ if IS_POSTGRES:
     class DictRowWrapper:
         def __init__(self, tuple_data, keys):
             self.tuple_data = tuple_data
-            self.keys = keys
+            self._keys = keys
             self.dict_data = dict(zip(keys, tuple_data))
 
         def __getitem__(self, key):
@@ -30,7 +30,7 @@ if IS_POSTGRES:
             return self.dict_data[key]
 
         def keys(self):
-            return self.keys
+            return self._keys
 
         def get(self, key, default=None):
             return self.dict_data.get(key, default)
