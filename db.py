@@ -7,6 +7,10 @@ import sqlite3
 import os
 
 DB_PATH = os.getenv("DB_PATH", "jobs.db")
+if not os.path.isabs(DB_PATH):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    DB_PATH = os.path.join(base_dir, DB_PATH)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 IS_POSTGRES = bool(DATABASE_URL)
 
