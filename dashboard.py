@@ -597,33 +597,65 @@ def _stats(conn):
             "email_count": email_count}
 
 
-def _full_job(conn, job_id):
-    uid = get_user_id()
-    j = conn.execute("SELECT * FROM jobs WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
-    if not j:
-        return None
-    j = dict(j)
-    j["key_reqs_list"] = json.loads(j.get("key_reqs") or "[]")
-    j["matched_skills_list"] = json.loads(j.get("matched_skills") or "[]")
-    j["missing_skills_list"] = json.loads(j.get("missing_skills") or "[]")
-    cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
-    j["cover_letter"] = dict(cl) if cl else None
-    contacts = conn.execute("SELECT * FROM contacts WHERE job_id=? AND user_id=?", (job_id, uid)).fetchall()
-    j["contacts"] = [dict(c) for c in contacts]
-    notes = conn.execute("SELECT * FROM application_notes WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
-    j["notes"] = dict(notes) if notes else {"note": "", "linkedin_note": ""}
-    timeline = conn.execute(
-        "SELECT event, created_at FROM application_timeline WHERE job_id=? AND user_id=? ORDER BY created_at",
-        (job_id, uid)
-    ).fetchall()
-    j["timeline"] = [dict(t) for t in timeline]
-    
-    emails = conn.execute(
-        "SELECT * FROM received_emails WHERE job_id=? AND user_id=? ORDER BY received_at DESC",
-        (job_id, uid)
-    ).fetchall()
-    j["emails"] = [dict(e) for e in emails]
-    return j
+def _batch_full_jobs(conn, raw_jobs, uid):
+    if not raw_jobs:
+        return []
+
+    # 1. Cover letters
+    cl_rows = conn.execute("SELECT * FROM cover_letters WHERE user_id = ?", (uid,)).fetchall()
+    cls = {row["job_id"]: dict(row) for row in cl_rows}
+
+    # 2. Contacts
+    contact_rows = conn.execute("SELECT * FROM contacts WHERE user_id = ?", (uid,)).fetchall()
+    contacts = {}
+    for row in contact_rows:
+        jid = row["job_id"]
+        if jid not in contacts:
+            contacts[jid] = []
+        contacts[jid].append(dict(row))
+
+    # 3. Notes
+    notes_rows = conn.execute("SELECT * FROM application_notes WHERE user_id = ?", (uid,)).fetchall()
+    notes = {row["job_id"]: dict(row) for row in notes_rows}
+
+    # 4. Timeline
+    timeline_rows = conn.execute("SELECT job_id, event, created_at FROM application_timeline WHERE user_id = ? ORDER BY created_at", (uid,)).fetchall()
+    timelines = {}
+    for row in timeline_rows:
+        jid = row["job_id"]
+        if jid not in timelines:
+            timelines[jid] = []
+        timelines[jid].append({"event": row["event"], "created_at": row["created_at"]})
+
+    # 5. Emails
+    email_rows = conn.execute("SELECT * FROM received_emails WHERE user_id = ? ORDER BY received_at DESC", (uid,)).fetchall()
+    emails = {}
+    for row in email_rows:
+        jid = row["job_id"]
+        if jid not in emails:
+            emails[jid] = []
+        emails[jid].append(dict(row))
+
+    # Construct the full job objects
+    full_jobs = []
+    for row in raw_jobs:
+        j = dict(row)
+        jid = j["job_id"]
+        
+        j["key_reqs_list"] = json.loads(j.get("key_reqs") or "[]")
+        j["matched_skills_list"] = json.loads(j.get("matched_skills") or "[]")
+        j["missing_skills_list"] = json.loads(j.get("missing_skills") or "[]")
+        
+        j["cover_letter"] = cls.get(jid)
+        j["contacts"] = contacts.get(jid, [])
+        j["notes"] = notes.get(jid, {"note": "", "linkedin_note": ""})
+        j["timeline"] = timelines.get(jid, [])
+        j["emails"] = emails.get(jid, [])
+        
+        full_jobs.append(j)
+        
+    return full_jobs
+
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────
@@ -661,22 +693,21 @@ def index():
         "rejected": []
     }
     
-    for row in raw_jobs:
-        j = _full_job(conn, row["job_id"])
-        if j:
-            status = j["status"]
-            if status == "whatsapp":
-                board["whatsapp"].append(j)
-            elif status in ("new", "scored", "ready"):
-                board["new"].append(j)
-            elif status in ("shortlisted", "interviewing"):
-                board["shortlisted"].append(j)
-            elif status == "applied":
-                board["applied"].append(j)
-            elif status == "offer":
-                board["offer"].append(j)
-            elif status == "rejected":
-                board["rejected"].append(j)
+    active_jobs = _batch_full_jobs(conn, raw_jobs, uid)
+    for j in active_jobs:
+        status = j["status"]
+        if status == "whatsapp":
+            board["whatsapp"].append(j)
+        elif status in ("new", "scored", "ready"):
+            board["new"].append(j)
+        elif status in ("shortlisted", "interviewing"):
+            board["shortlisted"].append(j)
+        elif status == "applied":
+            board["applied"].append(j)
+        elif status == "offer":
+            board["offer"].append(j)
+        elif status == "rejected":
+            board["rejected"].append(j)
             
     stats = _stats(conn)
     companies = [r[0] for r in conn.execute(
