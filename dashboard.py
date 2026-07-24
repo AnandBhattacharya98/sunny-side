@@ -1,6 +1,6 @@
 import os, json, sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, session, url_for
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file
 from db import get_conn, add_timeline, DB_PATH, init_db
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job
 from notifier import send_email_digest
@@ -27,7 +27,7 @@ def get_user_settings(conn, user_id):
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             return redirect(url_for("login"))
@@ -1366,6 +1366,18 @@ def print_resume(job_id):
   </div>
 </body>
 </html>"""
+
+
+@app.route("/logo.svg")
+def serve_logo():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_file(os.path.join(base_dir, "logo.svg"), mimetype="image/svg+xml")
+
+
+@app.route("/favicon.ico")
+def serve_favicon():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_file(os.path.join(base_dir, "logo.svg"), mimetype="image/svg+xml")
 
 
 def run_dashboard(port=5050):
