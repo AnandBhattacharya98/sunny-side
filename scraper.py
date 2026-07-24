@@ -92,7 +92,7 @@ def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     return True
 
 
-def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
+def scrape_naukri(conn, max_pages: int = 1, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
     new_jobs = []
     kw_hyphenated = keywords.lower().replace(" ", "-").replace("/", "-")
     for page in range(1, max_pages + 1):
@@ -105,7 +105,10 @@ def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1, keywords: str = "P
             resp = requests.get(url, headers=HEADERS, timeout=12)
             soup = BeautifulSoup(resp.text, "html.parser")
             cards = soup.select("article.jobTuple") or soup.select("div.srp-jobtuple-wrapper")
+            count = 0
             for card in cards:
+                if count >= 5:
+                    break
                 title_el = card.select_one("a.title") or card.select_one("a.jobTitle")
                 company_el = card.select_one("a.subTitle") or card.select_one("a.companyInfo")
                 loc_el = card.select_one("li.location span") or card.select_one("span.locWdth")
@@ -131,10 +134,11 @@ def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1, keywords: str = "P
                 }
                 if _insert_job(conn, job, user_id=user_id):
                     new_jobs.append(job)
-                time.sleep(0.8)
+                    count += 1
+                time.sleep(0.4)
         except Exception as e:
             print(f"  [Naukri p{page}] {e}")
-        time.sleep(1.5)
+        time.sleep(0.5)
     print(f"  Naukri: {len(new_jobs)} new jobs")
     return new_jobs
 
@@ -150,7 +154,10 @@ def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manage
     try:
         resp = requests.get(url, headers=HEADERS, timeout=12)
         soup = BeautifulSoup(resp.text, "html.parser")
+        count = 0
         for card in soup.select("div.base-card"):
+            if count >= 5:
+                break
             title_el = card.select_one("h3.base-search-card__title")
             company_el = card.select_one("h4.base-search-card__subtitle")
             loc_el = card.select_one("span.job-search-card__location")
@@ -177,7 +184,8 @@ def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manage
             }
             if _insert_job(conn, job, user_id=user_id):
                 new_jobs.append(job)
-            time.sleep(1)
+                count += 1
+            time.sleep(0.4)
     except Exception as e:
         print(f"  [LinkedIn] {e}")
     print(f"  LinkedIn: {len(new_jobs)} new jobs")
@@ -190,7 +198,10 @@ def scrape_company_pages(conn, user_id: int = 1) -> list[dict]:
         try:
             resp = requests.get(cfg["url"], headers=HEADERS, timeout=12)
             soup = BeautifulSoup(resp.text, "html.parser")
+            count = 0
             for link in soup.select(cfg["selector"]):
+                if count >= 3:
+                    break
                 text = link.get_text(strip=True).lower()
                 if not any(k in text for k in cfg["filter_keywords"]):
                     continue
@@ -212,7 +223,8 @@ def scrape_company_pages(conn, user_id: int = 1) -> list[dict]:
                 }
                 if _insert_job(conn, job, user_id=user_id):
                     new_jobs.append(job)
-            time.sleep(1.5)
+                    count += 1
+            time.sleep(0.5)
         except Exception as e:
             print(f"  [{cfg['company']}] {e}")
     print(f"  Company pages: {len(new_jobs)} new jobs")
@@ -232,8 +244,11 @@ def scrape_google_search_jobs(conn, user_id: int = 1, keywords: str = "Product M
         resp = requests.get(url, headers=HEADERS, timeout=12)
         soup = BeautifulSoup(resp.text, "html.parser")
         
+        count = 0
         # Google search results container: a links inside h3 elements
         for a in soup.select("a"):
+            if count >= 5:
+                break
             href = a.get("href", "")
             # Google links in simple HTML search look like: /url?q=https://company.com/job...
             if href.startswith("/url?q="):
@@ -283,6 +298,7 @@ def scrape_google_search_jobs(conn, user_id: int = 1, keywords: str = "Product M
                 
                 if _insert_job(conn, job, user_id=user_id):
                     new_jobs.append(job)
+                    count += 1
                     
     except Exception as e:
         print(f"  [Google Search] {e}")
@@ -306,19 +322,40 @@ def _fetch_description(url: str) -> str:
 
 def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
     conn = init_db(db_path)
-    all_new = []
-    print(f"\n[Scraping job listings for user {user_id}...]")
-
     # Query user's designation to use as query keywords
     row = conn.execute("SELECT designation FROM users WHERE id = ?", (user_id,)).fetchone()
     keywords = row[0] if row and row[0] else "Product Manager"
-
-    all_new += scrape_naukri(conn, user_id=user_id, keywords=keywords)
-    all_new += scrape_linkedin_jobs(conn, user_id=user_id, keywords=keywords)
-    all_new += scrape_google_search_jobs(conn, user_id=user_id, keywords=keywords)
-    all_new += scrape_company_pages(conn, user_id=user_id)
-
     conn.close()
+
+    print(f"\n[Scraping job listings in parallel for user {user_id}...]")
+    
+    import concurrent.futures
+    
+    def run_scraper(scraper_func, *args, **kwargs):
+        thread_conn = init_db(db_path)
+        try:
+            res = scraper_func(thread_conn, *args, **kwargs)
+            thread_conn.commit()
+            return res
+        except Exception as e:
+            print(f"Error in thread scraper: {e}")
+            return []
+        finally:
+            thread_conn.close()
+
+    all_new = []
+    scrapers = [
+        (scrape_naukri, (1, user_id, keywords)),
+        (scrape_linkedin_jobs, (user_id, keywords)),
+        (scrape_google_search_jobs, (user_id, keywords)),
+        (scrape_company_pages, (user_id,))
+    ]
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(run_scraper, func, *args) for func, args in scrapers]
+        for future in concurrent.futures.as_completed(futures):
+            all_new += future.result()
+
     print(f"  Total new jobs this run: {len(all_new)}\n")
     return all_new
 
