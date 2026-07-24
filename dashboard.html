@@ -1032,6 +1032,32 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
               {% for r in job.key_reqs_list %}<span class="rtag">{{ r }}</span>{% endfor %}
             </div>
             {% endif %}
+
+            {% if job.matched_skills_list or job.missing_skills_list %}
+            <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+              {% if job.matched_skills_list %}
+              <div>
+                <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Matched Skills</span>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  {% for s in job.matched_skills_list %}
+                  <span style="font-size:11px; background-color:rgba(46, 204, 113, 0.15); color:#2ecc71; border:1px solid rgba(46, 204, 113, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">✓ {{ s }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              
+              {% if job.missing_skills_list %}
+              <div>
+                <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Skill Gaps (Missing)</span>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  {% for s in job.missing_skills_list %}
+                  <span style="font-size:11px; background-color:rgba(231, 76, 60, 0.15); color:#e74c3c; border:1px solid rgba(231, 76, 60, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">⚠ {{ s }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
             
             {% if job.description %}
             <span class="lbl" style="margin-top:16px;display:block">Job Description Preview</span>

@@ -293,16 +293,71 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
     except Exception as e:
         print(f"Error fetching liked/disliked jobs: {e}")
 
+    # Fetch parsed resume profile for skills analysis
+    resume_profile = {}
+    try:
+        conn = get_conn(DB_PATH)
+        p_row = conn.execute("SELECT resume_profile_json FROM users WHERE id = ?", (user_id,)).fetchone()
+        conn.close()
+        if p_row and p_row[0]:
+            resume_profile = json.loads(p_row[0])
+    except Exception as e:
+        print(f"Error reading resume profile: {e}")
+
+    if not resume_profile or not resume_profile.get("skills"):
+        from resume_parser import parse_resume_local
+        resume_profile = parse_resume_local(resume_text or "")
+
+    user_skills = set(
+        [s.lower().strip() for s in resume_profile.get("skills", [])] +
+        [t.lower().strip() for t in resume_profile.get("tools", [])] +
+        [d.lower().strip() for d in resume_profile.get("domains", [])]
+    )
+
+    skills_lexicon = [
+        "python", "sql", "javascript", "java", "c++", "c#", "go", "rust", "ruby", "php", "typescript",
+        "product roadmapping", "product management", "user research", "agile", "scrum", "kanban", "jira", "confluence",
+        "stakeholder management", "go-to-market", "gtm", "market research", "ab testing", "a/b testing", "data analytics",
+        "tableau", "power bi", "looker", "mixpanel", "amplitude", "figma", "sketch", "wireframing", "prototyping",
+        "machine learning", "deep learning", "nlp", "llm", "conversational ai", "prompt engineering", "retell", "deepgram",
+        "bfsi", "fintech", "saas", "edtech", "healthcare", "e-commerce", "retail", "cloud computing", "aws", "gcp", "azure",
+        "docker", "kubernetes", "git", "github", "ci/cd", "devops"
+    ]
+
+    job_skills = set()
+    desc_lower = description.lower()
+    title_lower = title.lower()
+    for word in skills_lexicon:
+        pattern = rf"\b{re.escape(word)}\b"
+        if re.search(pattern, desc_lower) or re.search(pattern, title_lower):
+            job_skills.add(word)
+
+    matched = []
+    missing = []
+    for s in job_skills:
+        name = s.upper() if len(s) <= 3 else s.title()
+        if s in user_skills:
+            matched.append(name)
+        else:
+            missing.append(name)
+
+    # Call underlying scoring engine
     if ANTHROPIC_API_KEY:
-        return _ai_score(title, company, description, resume_text)
-    
-    key_to_use = api_key or get_fallback_gemini_key()
-    if key_to_use:
-        return _gemini_score(title, company, description, resume_text, api_key=key_to_use,
-                             liked_titles=liked_titles, disliked_titles=disliked_titles,
-                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
-    return _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                        w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
+        res = _ai_score(title, company, description, resume_text)
+    else:
+        key_to_use = api_key or get_fallback_gemini_key()
+        if key_to_use:
+            res = _gemini_score(title, company, description, resume_text, api_key=key_to_use,
+                                 liked_titles=liked_titles, disliked_titles=disliked_titles,
+                                 w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
+        else:
+            res = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
+                                w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
+
+    # Attach matched and missing lists
+    res["matched_skills"] = json.dumps(matched)
+    res["missing_skills"] = json.dumps(missing)
+    return res
 
 
 # ── Cover letter ───────────────────────────────────────────────────────────
@@ -570,8 +625,8 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
 
         key_reqs_json = json.dumps(score_data.get("key_requirements", []))
         conn.execute(
-            "UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=?, status=? WHERE job_id=?",
-            (score, score_data["fit_summary"], key_reqs_json, "scored", job_id),
+            "UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=?, status=?, matched_skills=?, missing_skills=? WHERE job_id=? AND user_id=?",
+            (score, score_data["fit_summary"], key_reqs_json, "scored", score_data["matched_skills"], score_data["missing_skills"], job_id, user_id),
         )
         conn.commit()
 

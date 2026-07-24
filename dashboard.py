@@ -81,18 +81,34 @@ def signup():
                 except Exception as e:
                     print(f"Error parsing PDF: {e}")
                     resume_text = ""
+            elif filename.endswith(".docx"):
+                import docx
+                try:
+                    doc = docx.Document(file)
+                    resume_text = "\n".join([p.text for p in doc.paragraphs])
+                except Exception as e:
+                    print(f"Error parsing DOCX: {e}")
+                    resume_text = ""
         
         if not resume_text:
             resume_text = request.form.get("resume_text", "").strip()
+
+        from resume_parser import parse_resume
+        profile_json = ""
+        if resume_text:
+            try:
+                profile_json = json.dumps(parse_resume(resume_text, gemini_api_key))
+            except Exception as e:
+                print(f"Error parsing resume: {e}")
 
         conn = get_conn(DB_PATH)
         try:
             uid = signup_user(conn, username, password)
             conn.execute(
                 """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
-                   name = ?, designation = ?, share_profile = ?, resume_filename = ?
+                   name = ?, designation = ?, share_profile = ?, resume_filename = ?, resume_profile_json = ?
                    WHERE id = ?""",
-                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, uid)
+                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, profile_json, uid)
             )
             conn.commit()
             
@@ -286,16 +302,48 @@ def update_profile():
     d = request.json
     uid = get_user_id()
     conn = get_conn(DB_PATH)
+    
+    # Fetch old values to check for changes
+    old = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    old_resume = old[0] if old else ""
+    old_key = old[1] if old else ""
+    
+    new_resume = d.get("resume_text", "")
+    new_key = d.get("gemini_api_key", "")
+    
+    should_reparse = (new_resume != old_resume) or (new_key != old_key)
+    
+    profile_json = None
+    if should_reparse:
+        from resume_parser import parse_resume
+        try:
+            profile_json = json.dumps(parse_resume(new_resume, new_key))
+        except Exception as e:
+            print(f"Error parsing resume: {e}")
+    else:
+        profile_row = conn.execute("SELECT resume_profile_json FROM users WHERE id = ?", (uid,)).fetchone()
+        profile_json = profile_row[0] if profile_row else None
+        
     conn.execute(
         """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
-           name = ?, designation = ?, share_profile = ?, resume_filename = ?,
+           name = ?, designation = ?, share_profile = ?, resume_filename = ?, resume_profile_json = ?,
            weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?
            WHERE id = ?""",
-        (d.get("resume_text", ""), d.get("imap_email", ""), d.get("imap_password", ""), d.get("gemini_api_key", ""), d.get("linkedin_profile", ""),
-         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""),
+        (new_resume, d.get("imap_email", ""), d.get("imap_password", ""), new_key, d.get("linkedin_profile", ""),
+         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""), profile_json,
          float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)), uid)
     )
     conn.commit()
+    
+    if should_reparse:
+        conn.execute(
+            "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+            (uid,)
+        )
+        conn.commit()
+        from ai_engine import process_new_jobs
+        process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+        
     conn.close()
     return jsonify({"ok": True})
 
@@ -349,12 +397,42 @@ def upload_profile_resume():
             resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
         except Exception as e:
             return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
+    elif filename.endswith(".docx"):
+        import docx
+        try:
+            doc = docx.Document(file)
+            resume_text = "\n".join([p.text for p in doc.paragraphs])
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
     else:
-        return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF or TXT."}), 400
+        return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF, TXT, or DOCX."}), 400
         
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ? WHERE id = ?", (resume_text, file.filename, uid))
+    # Get gemini api key to use for parsing
+    p_row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    api_key = p_row[0] if p_row else None
+    
+    from resume_parser import parse_resume
+    profile_json = ""
+    try:
+        profile_json = json.dumps(parse_resume(resume_text, api_key))
+    except Exception as e:
+        print(f"Error parsing resume: {e}")
+        
+    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, file.filename, profile_json, uid))
     conn.commit()
+    
+    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
+    conn.execute(
+        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+        (uid,)
+    )
+    conn.commit()
+    
+    # Run re-scoring
+    from ai_engine import process_new_jobs
+    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    
     conn.close()
     return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": file.filename})
 
@@ -384,8 +462,15 @@ def onboard_resume():
                 resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
             except Exception as e:
                 return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
+        elif filename.endswith(".docx"):
+            import docx
+            try:
+                doc = docx.Document(file)
+                resume_text = "\n".join([p.text for p in doc.paragraphs])
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
         else:
-            return jsonify({"ok": False, "error": "Unsupported file format"}), 400
+            return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF, TXT, or DOCX."}), 400
     else:
         # Fallback to form field or JSON body
         resume_text = request.form.get("resume_text", "").strip()
@@ -400,8 +485,67 @@ def onboard_resume():
         return jsonify({"ok": False, "error": "Resume text is empty"}), 400
 
     conn = get_conn(DB_PATH)
-    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ? WHERE id = ?", (resume_text, resume_filename, uid))
+    # Get gemini api key to use for parsing
+    p_row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    api_key = p_row[0] if p_row else None
+    
+    from resume_parser import parse_resume
+    profile_json = ""
+    try:
+        profile_json = json.dumps(parse_resume(resume_text, api_key))
+    except Exception as e:
+        print(f"Error parsing resume: {e}")
+
+    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, resume_filename, profile_json, uid))
     conn.commit()
+
+
+@app.route("/api/resume/parse", methods=["POST"])
+def api_resume_parse():
+    file = request.files.get("resume_file")
+    resume_text = ""
+    if file and file.filename:
+        filename = file.filename.lower()
+        if filename.endswith(".txt"):
+            resume_text = file.read().decode("utf-8", errors="ignore")
+        elif filename.endswith(".pdf"):
+            import pypdf
+            try:
+                reader = pypdf.PdfReader(file)
+                resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
+        elif filename.endswith(".docx"):
+            import docx
+            try:
+                doc = docx.Document(file)
+                resume_text = "\n".join([p.text for p in doc.paragraphs])
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
+        else:
+            return jsonify({"ok": False, "error": "Unsupported file format"}), 400
+    else:
+        try:
+            d = request.json or {}
+            resume_text = d.get("resume_text", "").strip()
+        except Exception:
+            resume_text = request.form.get("resume_text", "").strip()
+            
+    if not resume_text:
+        return jsonify({"ok": False, "error": "No resume content provided"}), 400
+        
+    from resume_parser import parse_resume
+    try:
+        uid = get_user_id()
+        conn = get_conn(DB_PATH)
+        row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+        conn.close()
+        api_key = row[0] if row else None
+        
+        profile = parse_resume(resume_text, api_key)
+        return jsonify({"ok": True, "profile": profile})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
     
     # Load demo jobs if no jobs exist for user
     job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
@@ -460,6 +604,8 @@ def _full_job(conn, job_id):
         return None
     j = dict(j)
     j["key_reqs_list"] = json.loads(j.get("key_reqs") or "[]")
+    j["matched_skills_list"] = json.loads(j.get("matched_skills") or "[]")
+    j["missing_skills_list"] = json.loads(j.get("missing_skills") or "[]")
     cl = conn.execute("SELECT * FROM cover_letters WHERE job_id=? AND user_id=?", (job_id, uid)).fetchone()
     j["cover_letter"] = dict(cl) if cl else None
     contacts = conn.execute("SELECT * FROM contacts WHERE job_id=? AND user_id=?", (job_id, uid)).fetchall()

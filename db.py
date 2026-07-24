@@ -196,7 +196,7 @@ def migrate_db(conn) -> None:
             
     # Migrate users table columns if needed
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
-    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile", "name", "designation", "resume_filename"]:
+    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile", "name", "designation", "resume_filename", "resume_profile_json"]:
         if col not in user_cols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
             conn.commit()
@@ -219,6 +219,11 @@ def migrate_db(conn) -> None:
     if "feedback" not in jobs_cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN feedback INTEGER DEFAULT 0;")
         conn.commit()
+        
+    for col in ["matched_skills", "missing_skills"]:
+        if col not in jobs_cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT;")
+            conn.commit()
 
 
 def init_db(db_path: str = DB_PATH):
