@@ -1380,6 +1380,37 @@ def serve_favicon():
     return send_file(os.path.join(base_dir, "logo.svg"), mimetype="image/svg+xml")
 
 
+@app.route("/api/debug/db")
+def debug_db():
+    uid = session.get("user_id")
+    if not uid:
+        return "Unauthorized", 401
+    import re
+    conn = get_conn(DB_PATH)
+    try:
+        user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        jobs_sample = conn.execute("SELECT job_id, title, status, user_id FROM jobs LIMIT 5").fetchall()
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+    finally:
+        conn.close()
+        
+    db_masked = ""
+    if IS_POSTGRES:
+        db_masked = re.sub(r":([^@]+)@", ":***@", DATABASE_URL)
+        
+    return jsonify({
+        "ok": True,
+        "is_postgres": IS_POSTGRES,
+        "database_url_masked": db_masked,
+        "db_path": DB_PATH,
+        "user_count": user_count,
+        "job_count": job_count,
+        "jobs_sample": [dict(r) for r in jobs_sample]
+    })
+
+
 def run_dashboard(port=5050):
     init_db(DB_PATH)
     print(f"\nDashboard → http://localhost:{port}")
