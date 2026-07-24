@@ -1,0 +1,35 @@
+<svg width="256" height="256" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="yolkGrad" x1="15%" y1="10%" x2="90%" y2="95%">
+      <stop offset="0%" stop-color="#FFD27A"/>
+      <stop offset="50%" stop-color="#FFA700"/>
+      <stop offset="100%" stop-color="#F26B00"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="34%" cy="26%" r="45%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65"/>
+      <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#2A2315" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <g transform="translate(12,12)">
+    <!-- egg white: single organic lobe, asymmetric like a real fried egg, not a perfect blob -->
+    <path filter="url(#soft)" fill="#FFFDF7" stroke="#EFE3C8" stroke-width="2"
+          d="M132 34
+             C 176 30, 214 48, 226 88
+             C 236 120, 224 144, 232 172
+             C 240 200, 216 224, 180 226
+             C 148 228, 138 214, 108 218
+             C 70 223, 34 204, 26 168
+             C 19 136, 34 116, 30 86
+             C 26 54, 60 30, 96 30
+             C 108 30, 120 32, 132 34 Z"/>
+
+    <!-- yolk -->
+    <circle cx="146" cy="122" r="58" fill="url(#yolkGrad)"/>
+    <circle cx="146" cy="122" r="58" fill="url(#sheen)"/>
+  </g>
+</svg>
