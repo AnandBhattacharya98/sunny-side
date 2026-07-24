@@ -499,6 +499,29 @@ def onboard_resume():
     conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, resume_filename, profile_json, uid))
     conn.commit()
 
+    # Load demo jobs if no jobs exist for user
+    job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
+    if job_count == 0:
+        from scraper import seed_demo_jobs
+        seed_demo_jobs(conn, user_id=uid)
+        conn.commit()
+
+    # Re-score all jobs for this user
+    from ai_engine import process_new_jobs
+    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    
+    suggestions = conn.execute(
+        """SELECT title, company, location, ai_score, ai_summary 
+           FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL 
+           ORDER BY ai_score DESC LIMIT 3""", (uid,)
+    ).fetchall()
+    
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "suggestions": [dict(s) for s in suggestions]
+    })
+
 
 @app.route("/api/resume/parse", methods=["POST"])
 def api_resume_parse():
@@ -546,29 +569,6 @@ def api_resume_parse():
         return jsonify({"ok": True, "profile": profile})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
-    
-    # Load demo jobs if no jobs exist for user
-    job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
-    if job_count == 0:
-        from scraper import seed_demo_jobs
-        seed_demo_jobs(conn, user_id=uid)
-        conn.commit()
-
-    # Re-score all jobs for this user
-    from ai_engine import process_new_jobs
-    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-    
-    suggestions = conn.execute(
-        """SELECT title, company, location, ai_score, ai_summary 
-           FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL 
-           ORDER BY ai_score DESC LIMIT 3""", (uid,)
-    ).fetchall()
-    
-    conn.close()
-    return jsonify({
-        "ok": True,
-        "suggestions": [dict(s) for s in suggestions]
-    })
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
