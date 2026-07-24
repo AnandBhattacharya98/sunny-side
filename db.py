@@ -41,6 +41,9 @@ if IS_POSTGRES:
             self._lastrowid = None
 
         def execute(self, query, params=None):
+            # Normalize whitespace/newlines for robust pattern matching
+            query = " ".join(query.split())
+
             if params is not None:
                 query = query.replace('?', '%s')
             
@@ -59,6 +62,13 @@ if IS_POSTGRES:
                 query = query.replace("INSERT OR IGNORE INTO tailored_resumes", "INSERT INTO tailored_resumes") + " ON CONFLICT (job_id) DO NOTHING"
             elif "INSERT OR IGNORE" in query:
                 query = query.replace("INSERT OR IGNORE", "INSERT")
+
+            if "INSERT OR REPLACE INTO cover_letters" in query:
+                query = query.replace("INSERT OR REPLACE INTO cover_letters", "INSERT INTO cover_letters") + " ON CONFLICT (job_id) DO UPDATE SET subject = EXCLUDED.subject, body = EXCLUDED.body, linkedin_note = EXCLUDED.linkedin_note, created_at = EXCLUDED.created_at, user_id = EXCLUDED.user_id"
+            elif "INSERT OR REPLACE INTO application_notes" in query:
+                query = query.replace("INSERT OR REPLACE INTO application_notes", "INSERT INTO application_notes") + " ON CONFLICT (job_id) DO UPDATE SET note = EXCLUDED.note, linkedin_note = EXCLUDED.linkedin_note, user_id = EXCLUDED.user_id"
+            elif "INSERT OR REPLACE INTO tailored_resumes" in query:
+                query = query.replace("INSERT OR REPLACE INTO tailored_resumes", "INSERT INTO tailored_resumes") + " ON CONFLICT (job_id) DO UPDATE SET resume_content = EXCLUDED.resume_content, created_at = EXCLUDED.created_at, user_id = EXCLUDED.user_id"
 
             if "PRAGMA table_info" in query:
                 import re
