@@ -429,9 +429,10 @@ def upload_profile_resume():
     )
     conn.commit()
     
-    # Run re-scoring
+    # Run re-scoring in a background thread to prevent gateway timeouts on large pipelines
+    import threading
     from ai_engine import process_new_jobs
-    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    threading.Thread(target=process_new_jobs, args=(DB_PATH, 0, uid), daemon=True).start()
     
     conn.close()
     return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": file.filename})
