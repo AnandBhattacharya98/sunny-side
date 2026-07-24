@@ -1,39 +1,63 @@
 <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- Background Gradient -->
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1B1F3B"/>
-      <stop offset="100%" stop-color="#11142B"/>
+      <stop offset="0%" stop-color="#221A0F"/>
+      <stop offset="100%" stop-color="#140F08"/>
     </linearGradient>
-    <linearGradient id="needle" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F2B441"/>
-      <stop offset="100%" stop-color="#E8952B"/>
+    
+    <!-- Yolk Gradient -->
+    <linearGradient id="yolkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD000"/>
+      <stop offset="50%" stop-color="#FFA700"/>
+      <stop offset="100%" stop-color="#FF5E00"/>
     </linearGradient>
+    
+    <!-- Yolk Glow Shadow -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Drop Shadow for White -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
   </defs>
 
-  <!-- background -->
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Card Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
 
-  <!-- radar rings (scanning / auto-match motif) -->
-  <circle cx="256" cy="256" r="160" fill="none" stroke="#2E3462" stroke-width="2"/>
-  <circle cx="256" cy="256" r="120" fill="none" stroke="#2E3462" stroke-width="2"/>
-  <circle cx="256" cy="256" r="80" fill="none" stroke="#3A4080" stroke-width="2" opacity="0.8"/>
+  <!-- Subtle compass / search grid lines in background -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#FFA700" stroke-width="2" opacity="0.08"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#FFA700" stroke-width="2" opacity="0.05"/>
+  <line x1="76" y1="256" x2="436" y2="256" stroke="#FFA700" stroke-width="2" opacity="0.06"/>
+  <line x1="256" y1="76" x2="256" y2="436" stroke="#FFA700" stroke-width="2" opacity="0.06"/>
 
-  <!-- sweeping scan wedge -->
-  <path d="M256 256 L256 96 A160 160 0 0 1 397 179 Z" fill="#4ECDC4" opacity="0.16"/>
+  <!-- The Egg White (Albumin) - organic, fluid blob shape -->
+  <path d="M 180,140 
+           C 280,110 380,150 400,220 
+           C 420,290 390,370 320,400 
+           C 250,430 140,390 110,320 
+           C 80,250 80,170 180,140 Z" 
+        fill="#FCFAF2" 
+        filter="url(#shadow)"/>
 
-  <!-- compass needle pointing to top-right (target match) -->
-  <g>
-    <path d="M256 256 L216 216 L340 128 Z" fill="url(#needle)"/>
-    <path d="M256 256 L296 296 L172 384 Z" fill="#3A4080"/>
+  <!-- The Egg Yolk - vibrant glowing yellow/orange yolk -->
+  <circle cx="240" cy="245" r="90" fill="url(#yolkGrad)" filter="url(#glow)"/>
+  
+  <!-- Yolk Specular Highlight (3D gloss effect) -->
+  <circle cx="205" cy="210" r="18" fill="#FFFFFF" opacity="0.45" filter="blur(2px)"/>
+  <circle cx="198" cy="203" r="8" fill="#FFFFFF" opacity="0.6"/>
+
+  <!-- Briefcase scanner overlay (retains job hunter board theme inside yolk) -->
+  <g transform="translate(240, 260) scale(0.65)" opacity="0.85">
+    <!-- handle -->
+    <path d="M -24 -24 L -24 -36 C -24 -42, 24 -42, 24 -36 L 24 -24" fill="none" stroke="#221A0F" stroke-width="6" stroke-linecap="round"/>
+    <!-- body -->
+    <rect x="-48" y="-20" width="96" height="64" rx="10" fill="#221A0F"/>
+    <!-- latch line -->
+    <line x1="-48" y1="5" x2="48" y2="5" stroke="#FFA700" stroke-width="3" opacity="0.5"/>
+    <rect x="-8" y="-5" width="16" height="14" rx="3" fill="#FFA700"/>
   </g>
-
-  <!-- briefcase icon, center -->
-  <g transform="translate(256,256)">
-    <rect x="-46" y="-8" width="92" height="66" rx="10" fill="#F4F1EA"/>
-    <rect x="-46" y="-8" width="92" height="22" rx="10" fill="#E8952B"/>
-    <rect x="-18" y="-26" width="36" height="20" rx="6" fill="none" stroke="#F4F1EA" stroke-width="6"/>
-  </g>
-
-  <!-- center pivot dot -->
-  <circle cx="256" cy="256" r="7" fill="#F2B441"/>
 </svg>
