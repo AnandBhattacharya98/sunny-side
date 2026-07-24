@@ -225,6 +225,16 @@ def migrate_db(conn) -> None:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT;")
             conn.commit()
 
+    if IS_POSTGRES:
+        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes"]
+        for t in seq_tables:
+            try:
+                conn.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE(max(id), 1)) FROM {t}")
+                conn.commit()
+            except Exception as e:
+                pass
+
+
 
 def init_db(db_path: str = DB_PATH):
     conn = get_conn(db_path)
