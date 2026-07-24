@@ -1,0 +1,39 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B1F3B"/>
+      <stop offset="100%" stop-color="#11142B"/>
+    </linearGradient>
+    <linearGradient id="needle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2B441"/>
+      <stop offset="100%" stop-color="#E8952B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- radar rings (scanning / auto-match motif) -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#2E3462" stroke-width="2"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#2E3462" stroke-width="2"/>
+  <circle cx="256" cy="256" r="80" fill="none" stroke="#3A4080" stroke-width="2" opacity="0.8"/>
+
+  <!-- sweeping scan wedge -->
+  <path d="M256 256 L256 96 A160 160 0 0 1 397 179 Z" fill="#4ECDC4" opacity="0.16"/>
+
+  <!-- compass needle pointing to top-right (target match) -->
+  <g>
+    <path d="M256 256 L216 216 L340 128 Z" fill="url(#needle)"/>
+    <path d="M256 256 L296 296 L172 384 Z" fill="#3A4080"/>
+  </g>
+
+  <!-- briefcase icon, center -->
+  <g transform="translate(256,256)">
+    <rect x="-46" y="-8" width="92" height="66" rx="10" fill="#F4F1EA"/>
+    <rect x="-46" y="-8" width="92" height="22" rx="10" fill="#E8952B"/>
+    <rect x="-18" y="-26" width="36" height="20" rx="6" fill="none" stroke="#F4F1EA" stroke-width="6"/>
+  </g>
+
+  <!-- center pivot dot -->
+  <circle cx="256" cy="256" r="7" fill="#F2B441"/>
+</svg>
