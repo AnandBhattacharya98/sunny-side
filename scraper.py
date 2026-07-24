@@ -60,193 +60,7 @@ COMPANY_CAREER_PAGES = [
     },
 ]
 
-# ── Demo seed data — shown when all scraping fails ─────────────────────────
-DEMO_JOBS = [
-    {
-        "job_id": "demo_razorpay_spm_001",
-        "title": "Senior Product Manager — Checkout",
-        "company": "Razorpay",
-        "location": "Bengaluru",
-        "url": "https://razorpay.com/jobs/",
-        "description": (
-            "Lead the checkout product for India's largest payment gateway. "
-            "You will own the end-to-end checkout experience for 10M+ merchants. "
-            "Requirements: 4+ years PM experience, strong analytical skills, "
-            "experience with payments or fintech preferred. "
-            "You will work closely with engineering, design, and business teams "
-            "to define the product vision and roadmap. "
-            "Responsibilities include defining success metrics, running A/B tests, "
-            "and shipping features that improve conversion rates."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_cred_pm_002",
-        "title": "Product Manager — Rewards & Loyalty",
-        "company": "CRED",
-        "location": "Bengaluru",
-        "url": "https://careers.cred.club/",
-        "description": (
-            "Own the rewards and loyalty platform at CRED, serving 12M+ premium users. "
-            "3-5 years experience required. Strong design sense and data-driven mindset. "
-            "You will partner with brand, marketing, and engineering to build engaging "
-            "reward experiences. Experience in consumer apps is a strong plus. "
-            "Responsibilities: product strategy, OKR setting, stakeholder management, "
-            "and cross-functional execution."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_zepto_pm_003",
-        "title": "Product Manager — Supply Chain",
-        "company": "Zepto",
-        "location": "Mumbai",
-        "url": "https://www.zepto.team/careers",
-        "description": (
-            "Drive the supply chain and dark store operations product at Zepto. "
-            "2-4 years PM experience, ideally in logistics, ops-tech, or marketplace. "
-            "You will work on inventory management, demand forecasting, and last-mile tools. "
-            "Strong SQL skills required. Experience with operations-heavy products preferred. "
-            "Collaborate with city ops, category, and tech teams to build India's "
-            "fastest grocery delivery platform."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_groww_pm_004",
-        "title": "Associate Product Manager — Mutual Funds",
-        "company": "Groww",
-        "location": "Bengaluru",
-        "url": "https://groww.in/careers",
-        "description": (
-            "Build investment products for first-time investors on Groww. "
-            "0-2 years experience, APM or fresh MBA welcome. Strong problem-solving "
-            "and communication skills essential. You will work on the mutual funds "
-            "discovery and investment flow. Responsibilities include user research, "
-            "wireframing with design, and working with engineering on delivery. "
-            "Familiarity with financial products is a strong plus."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_phonepe_gpm_005",
-        "title": "Group Product Manager — UPI Payments",
-        "company": "PhonePe",
-        "location": "Bengaluru",
-        "url": "https://www.phonepe.com/careers/",
-        "description": (
-            "Lead a team of PMs on PhonePe's core UPI payments product, "
-            "used by 500M+ Indians. 7+ years experience required with at least "
-            "2 years managing a PM team. Deep understanding of payments ecosystem "
-            "and regulatory environment (RBI, NPCI) preferred. "
-            "You will set product vision, manage a roadmap across multiple squads, "
-            "and represent product in leadership reviews. Strong execution track record essential."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_meesho_pm_006",
-        "title": "Product Manager — Seller Experience",
-        "company": "Meesho",
-        "location": "Bengaluru",
-        "url": "https://meesho.io/careers",
-        "description": (
-            "Own the seller onboarding and catalogue management experience at Meesho. "
-            "3-5 years PM experience, ideally in marketplace or e-commerce. "
-            "You will work on tools that help 1.5M+ sellers list, price, and sell products. "
-            "Strong analytical skills and experience with large-scale consumer products. "
-            "Comfort with SQL, Mixpanel or similar analytics tools required."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_swiggy_pm_007",
-        "title": "Senior PM — Consumer App (Food)",
-        "company": "Swiggy",
-        "location": "Bengaluru",
-        "url": "https://careers.swiggy.com/",
-        "description": (
-            "Drive discovery and personalisation on Swiggy's consumer app. "
-            "4-6 years experience in consumer product management. "
-            "Experience with recommendation systems or personalisation is a big plus. "
-            "You will own the home feed, search, and restaurant discovery experience. "
-            "Strong data instincts, ability to run rapid experiments, and comfort "
-            "working with ML teams required."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_browserstack_pm_008",
-        "title": "Product Manager — Developer Tools",
-        "company": "BrowserStack",
-        "location": "Mumbai / Remote",
-        "url": "https://www.browserstack.com/careers",
-        "description": (
-            "Build developer-first testing tools used by 50,000+ companies globally. "
-            "3-5 years PM experience, ideally in B2B SaaS or developer tools. "
-            "Strong technical background preferred — you will work closely with engineers "
-            "on API design, SDKs, and CI/CD integrations. "
-            "Excellent written communication for external product documentation. "
-            "Experience with agile delivery and working with distributed global teams."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_stripe_mle_009",
-        "title": "Machine Learning Engineer — Risk & Fraud",
-        "company": "Stripe",
-        "location": "San Francisco, CA / Remote",
-        "url": "https://stripe.com/jobs",
-        "description": (
-            "Build and deploy real-time fraud detection and risk models. "
-            "Scale Stripe's transaction scoring pipeline processing billions of dollars daily. "
-            "Requirements: 3+ years experience with PyTorch/TensorFlow, Python, Spark, and MLOps platforms. "
-            "Experience with streaming architectures using Kafka/Flink is a strong plus. "
-            "You will optimize ML model inference latency to run under 50ms at consumer-scale throughput."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_pinterest_mle_010",
-        "title": "Machine Learning Engineer — Recommendation Systems",
-        "company": "Pinterest",
-        "location": "San Francisco, CA",
-        "url": "https://careers.pinterest.com",
-        "description": (
-            "Develop candidate-generation and ranking models for home feed recommendations. "
-            "Work on large-scale recommendation systems, NLP text classifiers (using BERT/Transformers), "
-            "and A/B experimentation frameworks. "
-            "Skills required: Python, PyTorch, SQL, Docker, and TensorFlow Serving. "
-            "You will deploy deep learning models serving 100M+ active users."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-    {
-        "job_id": "demo_adobe_ds_011",
-        "title": "Data Scientist / ML Developer",
-        "company": "Adobe",
-        "location": "San Jose, CA",
-        "url": "https://adobe.com/careers",
-        "description": (
-            "Build subscription churn prediction and marketing analytics models. "
-            "Work on ML pipelines utilizing gradient-boosted trees, Python, SQL, and pandas. "
-            "Automate data workflows, design KPI dashboards, and present findings to leadership. "
-            "Experience in statistics, experimental design, and predictive modeling required."
-        ),
-        "source": "demo",
-        "posted_at": datetime.now().strftime("%Y-%m-%d"),
-    },
-]
+# -- DEMO_JOBS removed --
 
 
 def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
@@ -278,13 +92,14 @@ def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     return True
 
 
-def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1) -> list[dict]:
+def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
     new_jobs = []
+    kw_hyphenated = keywords.lower().replace(" ", "-").replace("/", "-")
     for page in range(1, max_pages + 1):
         url = (
-            f"https://www.naukri.com/product-manager-jobs-in-india-{page}"
+            f"https://www.naukri.com/{kw_hyphenated}-jobs-in-india-{page}"
             if page > 1 else
-            "https://www.naukri.com/product-manager-jobs-in-india"
+            f"https://www.naukri.com/{kw_hyphenated}-jobs-in-india"
         )
         try:
             resp = requests.get(url, headers=HEADERS, timeout=12)
@@ -297,8 +112,13 @@ def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1) -> list[dict]:
                 if not title_el:
                     continue
                 title = title_el.get_text(strip=True)
-                if not any(k in title.lower() for k in ["product manager", "product management"]):
+                
+                # Loose overlap match: job title should contain at least one term of the keyword phrase
+                terms = [t.strip().lower() for t in keywords.replace("-", " ").split() if len(t.strip()) > 2]
+                title_lower = title.lower()
+                if terms and not any(t in title_lower for t in terms):
                     continue
+                
                 job_url = title_el.get("href", url)
                 job_id = f"naukri_{re.sub(r'[^a-z0-9]', '_', job_url[-40:].lower())}"
                 job = {
@@ -319,10 +139,12 @@ def scrape_naukri(conn, max_pages: int = 2, user_id: int = 1) -> list[dict]:
     return new_jobs
 
 
-def scrape_linkedin_jobs(conn, user_id: int = 1) -> list[dict]:
+def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
+    import urllib.parse
+    q_keywords = urllib.parse.quote_plus(keywords)
     url = (
-        "https://www.linkedin.com/jobs/search?"
-        "keywords=Product+Manager&location=India&f_TPR=r86400&position=1&pageNum=0"
+        f"https://www.linkedin.com/jobs/search?"
+        f"keywords={q_keywords}&location=India&f_TPR=r86400&position=1&pageNum=0"
     )
     new_jobs = []
     try:
@@ -336,8 +158,13 @@ def scrape_linkedin_jobs(conn, user_id: int = 1) -> list[dict]:
             if not title_el or not link_el:
                 continue
             title = title_el.get_text(strip=True)
-            if "product manager" not in title.lower():
+            
+            # Loose overlap match: job title should contain at least one term of the keyword phrase
+            terms = [t.strip().lower() for t in keywords.replace("-", " ").split() if len(t.strip()) > 2]
+            title_lower = title.lower()
+            if terms and not any(t in title_lower for t in terms):
                 continue
+                
             job_url = link_el.get("href", "").split("?")[0]
             job_id = f"li_{re.sub(r'[^0-9]', '', job_url[-20:])}"
             job = {
@@ -393,12 +220,73 @@ def scrape_company_pages(conn, user_id: int = 1) -> list[dict]:
 
 
 def seed_demo_jobs(conn, user_id: int = 1) -> list[dict]:
-    """Load demo jobs so the app works with no internet / no keys."""
+    return []
+
+
+def scrape_google_search_jobs(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
+    import urllib.parse
+    q = f"{keywords} jobs India"
+    url = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}&num=30"
     new_jobs = []
-    for job in DEMO_JOBS:
-        if _insert_job(conn, job, user_id=user_id):
-            new_jobs.append(job)
-    print(f"  Demo seed: {len(new_jobs)} jobs loaded")
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=12)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Google search results container: a links inside h3 elements
+        for a in soup.select("a"):
+            href = a.get("href", "")
+            # Google links in simple HTML search look like: /url?q=https://company.com/job...
+            if href.startswith("/url?q="):
+                real_url = href.split("/url?q=")[1].split("&")[0]
+                real_url = urllib.parse.unquote(real_url)
+                
+                # Exclude internal google domains or support pages
+                if "google.com" in real_url or "youtube.com" in real_url:
+                    continue
+                
+                # Extract title from child h3 or the link text
+                title_el = a.select_one("h3")
+                title = title_el.get_text(strip=True) if title_el else a.get_text(strip=True)
+                
+                if not title or len(title) < 10:
+                    continue
+                    
+                # Clean up title
+                for suffix in [" | ", " - "]:
+                    if suffix in title:
+                        title = title.split(suffix)[0].strip()
+                
+                # Generate a unique job_id
+                job_id = f"google_{re.sub(r'[^a-z0-9]', '_', real_url[-40:].lower())}"
+                
+                # Fetch snippet from search description
+                parent = a.find_parent("div")
+                description = ""
+                if parent:
+                    # Look for child span or div with snippet text
+                    for sibling in parent.find_next_siblings():
+                        sib_text = sibling.get_text(strip=True)
+                        if len(sib_text) > 40:
+                            description = sib_text
+                            break
+                            
+                job = {
+                    "job_id": job_id,
+                    "title": title,
+                    "company": "Google Search Match",
+                    "location": "India",
+                    "url": real_url,
+                    "source": "google",
+                    "description": description or f"Job listing found on Google Search for: {keywords}",
+                    "posted_at": "",
+                }
+                
+                if _insert_job(conn, job, user_id=user_id):
+                    new_jobs.append(job)
+                    
+    except Exception as e:
+        print(f"  [Google Search] {e}")
+    print(f"  Google Search: {len(new_jobs)} new jobs")
     return new_jobs
 
 
@@ -421,13 +309,13 @@ def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
     all_new = []
     print(f"\n[Scraping job listings for user {user_id}...]")
 
-    # Always seed demo data first so app has something to show
-    demo = seed_demo_jobs(conn, user_id=user_id)
-    all_new += demo
+    # Query user's designation to use as query keywords
+    row = conn.execute("SELECT designation FROM users WHERE id = ?", (user_id,)).fetchone()
+    keywords = row[0] if row and row[0] else "Product Manager"
 
-    # Then try live sources — failures are silent, demo data is the fallback
-    all_new += scrape_naukri(conn, user_id=user_id)
-    all_new += scrape_linkedin_jobs(conn, user_id=user_id)
+    all_new += scrape_naukri(conn, user_id=user_id, keywords=keywords)
+    all_new += scrape_linkedin_jobs(conn, user_id=user_id, keywords=keywords)
+    all_new += scrape_google_search_jobs(conn, user_id=user_id, keywords=keywords)
     all_new += scrape_company_pages(conn, user_id=user_id)
 
     conn.close()

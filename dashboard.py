@@ -112,11 +112,11 @@ def signup():
             )
             conn.commit()
             
-            # If resume is provided on signup, seed and score demo jobs
+            # If resume is provided on signup, scrape live jobs matching user designation and score them
             if resume_text:
-                from scraper import seed_demo_jobs
-                seed_demo_jobs(conn, user_id=uid)
+                from scraper import run_all_scrapers
                 conn.commit()
+                run_all_scrapers(DB_PATH, user_id=uid)
                 from ai_engine import process_new_jobs
                 process_new_jobs(DB_PATH, min_score=0, user_id=uid)
 
@@ -499,12 +499,11 @@ def onboard_resume():
     conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, resume_filename, profile_json, uid))
     conn.commit()
 
-    # Load demo jobs if no jobs exist for user
-    job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (uid,)).fetchone()[0]
-    if job_count == 0:
-        from scraper import seed_demo_jobs
-        seed_demo_jobs(conn, user_id=uid)
-        conn.commit()
+    # Scrape live jobs matching user designation
+    from scraper import run_all_scrapers
+    conn.close()
+    run_all_scrapers(DB_PATH, user_id=uid)
+    conn = get_conn(DB_PATH)
 
     # Re-score all jobs for this user
     from ai_engine import process_new_jobs
