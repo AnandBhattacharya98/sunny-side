@@ -69,6 +69,8 @@ if IS_POSTGRES:
                 query = query.replace("INSERT OR REPLACE INTO application_notes", "INSERT INTO application_notes") + " ON CONFLICT (job_id) DO UPDATE SET note = EXCLUDED.note, linkedin_note = EXCLUDED.linkedin_note, user_id = EXCLUDED.user_id"
             elif "INSERT OR REPLACE INTO tailored_resumes" in query:
                 query = query.replace("INSERT OR REPLACE INTO tailored_resumes", "INSERT INTO tailored_resumes") + " ON CONFLICT (job_id) DO UPDATE SET resume_content = EXCLUDED.resume_content, created_at = EXCLUDED.created_at, user_id = EXCLUDED.user_id"
+            elif "INSERT OR REPLACE INTO interview_prep" in query:
+                query = query.replace("INSERT OR REPLACE INTO interview_prep", "INSERT INTO interview_prep") + " ON CONFLICT (job_id) DO UPDATE SET quick_questions = EXCLUDED.quick_questions, deep_questions = EXCLUDED.deep_questions, created_at = EXCLUDED.created_at, user_id = EXCLUDED.user_id"
 
             if "PRAGMA table_info" in query:
                 import re

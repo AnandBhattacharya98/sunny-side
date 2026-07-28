@@ -864,12 +864,12 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   <div class="board">
     {% for col in cols %}
     {% set column_title = {
-      'whatsapp': 'Self Imports',
-      'new': 'Inbox / New',
-      'shortlisted': 'Shortlisted',
+      'whatsapp': 'Self-Import',
+      'new': 'Inbox',
+      'shortlisted': 'Shortlist',
       'interviewing': 'Interviewing',
       'applied': 'Applied',
-      'offer': 'Offers',
+      'offer': 'Offer',
       'rejected': 'Rejected'
     }.get(col, col.title()) %}
     
