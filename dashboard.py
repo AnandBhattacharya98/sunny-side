@@ -327,11 +327,13 @@ def update_profile():
     conn.execute(
         """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
            name = ?, designation = ?, share_profile = ?, resume_filename = ?, resume_profile_json = ?,
-           weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?
+           weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?,
+           daily_recs_enabled = ?, daily_recs_min_score = ?, daily_recs_time = ?
            WHERE id = ?""",
         (new_resume, d.get("imap_email", ""), d.get("imap_password", ""), new_key, d.get("linkedin_profile", ""),
          d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""), profile_json,
-         float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)), uid)
+         float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)),
+         int(d.get("daily_recs_enabled", 1)), float(d.get("daily_recs_min_score", 7.5)), d.get("daily_recs_time", "07:30"), uid)
     )
     conn.commit()
     
@@ -688,6 +690,7 @@ def index():
         "whatsapp": [],
         "new": [],
         "shortlisted": [],
+        "interviewing": [],
         "applied": [],
         "offer": [],
         "rejected": []
@@ -700,8 +703,10 @@ def index():
             board["whatsapp"].append(j)
         elif status in ("new", "scored", "ready"):
             board["new"].append(j)
-        elif status in ("shortlisted", "interviewing"):
+        elif status == "shortlisted":
             board["shortlisted"].append(j)
+        elif status == "interviewing":
+            board["interviewing"].append(j)
         elif status == "applied":
             board["applied"].append(j)
         elif status == "offer":
@@ -718,7 +723,7 @@ def index():
     if is_new_user:
         session.pop("is_new_user", None)
         
-    cols = ["whatsapp", "new", "shortlisted", "applied", "offer", "rejected"]
+    cols = ["whatsapp", "new", "shortlisted", "interviewing", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
                            companies=companies, settings=settings, view_mode="board", is_new_user=is_new_user)
 
@@ -971,6 +976,215 @@ def pipeline_move():
     add_timeline(conn, d["job_id"], f"Pipeline → {d['status']}")
     conn.commit(); conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/cron/daily-recommendations", methods=["POST"])
+def cron_daily_recommendations():
+    auth_header = request.headers.get("X-Cron-Token")
+    expected_token = os.environ.get("CRON_SECRET", "default_cron_secret")
+    if auth_header != expected_token:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    conn = get_conn(DB_PATH)
+    users = conn.execute("SELECT id, daily_recs_min_score FROM users WHERE daily_recs_enabled = 1").fetchall()
+    
+    from scraper import run_all_scrapers
+    from linkedin_finder import enrich_jobs_with_contacts
+    from email_scraper import sync_job_statuses_from_email
+    from ai_engine import process_new_jobs
+    from datetime import datetime
+
+    for user in users:
+        uid = user[0]
+        min_score = user[1] if user[1] is not None else 7.5
+
+        # 1. Clear old daily picks
+        conn.execute("UPDATE jobs SET is_daily_pick = 0 WHERE user_id = ?", (uid,))
+        conn.commit()
+
+        # 2. Run scrapers
+        run_all_scrapers(DB_PATH, user_id=uid)
+
+        # 3. Find contacts
+        enrich_jobs_with_contacts(DB_PATH)
+
+        # 4. Sync emails
+        try:
+            sync_job_statuses_from_email(DB_PATH, user_id=uid)
+        except Exception as e:
+            print(f"Email sync failed: {e}")
+
+        # 5. Get new jobs before scoring
+        new_jobs = conn.execute("SELECT job_id FROM jobs WHERE status = 'new' AND user_id = ?", (uid,)).fetchall()
+        new_job_ids = [r[0] for r in new_jobs]
+
+        # 6. Score jobs
+        process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+
+        # 7. Set daily picks
+        if new_job_ids:
+            placeholders = ",".join(["?"] * len(new_job_ids))
+            query = f"""
+                UPDATE jobs 
+                SET is_daily_pick = 1, picked_at = ? 
+                WHERE user_id = ? AND job_id IN ({placeholders}) AND ai_score >= ?
+            """
+            conn.execute(query, (datetime.now().isoformat(), uid, *new_job_ids, min_score))
+            conn.commit()
+
+        # 8. Fire email digest
+        try:
+            from notifier import send_email_digest
+            send_email_digest(uid)
+        except Exception as e:
+            print(f"Failed to send email digest: {e}")
+
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/recommendations/today", methods=["GET"])
+def get_daily_recommendations():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    picks = conn.execute(
+        """SELECT job_id, title, company, location, url, ai_score, ai_summary, picked_at 
+           FROM jobs 
+           WHERE user_id = ? AND is_daily_pick = 1 
+           ORDER BY ai_score DESC""", (uid,)
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "picks": [dict(p) for p in picks]
+    })
+
+
+@app.route("/api/job/<job_id>/interview-round", methods=["POST"])
+def update_interview_round(job_id):
+    uid = get_user_id()
+    d = request.json or {}
+    round_name = d.get("round", "").strip()
+    
+    conn = get_conn(DB_PATH)
+    row = conn.execute("SELECT 1 FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+        
+    from datetime import datetime
+    
+    conn.execute(
+        "UPDATE jobs SET interview_round = ?, interview_round_updated_at = ? WHERE job_id = ? AND user_id = ?",
+        (round_name, datetime.now().isoformat(), job_id, uid)
+    )
+    conn.commit()
+    
+    add_timeline(conn, job_id, f"Interview round -> {round_name}")
+    
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/job/<job_id>/interview-prep", methods=["GET"])
+def get_job_interview_prep(job_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    
+    prep = conn.execute(
+        "SELECT quick_questions, deep_questions FROM interview_prep WHERE job_id = ? AND user_id = ?",
+        (job_id, uid)
+    ).fetchone()
+    
+    if prep:
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "quick_questions": json.loads(prep[0] or "[]"),
+            "deep_questions": json.loads(prep[1] or "[]")
+        })
+        
+    job = conn.execute(
+        "SELECT title, company, description FROM jobs WHERE job_id = ? AND user_id = ?",
+        (job_id, uid)
+    ).fetchone()
+    
+    if not job:
+        conn.close()
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+        
+    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    resume_text = row[0] if row else None
+    api_key = row[1] if row else None
+    
+    from ai_engine import generate_interview_prep
+    from datetime import datetime
+    
+    try:
+        prep_data = generate_interview_prep(job[0], job[1], job[2] or "", resume_text, api_key)
+        quick_json = json.dumps(prep_data.get("quick_questions", []))
+        deep_json = json.dumps(prep_data.get("deep_questions", []))
+        
+        conn.execute(
+            """INSERT OR REPLACE INTO interview_prep (job_id, quick_questions, deep_questions, created_at, user_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (job_id, quick_json, deep_json, datetime.now().isoformat(), uid)
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "ok": True,
+            "quick_questions": prep_data.get("quick_questions", []),
+            "deep_questions": prep_data.get("deep_questions", [])
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False, "error": f"Failed to generate prep questions: {e}"}), 500
+
+
+@app.route("/api/job/<job_id>/interview-prep/regenerate", methods=["POST"])
+def regenerate_job_interview_prep(job_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    
+    job = conn.execute(
+        "SELECT title, company, description FROM jobs WHERE job_id = ? AND user_id = ?",
+        (job_id, uid)
+    ).fetchone()
+    
+    if not job:
+        conn.close()
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+        
+    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    resume_text = row[0] if row else None
+    api_key = row[1] if row else None
+    
+    from ai_engine import generate_interview_prep
+    from datetime import datetime
+    
+    try:
+        prep_data = generate_interview_prep(job[0], job[1], job[2] or "", resume_text, api_key)
+        quick_json = json.dumps(prep_data.get("quick_questions", []))
+        deep_json = json.dumps(prep_data.get("deep_questions", []))
+        
+        conn.execute(
+            """INSERT OR REPLACE INTO interview_prep (job_id, quick_questions, deep_questions, created_at, user_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (job_id, quick_json, deep_json, datetime.now().isoformat(), uid)
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "ok": True,
+            "quick_questions": prep_data.get("quick_questions", []),
+            "deep_questions": prep_data.get("deep_questions", [])
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False, "error": f"Failed to regenerate prep questions: {e}"}), 500
 
 
 @app.route("/api/stats")

@@ -673,6 +673,128 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
     return digest
 
 
+def generate_interview_prep(title: str, company: str, description: str,
+                            resume_text: str = None, api_key: str = None) -> dict:
+    if not resume_text:
+        resume_text = RESUME_TEXT
+    if ANTHROPIC_API_KEY:
+        try:
+            return _ai_interview_prep(title, company, description, resume_text)
+        except Exception:
+            pass
+    
+    key_to_use = api_key or GEMINI_API_KEY or get_fallback_gemini_key()
+    if key_to_use:
+        try:
+            return _gemini_interview_prep(title, company, description, resume_text, api_key=key_to_use)
+        except Exception as e:
+            print(f"Gemini prep failed, falling back to local: {e}")
+            
+    return _local_interview_prep(title, company)
+
+
+def _local_interview_prep(title, company):
+    quick = [
+        f"Why do you want to join {company} as a {title}?",
+        "Walk me through your resume in 60 seconds.",
+        f"What do you think are the core challenges {company} is facing in the market?",
+        "Tell me about a time you managed a difficult stakeholder or team conflict.",
+        "What are your salary expectations and availability?"
+    ]
+    deep = [
+        {
+            "q": f"How would you approach designing a new feature or optimization for {company}'s core product?",
+            "hints": "Define goals -> Identify user segments -> Ideate solutions -> Prioritize using a framework -> Define metrics."
+        },
+        {
+            "q": "Tell me about a project you led that had significant business impact. What were the key metrics?",
+            "hints": "Use STAR method. Focus on your specific contribution, the outcome, and quantifiable metrics (revenue, conversion, etc.)."
+        },
+        {
+            "q": "How do you prioritize competing requests from multiple teams or leadership?",
+            "hints": "Explain your framework (e.g., ROI, effort vs. impact, alignment with company objectives). Mention communication."
+        },
+        {
+            "q": "Describe a time you failed or made a major mistake. What did you learn and how did you handle it?",
+            "hints": "Choose a real but professional mistake. Take full ownership, explain the mitigation steps, and highlight the long-term learning."
+        },
+        {
+            "q": "What technical or analytical tools do you rely on to make product and engineering decisions?",
+            "hints": "Mention specific tools (SQL, Mixpanel, Tableau, Jira) and explain how data/metrics guide your roadmap decisions."
+        }
+    ]
+    return {"quick_questions": quick, "deep_questions": deep}
+
+
+def _ai_interview_prep(title, company, description, resume_text):
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        prompt = f"""
+        You are an elite interview coach preparing a candidate for a {title} role at {company}.
+        
+        Job Description:
+        {description}
+        
+        Candidate Resume:
+        {resume_text}
+        
+        Generate:
+        1. 5 warm-up 'Quick-fire' questions.
+        2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
+        
+        Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
+        {{
+          "quick_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+          "deep_questions": [
+             {{"q": "Question 1", "hints": "Model answer outline bullet points..."}},
+             ...
+          ]
+        }}
+        """
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        res_text = msg.content[0].text.strip()
+        if res_text.startswith("```"):
+            res_text = re.sub(r"^```(?:json)?\n|```$", "", res_text, flags=re.MULTILINE)
+        return json.loads(res_text.strip())
+    except Exception as e:
+        print(f"Claude interview prep failed: {e}")
+        raise e
+
+
+def _gemini_interview_prep(title, company, description, resume_text, api_key):
+    prompt = f"""
+    You are an elite interview coach preparing a candidate for a {title} role at {company}.
+    
+    Job Description:
+    {description}
+    
+    Candidate Resume:
+    {resume_text}
+    
+    Generate:
+    1. 5 warm-up 'Quick-fire' questions.
+    2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
+    
+    Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
+    {{
+      "quick_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+      "deep_questions": [
+         {{"q": "Question 1", "hints": "Model answer outline bullet points..."}},
+         ...
+      ]
+    }}
+    """
+    res_text = _call_gemini(prompt, response_json=True, api_key=api_key)
+    if res_text.startswith("```"):
+        res_text = re.sub(r"^```(?:json)?\n|```$", "", res_text, flags=re.MULTILINE)
+    return json.loads(res_text.strip())
+
+
 if __name__ == "__main__":
     results = process_new_jobs()
     for r in results:

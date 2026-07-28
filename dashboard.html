@@ -264,6 +264,48 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   0% { transform: scale(0.95); border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; }
   100% { transform: scale(1.08); border-radius: 40% 60% 50% 60% / 60% 40% 60% 40%; }
 }
+.flashcard-wrapper {
+  perspective: 1000px;
+  height: 120px;
+  cursor: pointer;
+}
+.flashcard-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.4s ease-out;
+  transform-style: preserve-3d;
+  border-radius: 12px;
+}
+.flashcard-inner.flipped {
+  transform: rotateY(180deg);
+}
+.flashcard-front, .flashcard-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+  border: 1px solid var(--bdr);
+}
+.flashcard-front {
+  background: var(--sur);
+  color: var(--txt);
+  font-weight: 600;
+}
+.flashcard-back {
+  background: var(--purl);
+  color: var(--pur);
+  transform: rotateY(180deg);
+  font-weight: 500;
+  overflow-y: auto;
+}
 .terminal-box {
   background: #0f0e1c;
   border: 1px solid var(--bdr);
@@ -804,12 +846,28 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 
 
+  <!-- Today's Picks Strip -->
+  <div id="daily-picks-strip" style="display:none; margin: 0 20px 20px 20px; padding: 16px; background: linear-gradient(135deg, #FFFDF6 0%, #FFF2CC 100%); border: 1px solid #FFE082; border-radius: 16px; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.05);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; cursor:pointer;" onclick="toggleDailyPicksBody()">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:16px;">✨</span>
+        <h4 style="font-family:'Space Grotesk', sans-serif; font-size:14px; font-weight:700; color:#5D4037;" id="daily-picks-title">Today's Picks</h4>
+        <span style="font-size:11px; color:#795548; font-weight:500; background:#FFFDE7; padding:2px 8px; border-radius:10px;" id="daily-picks-timestamp">Since yesterday</span>
+      </div>
+      <button style="background:none; border:none; color:#795548; font-size:12px; font-weight:600; cursor:pointer;" id="daily-picks-toggle-btn">Hide</button>
+    </div>
+    <div id="daily-picks-body" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:4px;">
+      <!-- JavaScript populated cards -->
+    </div>
+  </div>
+
   <div class="board">
     {% for col in cols %}
     {% set column_title = {
       'whatsapp': 'Self Imports',
       'new': 'Inbox / New',
-      'shortlisted': 'Shortlisted / Active',
+      'shortlisted': 'Shortlisted',
+      'interviewing': 'Interviewing',
       'applied': 'Applied',
       'offer': 'Offers',
       'rejected': 'Rejected'
@@ -832,7 +890,8 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         {{ {
           'whatsapp': 'Self-imported jobs and pasted links/descriptions.',
           'new': 'New job listings scraped from email alerts and pending review.',
-          'shortlisted': 'Roles you are actively interviewing for or shortlisted for.',
+          'shortlisted': "Roles you're interested in and plan to apply to soon.",
+          'interviewing': "Roles where you're actively in the interview loop.",
           'applied': 'Jobs you have successfully submitted applications to.',
           'offer': 'Roles where you have received official job offers.',
           'rejected': 'Roles where you have been rejected or decided not to proceed.'
@@ -900,6 +959,18 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
               </span>
             </div>
           </div>
+          {% if job.status == 'interviewing' or job.interview_round %}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:1px dashed var(--bdr);" onclick="event.stopPropagation();">
+            {% if job.interview_round %}
+            <span style="font-size:10px; font-weight:700; color:var(--pur); background:var(--purl); padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">
+              🎯 {{ job.interview_round }}
+            </span>
+            {% else %}
+            <span style="font-size:10px; font-weight:500; color:var(--mut); font-style:italic;">No round set</span>
+            {% endif %}
+            <button onclick="openRoundModal('{{ job.job_id }}', '{{ job.interview_round or '' }}')" style="background:none; border:none; color:var(--pur); font-size:10px; font-weight:600; cursor:pointer; padding:2px 4px; border-radius:4px; transition: background 0.15s;" onmouseover="this.style.background='var(--purl)'" onmouseout="this.style.background='none'">Edit Stage</button>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
         
@@ -1047,6 +1118,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">🧠 Quiz Mode</button>
         </div>
         <div class="modal-body">
           
@@ -1054,6 +1126,14 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <div class="tab-panel active" id="panel-fit-{{ job.job_id }}">
             <span class="lbl">Fit analysis</span>
             <div class="fit">{{ job.ai_summary or 'No summary yet — click Regenerate.' }}</div>
+            
+            {% if job.status == 'interviewing' %}
+            <div style="margin-top:14px; margin-bottom:14px; padding:12px; background:var(--purl); border:1px dashed var(--pur); border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:600; color:var(--pur);">Prepping for an interview? Try Quiz Mode &rarr;</span>
+              <button class="btn btn-p" style="font-size:11px; padding:4px 10px; border:none; background:var(--pur); color:white; border-radius:12px; cursor:pointer;" onclick="const t = this.closest('.modal-content').querySelector('.modal-tabs button[onclick*=\'quiz\']'); if(t) t.click();">Open Prep</button>
+            </div>
+            {% endif %}
+            
             {% if job.key_reqs_list %}
             <div class="reqs">
               {% for r in job.key_reqs_list %}<span class="rtag">{{ r }}</span>{% endfor %}
@@ -1196,6 +1276,41 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             </div>
             
             <div class="resume-content-box-{{ job.job_id }}" style="display:none;background:var(--bg);padding:16px;border-radius:8px;font-size:12px;color:var(--txt);line-height:1.6;overflow-y:auto;max-height:380px;white-space:pre-wrap;font-family:monospace;border:1px solid var(--bdr);text-align:left;">
+            </div>
+          </div>
+          
+          <!-- Quiz Mode Panel -->
+          <div class="tab-panel quiz-theme" id="panel-quiz-{{ job.job_id }}" style="position:relative;">
+            <style>
+              #panel-quiz-{{ job.job_id }} {
+                --pur: #6C5CE7;
+                --purl: rgba(108, 92, 231, 0.08);
+              }
+            </style>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <span class="lbl" style="color:var(--pur); font-weight:700;">Interview Prep Quiz</span>
+              <button class="btn btn-p" style="background:var(--pur); border:none; color:white; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">🔄 Regenerate Questions</button>
+            </div>
+            
+            <div class="quiz-loading-{{ job.job_id }}" style="text-align:center; padding:40px; color:var(--mut);">
+              <span>⏳</span> Generating tailored interview questions...
+            </div>
+            
+            <div class="quiz-content-{{ job.job_id }}" style="display:none; flex-direction:column; gap:20px; text-align:left;">
+              <div>
+                <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Quick-Fire Flashcards (Tap to Reveal)</span>
+                <div class="flashcard-container-{{ job.job_id }}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:8px;">
+                  <!-- JS populated cards -->
+                </div>
+              </div>
+              
+              <div style="border-top: 1px solid var(--bdr); padding-top:16px;">
+                <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Deeper Prep Questions</span>
+                <div class="deep-questions-list-{{ job.job_id }}" style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+                  <!-- JS populated deep questions -->
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1349,6 +1464,31 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <input type="hidden" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}">
       {% endif %}
 
+      <!-- Daily Recommendations Config -->
+      <div style="border:1px solid var(--bdr); border-radius:12px; padding:12px; margin-top:4px;">
+        <span style="font-size:12px; font-weight:700; color:var(--txt); text-transform:uppercase; display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+          ✨ Daily Recommendations
+        </span>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <label for="settings-daily-enabled" style="font-size:13px; color:var(--txt); font-weight:500; cursor:pointer;">Enable Daily Picks</label>
+            <input type="checkbox" id="settings-daily-enabled" {% if (settings or {}).get('daily_recs_enabled', 1) %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+          </div>
+          
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="font-size:11px; font-weight:600; color:var(--mut);">Min Recommendation Score Threshold: <span id="recs-min-score-val" style="color:var(--pur); font-weight:700;">{{ (settings or {}).get('daily_recs_min_score', 7.5) }}</span></label>
+            </div>
+            <input type="range" min="0" max="10" step="0.5" id="settings-daily-min-score" value="{{ (settings or {}).get('daily_recs_min_score', 7.5) }}" oninput="document.getElementById('recs-min-score-val').textContent = this.value" style="width:100%; cursor:pointer;">
+          </div>
+          
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:600; color:var(--mut);">Preferred Delivery Time (Local/Server)</label>
+            <input type="text" id="settings-daily-time" value="{{ (settings or {}).get('daily_recs_time', '07:30') }}" placeholder="e.g. 07:30" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none; max-width: 120px;">
+          </div>
+        </div>
+      </div>
+
       <!-- Advanced Match Settings (Weights) -->
       <div style="border:1px solid var(--bdr); border-radius:12px; padding:12px; margin-top:4px;">
         <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleAdvancedSettings()">
@@ -1397,6 +1537,33 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     <div style="display: flex; gap: 12px; justify-content: center;">
       <button class="btn" onclick="closeDeleteConfirmModal()">Cancel</button>
       <button id="delete-confirm-btn" class="btn btn-p" style="background: var(--rd); color: white; border: none; padding: 8px 16px; border-radius: 20px;">Yes, Delete Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Interview Round Picker Modal -->
+<div id="modal-interview-round" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 10000;" onclick="closeRoundModal()">
+  <div class="modal-window" style="max-width: 440px; width:100%; padding: 24px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);" onclick="event.stopPropagation()">
+    <div class="modal-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: none; padding: 0;">
+      <h3 class="modal-title" style="font-size: 16px; font-weight: 700; color: var(--txt); font-family: 'Space Grotesk', sans-serif;">Select Interview Round</h3>
+      <button class="modal-close" onclick="closeRoundModal()">&times;</button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+      <p style="font-size: 13px; color: var(--mut); margin: 0;">Which round are you currently on for this role?</p>
+      
+      <select id="round-select" onchange="toggleCustomRoundInput()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--bdr); font-size: 13px; background: var(--bg); color: var(--txt); width: 100%;">
+        <option value="Round 1 — Recruiter Screen">Round 1 — Recruiter Screen</option>
+        <option value="Round 2 — Technical/Case">Round 2 — Technical/Case</option>
+        <option value="Round 3 — Hiring Manager">Round 3 — Hiring Manager</option>
+        <option value="Final — Onsite/Panel">Final — Onsite/Panel</option>
+        <option value="custom">Custom (Enter below)...</option>
+      </select>
+      
+      <input type="text" id="custom-round-input" placeholder="e.g. Final Portfolio Review" style="display: none; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--bdr); font-size: 13px; background: var(--bg); color: var(--txt); width: 100%;" />
+    </div>
+    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button class="btn" onclick="closeRoundModal()">Cancel</button>
+      <button id="save-round-btn" class="btn btn-p" onclick="submitRoundSelection()">Save Stage</button>
     </div>
   </div>
 </div>
@@ -1633,6 +1800,11 @@ async function dropCard(e, col) {
   let status = col;
   if (col === 'new') status = 'ready';
   
+  if (status === 'interviewing') {
+    openRoundModal(draggingId);
+    return;
+  }
+  
   const r = await fetch('/api/job/' + draggingId + '/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1642,6 +1814,91 @@ async function dropCard(e, col) {
   if ((await r.json()).ok) {
     toast('Moved to ' + col);
     setTimeout(() => location.reload(), 600);
+  }
+}
+
+let activeRoundJobId = null;
+
+function openRoundModal(jobId, currentRound = '') {
+  activeRoundJobId = jobId;
+  document.getElementById('modal-interview-round').style.display = 'flex';
+  
+  const select = document.getElementById('round-select');
+  const customInput = document.getElementById('custom-round-input');
+  
+  if (currentRound) {
+    const options = Array.from(select.options).map(o => o.value);
+    if (options.includes(currentRound)) {
+      select.value = currentRound;
+      customInput.style.display = 'none';
+      customInput.value = '';
+    } else {
+      select.value = 'custom';
+      customInput.style.display = 'block';
+      customInput.value = currentRound;
+    }
+  } else {
+    select.value = 'Round 1 — Recruiter Screen';
+    customInput.style.display = 'none';
+    customInput.value = '';
+  }
+}
+
+function closeRoundModal() {
+  document.getElementById('modal-interview-round').style.display = 'none';
+  activeRoundJobId = null;
+}
+
+function toggleCustomRoundInput() {
+  const select = document.getElementById('round-select');
+  const customInput = document.getElementById('custom-round-input');
+  if (select.value === 'custom') {
+    customInput.style.display = 'block';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+}
+
+async function submitRoundSelection() {
+  if (!activeRoundJobId) return;
+  const select = document.getElementById('round-select');
+  const customInput = document.getElementById('custom-round-input');
+  let roundVal = select.value;
+  if (roundVal === 'custom') {
+    roundVal = customInput.value.trim();
+  }
+  
+  if (!roundVal) {
+    toast('Please enter a round name');
+    return;
+  }
+  
+  // 1. Move status to interviewing
+  const statusRes = await fetch('/api/job/' + activeRoundJobId + '/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'interviewing' })
+  });
+  
+  if (!(await statusRes.json()).ok) {
+    toast('Error moving job status');
+    return;
+  }
+  
+  // 2. Set interview round details
+  const roundRes = await fetch('/api/job/' + activeRoundJobId + '/interview-round', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ round: roundVal })
+  });
+  
+  if ((await roundRes.json()).ok) {
+    toast('Stage updated to ' + roundVal);
+    closeRoundModal();
+    setTimeout(() => location.reload(), 600);
+  } else {
+    toast('Error updating stage details');
   }
 }
 
@@ -1825,6 +2082,10 @@ async function saveSettings() {
   const wDown = parseInt(document.getElementById('settings-w-down').value, 10) || -1;
   const wRej = parseInt(document.getElementById('settings-w-rej').value, 10) || -2;
   
+  const dailyEnabled = document.getElementById('settings-daily-enabled').checked ? 1 : 0;
+  const dailyMinScore = parseFloat(document.getElementById('settings-daily-min-score').value) || 7.5;
+  const dailyTime = document.getElementById('settings-daily-time').value.trim() || '07:30';
+  
   try {
     const resp = await fetch('/api/profile', {
       method: 'POST',
@@ -1842,7 +2103,10 @@ async function saveSettings() {
         weight_thumbs_up: wUp,
         weight_applied: wApp,
         weight_thumbs_down: wDown,
-        weight_rejected: wRej
+        weight_rejected: wRej,
+        daily_recs_enabled: dailyEnabled,
+        daily_recs_min_score: dailyMinScore,
+        daily_recs_time: dailyTime
       })
     });
     const data = await resp.json();
@@ -2468,6 +2732,207 @@ function toggleMobileSidebar() {
   }
 }
 
+// Quiz Mode Logic
+async function initQuizMode(jobId) {
+  const loading = document.querySelector(`.quiz-loading-${jobId}`);
+  const content = document.querySelector(`.quiz-content-${jobId}`);
+  
+  if (content.style.display === 'flex') {
+    return;
+  }
+  
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  
+  try {
+    const r = await fetch(`/api/job/${jobId}/interview-prep`);
+    const data = await r.json();
+    if (data.ok) {
+      renderQuizData(jobId, data);
+    } else {
+      loading.textContent = "Error: " + (data.error || "failed to generate questions");
+    }
+  } catch (error) {
+    loading.textContent = "Error: " + error.message;
+  }
+}
+
+function renderQuizData(jobId, data) {
+  const loading = document.querySelector(`.quiz-loading-${jobId}`);
+  const content = document.querySelector(`.quiz-content-${jobId}`);
+  const flashcardContainer = document.querySelector(`.flashcard-container-${jobId}`);
+  const deepList = document.querySelector(`.deep-questions-list-${jobId}`);
+  
+  flashcardContainer.innerHTML = "";
+  if (data.quick_questions && data.quick_questions.length > 0) {
+    data.quick_questions.forEach((q, idx) => {
+      const card = document.createElement('div');
+      card.className = "flashcard-wrapper";
+      card.innerHTML = `
+        <div class="flashcard-inner" onclick="this.classList.toggle('flipped')">
+          <div class="flashcard-front">
+            <div>
+              <div style="font-size:10px; font-weight:700; color:var(--pur); margin-bottom:4px; text-transform:uppercase;">Question ${idx+1}</div>
+              <div>${q}</div>
+            </div>
+          </div>
+          <div class="flashcard-back">
+            <div>
+              <div style="font-size:10px; font-weight:700; opacity:0.8; margin-bottom:4px; text-transform:uppercase;">Tap to Reset</div>
+              <div style="font-size:11px;">Think through your answer, then tap to reset this card!</div>
+            </div>
+          </div>
+        </div>
+      `;
+      flashcardContainer.appendChild(card);
+    });
+  } else {
+    flashcardContainer.innerHTML = `<div style="font-size:12px; color:var(--mut);">No quick-fire questions available.</div>`;
+  }
+  
+  deepList.innerHTML = "";
+  if (data.deep_questions && data.deep_questions.length > 0) {
+    data.deep_questions.forEach((item, idx) => {
+      const qBox = document.createElement('div');
+      qBox.style.cssText = "border: 1px solid var(--bdr); border-radius: 12px; overflow: hidden; background: var(--sur); margin-bottom: 8px;";
+      
+      const headerId = `deep-q-hdr-${jobId}-${idx}`;
+      const bodyId = `deep-q-body-${jobId}-${idx}`;
+      
+      qBox.innerHTML = `
+        <div id="${headerId}" onclick="toggleDeepQAccordion('${jobId}', ${idx})" style="padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:12px; font-weight:600; color:var(--txt); display:flex; gap:8px;">
+            <span style="color:var(--pur); font-weight:700;">Q${idx+1}.</span>
+            <span>${item.q}</span>
+          </div>
+          <span class="chevron-${jobId}-${idx}" style="font-size:12px; color:var(--pur); transition: transform 0.2s;">▼</span>
+        </div>
+        <div id="${bodyId}" style="display:none; padding:12px; border-top:1px solid var(--bdr); background:var(--bg); font-size:11.5px; color:var(--mut); line-height:1.5;">
+          <strong style="color:var(--txt); display:block; margin-bottom:4px;">Model Answer Outline & Hints:</strong>
+          <div style="white-space:pre-line;">${item.hints || item.answer || 'No outline provided.'}</div>
+        </div>
+      `;
+      deepList.appendChild(qBox);
+    });
+  } else {
+    deepList.innerHTML = `<div style="font-size:12px; color:var(--mut);">No deeper prep questions available.</div>`;
+  }
+  
+  loading.style.display = 'none';
+  content.style.display = 'flex';
+}
+
+function toggleDeepQAccordion(jobId, idx) {
+  const body = document.getElementById(`deep-q-body-${jobId}-${idx}`);
+  const chev = document.querySelector(`.chevron-${jobId}-${idx}`);
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    chev.style.transform = 'rotate(180deg)';
+  } else {
+    body.style.display = 'none';
+    chev.style.transform = 'rotate(0deg)';
+  }
+}
+
+async function regenerateQuiz(jobId) {
+  const loading = document.querySelector(`.quiz-loading-${jobId}`);
+  const content = document.querySelector(`.quiz-content-${jobId}`);
+  
+  loading.style.display = 'block';
+  loading.textContent = "⏳ Regenerating tailored prep questions...";
+  content.style.display = 'none';
+  
+  try {
+    const r = await fetch(`/api/job/${jobId}/interview-prep/regenerate`, { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      renderQuizData(jobId, data);
+      toast("Questions refreshed successfully!");
+    } else {
+      loading.textContent = "Error: " + (data.error || "failed to regenerate");
+    }
+  } catch (error) {
+    loading.textContent = "Error: " + error.message;
+  }
+}
+
+async function loadDailyRecommendations() {
+  const r = await fetch('/api/recommendations/today');
+  const data = await r.json();
+  if (data.ok && data.picks && data.picks.length > 0) {
+    const strip = document.getElementById('daily-picks-strip');
+    const body = document.getElementById('daily-picks-body');
+    const title = document.getElementById('daily-picks-title');
+    
+    title.innerHTML = `✨ <strong>${data.picks.length} new pick${data.picks.length > 1 ? 's' : ''}</strong> since yesterday`;
+    body.innerHTML = "";
+    
+    data.picks.forEach(job => {
+      const card = document.createElement('div');
+      card.style.cssText = "flex: 0 0 240px; background:var(--sur); border:1px solid #FFE082; border-radius:12px; padding:12px; cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;";
+      card.innerHTML = `
+        <div style="font-size:12px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${job.title}</div>
+        <div style="font-size:11px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${job.company}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:10px; font-weight:700; background:#EAF3DE; color:#3B6D11; padding:2px 6px; border-radius:8px;">${job.ai_score.toFixed(1)}/10</span>
+          <span style="font-size:10px; color:var(--pur); font-weight:600;">View in Board &rarr;</span>
+        </div>
+      `;
+      card.onclick = () => {
+        scrollToAndHighlightJob(job.job_id);
+      };
+      
+      card.onmouseover = () => {
+        card.style.transform = "translateY(-2px)";
+        card.style.boxShadow = "0 4px 12px rgba(255, 193, 7, 0.15)";
+      };
+      card.onmouseout = () => {
+        card.style.transform = "translateY(0)";
+        card.style.boxShadow = "none";
+      };
+      
+      body.appendChild(card);
+    });
+    
+    strip.style.display = 'block';
+  }
+}
+
+function toggleDailyPicksBody() {
+  const body = document.getElementById('daily-picks-body');
+  const btn = document.getElementById('daily-picks-toggle-btn');
+  if (body.style.display === 'none') {
+    body.style.display = 'flex';
+    btn.textContent = 'Hide';
+  } else {
+    body.style.display = 'none';
+    btn.textContent = 'Show';
+  }
+}
+
+function scrollToAndHighlightJob(jobId) {
+  const card = document.querySelector(`.jcard[data-job-id="${jobId}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    card.style.transition = 'box-shadow 0.3s, border-color 0.3s, background 0.3s';
+    const oldBg = card.style.background;
+    const oldBdr = card.style.borderColor;
+    
+    card.style.background = '#FFF9C4';
+    card.style.borderColor = '#FBC02D';
+    card.style.boxShadow = '0 0 15px #FBC02D';
+    
+    setTimeout(() => {
+      card.style.background = oldBg;
+      card.style.borderColor = oldBdr;
+      card.style.boxShadow = 'none';
+    }, 2000);
+  } else {
+    toast("Job not found in board columns");
+  }
+}
+
 // Auto-close sidebar on link clicks inside mobile view
 document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('page-loader');
@@ -2477,6 +2942,8 @@ document.addEventListener('DOMContentLoaded', () => {
       loader.style.display = 'none';
     }, 400);
   }
+  
+  loadDailyRecommendations();
 
   document.querySelectorAll('.sidebar a').forEach(link => {
     link.addEventListener('click', () => {

@@ -235,8 +235,45 @@ def migrate_db(conn) -> None:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT;")
             conn.commit()
 
+    # Alter jobs table for daily picks and interview stage tracking
+    for col, ctype, default in [
+        ("is_daily_pick", "INTEGER", "0"),
+        ("picked_at", "TEXT", "NULL"),
+        ("interview_round", "TEXT", "NULL"),
+        ("interview_round_updated_at", "TEXT", "NULL")
+    ]:
+        if col not in jobs_cols:
+            alter_q = f"ALTER TABLE jobs ADD COLUMN {col} {ctype}"
+            if default != "NULL":
+                alter_q += f" DEFAULT {default}"
+            conn.execute(alter_q)
+            conn.commit()
+
+    # Alter users table for recommendations configurations
+    for col, ctype, default in [
+        ("daily_recs_enabled", "INTEGER", "1"),
+        ("daily_recs_min_score", "REAL", "7.5"),
+        ("daily_recs_time", "TEXT", "'07:30'")
+    ]:
+        if col not in user_cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype} DEFAULT {default};")
+            conn.commit()
+
+    # Create interview_prep table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS interview_prep (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT UNIQUE,
+            quick_questions TEXT,
+            deep_questions TEXT,
+            created_at TEXT,
+            user_id INTEGER DEFAULT 1
+        );
+    """)
+    conn.commit()
+
     if IS_POSTGRES:
-        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes"]
+        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep"]
         for t in seq_tables:
             try:
                 conn.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE(max(id), 1)) FROM {t}")
