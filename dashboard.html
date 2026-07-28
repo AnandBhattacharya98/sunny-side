@@ -2088,7 +2088,7 @@ async function startOnboardingParse(event) {
   
   // Transition to scanning screen
   document.getElementById('onboard-upload-step').style.display = 'none';
-  document.getElementById('onboard-scanning-step').style.display = 'block';
+  document.getElementById('onboard-scanning-step').style.display = 'flex';
   
   // Start fake terminal logs
   const logs = [
@@ -2141,7 +2141,7 @@ async function startOnboardingParse(event) {
     if (data.ok) {
       // Transition to Suggested Jobs screen
       document.getElementById('onboard-scanning-step').style.display = 'none';
-      document.getElementById('onboard-suggested-step').style.display = 'block';
+      document.getElementById('onboard-suggested-step').style.display = 'flex';
       
       const grid = document.getElementById('onboard-suggestions-grid');
       grid.innerHTML = "";
@@ -2175,13 +2175,13 @@ async function startOnboardingParse(event) {
     } else {
       alert("Parsing failed: " + (data.error || "unknown error"));
       // reset
-      document.getElementById('onboard-upload-step').style.display = 'block';
+      document.getElementById('onboard-upload-step').style.display = 'flex';
       document.getElementById('onboard-scanning-step').style.display = 'none';
     }
   } catch (error) {
     clearInterval(logInterval);
     alert("Connection error: " + error.message);
-    document.getElementById('onboard-upload-step').style.display = 'block';
+    document.getElementById('onboard-upload-step').style.display = 'flex';
     document.getElementById('onboard-scanning-step').style.display = 'none';
   }
 }
