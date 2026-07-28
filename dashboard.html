@@ -266,7 +266,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 }
 .flashcard-wrapper {
   perspective: 1000px;
-  height: 120px;
+  height: 160px;
   cursor: pointer;
 }
 .flashcard-inner {
@@ -2765,21 +2765,24 @@ function renderQuizData(jobId, data) {
   
   flashcardContainer.innerHTML = "";
   if (data.quick_questions && data.quick_questions.length > 0) {
-    data.quick_questions.forEach((q, idx) => {
+    data.quick_questions.forEach((item, idx) => {
+      const qText = (item && typeof item === 'object') ? item.q : item;
+      const aText = (item && typeof item === 'object') ? item.a : "Think through your answer, then tap to reset this card!";
+      
       const card = document.createElement('div');
       card.className = "flashcard-wrapper";
       card.innerHTML = `
         <div class="flashcard-inner" onclick="this.classList.toggle('flipped')">
           <div class="flashcard-front">
-            <div>
-              <div style="font-size:10px; font-weight:700; color:var(--pur); margin-bottom:4px; text-transform:uppercase;">Question ${idx+1}</div>
-              <div>${q}</div>
+            <div style="padding:4px;">
+              <div style="font-size:10px; font-weight:700; color:var(--pur); margin-bottom:6px; text-transform:uppercase;">Question ${idx+1}</div>
+              <div style="line-height:1.4;">${qText}</div>
             </div>
           </div>
           <div class="flashcard-back">
-            <div>
-              <div style="font-size:10px; font-weight:700; opacity:0.8; margin-bottom:4px; text-transform:uppercase;">Tap to Reset</div>
-              <div style="font-size:11px;">Think through your answer, then tap to reset this card!</div>
+            <div style="padding:4px; text-align:left; overflow-y:auto; height:100%;">
+              <div style="font-size:10px; font-weight:700; opacity:0.8; margin-bottom:6px; text-transform:uppercase;">Answer Outline</div>
+              <div style="font-size:10.5px; line-height:1.4; white-space:pre-line;">${aText}</div>
             </div>
           </div>
         </div>

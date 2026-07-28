@@ -695,11 +695,26 @@ def generate_interview_prep(title: str, company: str, description: str,
 
 def _local_interview_prep(title, company):
     quick = [
-        f"Why do you want to join {company} as a {title}?",
-        "Walk me through your resume in 60 seconds.",
-        f"What do you think are the core challenges {company} is facing in the market?",
-        "Tell me about a time you managed a difficult stakeholder or team conflict.",
-        "What are your salary expectations and availability?"
+        {
+            "q": f"Why do you want to join {company} as a {title}?",
+            "a": "Mention your passion for their industry, specify 1-2 product highlights of theirs, and explain how your background aligns with their current expansion."
+        },
+        {
+            "q": "Walk me through your resume in 60 seconds.",
+            "a": "State your current role/focus, highlight 2 key achievements (ideally quantitative), and tie your career trajectory back to why you are here today."
+        },
+        {
+            "q": f"What do you think are the core challenges {company} is facing in the market?",
+            "a": "Identify their main competitors, highlight current macro/technical shifts, and propose 1-2 ways a person in your role can help mitigate them."
+        },
+        {
+            "q": "Tell me about a time you managed a difficult stakeholder or team conflict.",
+            "a": "Describe the context, highlight how you practiced active listening to align goals, explain the solution implemented, and name the resulting metrics."
+        },
+        {
+            "q": "What are your salary expectations and availability?",
+            "a": "Keep it professional. Mention that you are open to competitive market rates depending on total package value, and state your standard notice period."
+        }
     ]
     deep = [
         {
@@ -740,12 +755,15 @@ def _ai_interview_prep(title, company, description, resume_text):
         {resume_text}
         
         Generate:
-        1. 5 warm-up 'Quick-fire' questions.
+        1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored to the candidate's actual experience/credentials in their resume.
         2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
         
         Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
         {{
-          "quick_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+          "quick_questions": [
+             {{"q": "Elevator Pitch or why this role?", "a": "Personalized outline/draft based on candidate's resume..."}},
+             ...
+          ],
           "deep_questions": [
              {{"q": "Question 1", "hints": "Model answer outline bullet points..."}},
              ...
@@ -777,12 +795,15 @@ def _gemini_interview_prep(title, company, description, resume_text, api_key):
     {resume_text}
     
     Generate:
-    1. 5 warm-up 'Quick-fire' questions.
+    1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored to the candidate's actual experience/credentials in their resume.
     2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
     
     Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
     {{
-      "quick_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+      "quick_questions": [
+         {{"q": "Elevator Pitch or why this role?", "a": "Personalized outline/draft based on candidate's resume..."}},
+         ...
+      ],
       "deep_questions": [
          {{"q": "Question 1", "hints": "Model answer outline bullet points..."}},
          ...
