@@ -1861,7 +1861,11 @@ function toggleCustomRoundInput() {
 }
 
 async function submitRoundSelection() {
-  if (!activeRoundJobId) return;
+  console.log("submitRoundSelection called with activeRoundJobId =", activeRoundJobId);
+  if (!activeRoundJobId) {
+    console.warn("submitRoundSelection aborted: activeRoundJobId is falsy");
+    return;
+  }
   const select = document.getElementById('round-select');
   const customInput = document.getElementById('custom-round-input');
   let roundVal = select.value;
