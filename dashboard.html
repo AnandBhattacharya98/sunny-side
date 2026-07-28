@@ -850,7 +850,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   <div id="daily-picks-strip" style="display:none; margin: 0 20px 20px 20px; padding: 16px; background: linear-gradient(135deg, #FFFDF6 0%, #FFF2CC 100%); border: 1px solid #FFE082; border-radius: 16px; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.05);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; cursor:pointer;" onclick="toggleDailyPicksBody()">
       <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:16px;">✨</span>
+        <span style="font-size:12px; font-weight:700; color:#F57C00; background:#FFF8E1; padding:2px 8px; border-radius:10px;">RECS</span>
         <h4 style="font-family:'Space Grotesk', sans-serif; font-size:14px; font-weight:700; color:#5D4037;" id="daily-picks-title">Today's Picks</h4>
         <span style="font-size:11px; color:#795548; font-weight:500; background:#FFFDE7; padding:2px 8px; border-radius:10px;" id="daily-picks-timestamp">Since yesterday</span>
       </div>
@@ -963,7 +963,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:1px dashed var(--bdr);" onclick="event.stopPropagation();">
             {% if job.interview_round %}
             <span style="font-size:10px; font-weight:700; color:var(--pur); background:var(--purl); padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">
-              🎯 {{ job.interview_round }}
+              Stage: {{ job.interview_round }}
             </span>
             {% else %}
             <span style="font-size:10px; font-weight:500; color:var(--mut); font-style:italic;">No round set</span>
@@ -1118,7 +1118,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
           <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">🧠 Quiz Mode</button>
+          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">Quiz Mode</button>
         </div>
         <div class="modal-body">
           
@@ -1267,12 +1267,12 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
               <span class="lbl">Tailored Resume</span>
               <a href="/resume/{{ job.job_id }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
-                <span>🖨️</span> Save / Download as PDF
+                Save / Download as PDF
               </a>
             </div>
             
             <div class="resume-loading-{{ job.job_id }}" style="text-align:center;padding:40px;color:var(--mut);">
-              <span>⏳</span> Tailoring your resume for this JD...
+              Tailoring your resume for this JD...
             </div>
             
             <div class="resume-content-box-{{ job.job_id }}" style="display:none;background:var(--bg);padding:16px;border-radius:8px;font-size:12px;color:var(--txt);line-height:1.6;overflow-y:auto;max-height:380px;white-space:pre-wrap;font-family:monospace;border:1px solid var(--bdr);text-align:left;">
@@ -1290,11 +1290,11 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
               <span class="lbl" style="color:var(--pur); font-weight:700;">Interview Prep Quiz</span>
-              <button class="btn btn-p" style="background:var(--pur); border:none; color:white; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">🔄 Regenerate Questions</button>
+              <button class="btn btn-p" style="background:var(--pur); border:none; color:white; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">Regenerate Questions</button>
             </div>
             
             <div class="quiz-loading-{{ job.job_id }}" style="text-align:center; padding:40px; color:var(--mut);">
-              <span>⏳</span> Generating tailored interview questions...
+              Generating tailored interview questions...
             </div>
             
             <div class="quiz-content-{{ job.job_id }}" style="display:none; flex-direction:column; gap:20px; text-align:left;">
@@ -1467,7 +1467,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <!-- Daily Recommendations Config -->
       <div style="border:1px solid var(--bdr); border-radius:12px; padding:12px; margin-top:4px;">
         <span style="font-size:12px; font-weight:700; color:var(--txt); text-transform:uppercase; display:flex; align-items:center; gap:6px; margin-bottom:12px;">
-          ✨ Daily Recommendations
+          Daily Recommendations
         </span>
         <div style="display:flex; flex-direction:column; gap:12px;">
           <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1946,7 +1946,7 @@ async function triggerRefresh() {
   const btn = document.querySelector('.refresh-btn');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Refreshing...';
+    btn.innerHTML = 'Refreshing...';
   }
   try {
     const r = await fetch('/api/refresh', {method:'POST'});
@@ -2839,7 +2839,7 @@ async function regenerateQuiz(jobId) {
   const content = document.querySelector(`.quiz-content-${jobId}`);
   
   loading.style.display = 'block';
-  loading.textContent = "⏳ Regenerating tailored prep questions...";
+  loading.textContent = "Regenerating tailored prep questions...";
   content.style.display = 'none';
   
   try {
@@ -2864,7 +2864,7 @@ async function loadDailyRecommendations() {
     const body = document.getElementById('daily-picks-body');
     const title = document.getElementById('daily-picks-title');
     
-    title.innerHTML = `✨ <strong>${data.picks.length} new pick${data.picks.length > 1 ? 's' : ''}</strong> since yesterday`;
+    title.innerHTML = `<strong>${data.picks.length} new pick${data.picks.length > 1 ? 's' : ''}</strong> since yesterday`;
     body.innerHTML = "";
     
     data.picks.forEach(job => {
