@@ -33,7 +33,8 @@ def migrate():
         "application_notes",
         "application_timeline",
         "received_emails",
-        "tailored_resumes"
+        "tailored_resumes",
+        "interview_prep"
     ]
 
     for table in tables:
