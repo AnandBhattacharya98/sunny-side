@@ -1861,11 +1861,13 @@ function toggleCustomRoundInput() {
 }
 
 async function submitRoundSelection() {
-  console.log("submitRoundSelection called with activeRoundJobId =", activeRoundJobId);
+  console.log("submitRoundSelection called. activeRoundJobId =", activeRoundJobId);
   if (!activeRoundJobId) {
     console.warn("submitRoundSelection aborted: activeRoundJobId is falsy");
+    toast("Error: No active job selected");
     return;
   }
+  
   const select = document.getElementById('round-select');
   const customInput = document.getElementById('custom-round-input');
   let roundVal = select.value;
@@ -1878,31 +1880,54 @@ async function submitRoundSelection() {
     return;
   }
   
-  // 1. Move status to interviewing
-  const statusRes = await fetch('/api/job/' + activeRoundJobId + '/status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'interviewing' })
-  });
-  
-  if (!(await statusRes.json()).ok) {
-    toast('Error moving job status');
-    return;
-  }
-  
-  // 2. Set interview round details
-  const roundRes = await fetch('/api/job/' + activeRoundJobId + '/interview-round', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ round: roundVal })
-  });
-  
-  if ((await roundRes.json()).ok) {
-    toast('Stage updated to ' + roundVal);
-    closeRoundModal();
-    setTimeout(() => location.reload(), 600);
-  } else {
-    toast('Error updating stage details');
+  try {
+    console.log("Sending status update to interviewing...");
+    const statusRes = await fetch('/api/job/' + activeRoundJobId + '/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'interviewing' })
+    });
+    
+    if (!statusRes.ok) {
+      const errText = await statusRes.text();
+      console.error("Status update HTTP error:", statusRes.status, errText);
+      toast("Error: Status update failed (" + statusRes.status + ")");
+      return;
+    }
+    
+    const statusData = await statusRes.json();
+    console.log("Status update response:", statusData);
+    if (!statusData.ok) {
+      toast('Error moving job status: ' + (statusData.error || 'unknown'));
+      return;
+    }
+    
+    console.log("Sending round update to:", roundVal);
+    const roundRes = await fetch('/api/job/' + activeRoundJobId + '/interview-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ round: roundVal })
+    });
+    
+    if (!roundRes.ok) {
+      const errText = await roundRes.text();
+      console.error("Round update HTTP error:", roundRes.status, errText);
+      toast("Error: Round update failed (" + roundRes.status + ")");
+      return;
+    }
+    
+    const roundData = await roundRes.json();
+    console.log("Round update response:", roundData);
+    if (roundData.ok) {
+      toast('Stage updated to ' + roundVal);
+      closeRoundModal();
+      setTimeout(() => location.reload(), 600);
+    } else {
+      toast('Error updating stage details: ' + (roundData.error || 'unknown'));
+    }
+  } catch (error) {
+    console.error("Exception in submitRoundSelection:", error);
+    toast("Connection or script error: " + error.message);
   }
 }
 
