@@ -582,8 +582,13 @@ def _stats(conn):
     avg = conn.execute("SELECT AVG(ai_score) FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL", (uid,)).fetchone()[0]
     email_count = conn.execute("SELECT COUNT(*) FROM received_emails WHERE user_id = ?", (uid,)).fetchone()[0]
     
-    last_updated_row = conn.execute("SELECT MAX(scraped_at) FROM jobs WHERE user_id = ?", (uid,)).fetchone()
-    last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
+    last_scraped_row = conn.execute("SELECT last_scraped_at FROM users WHERE id = ?", (uid,)).fetchone()
+    last_updated = last_scraped_row[0] if last_scraped_row and last_scraped_row[0] else None
+    
+    if not last_updated:
+        last_updated_row = conn.execute("SELECT MAX(scraped_at) FROM jobs WHERE user_id = ?", (uid,)).fetchone()
+        last_updated = last_updated_row[0] if last_updated_row and last_updated_row[0] else None
+        
     if last_updated:
         try:
             dt = datetime.fromisoformat(last_updated.split('.')[0])
@@ -1039,6 +1044,10 @@ def cron_daily_recommendations():
         except Exception as e:
             print(f"Failed to send email digest: {e}")
 
+        # 9. Update last scraped time
+        conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
+        conn.commit()
+
     conn.close()
     return jsonify({"ok": True})
 
@@ -1197,35 +1206,44 @@ def api_stats():
 
 @app.route("/api/refresh", methods=["POST"])
 def refresh_listings():
+    import threading
+    from datetime import datetime
     from scraper import run_all_scrapers
     from linkedin_finder import enrich_jobs_with_contacts
     from ai_engine import process_new_jobs
     
-    try:
-        uid = get_user_id()
-        run_all_scrapers(DB_PATH, user_id=uid)
-        
-        conn = get_conn(DB_PATH)
-        conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-        conn.commit()
-        
-        enrich_jobs_with_contacts(DB_PATH)
-        conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-        conn.commit()
-        
-        # Sync application statuses from user's email
-        from email_scraper import sync_job_statuses_from_email
-        sync_job_statuses_from_email(DB_PATH, user_id=uid)
-        conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-        conn.commit()
-        
-        # Using default MIN_SCORE or float(os.getenv("MIN_SCORE", "6.0"))
-        min_score = float(os.getenv("MIN_SCORE", "0.0")) # Score everything so we don't miss jobs in dashboard
-        process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
-        conn.close()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    uid = get_user_id()
+    
+    def run_sync():
+        try:
+            print(f"Background sync started for user {uid}")
+            run_all_scrapers(DB_PATH, user_id=uid)
+            
+            conn = get_conn(DB_PATH)
+            conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+            conn.commit()
+            
+            enrich_jobs_with_contacts(DB_PATH)
+            conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+            conn.commit()
+            
+            from email_scraper import sync_job_statuses_from_email
+            sync_job_statuses_from_email(DB_PATH, user_id=uid)
+            conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+            conn.commit()
+            
+            min_score = float(os.getenv("MIN_SCORE", "0.0"))
+            process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
+            
+            conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
+            conn.commit()
+            conn.close()
+            print(f"Background sync successfully completed for user {uid}")
+        except Exception as err:
+            print(f"Background sync failed for user {uid}: {err}")
+            
+    threading.Thread(target=run_sync).start()
+    return jsonify({"ok": True, "message": "Sync started in background"})
 
 
 def scrape_job_url(url: str) -> dict:

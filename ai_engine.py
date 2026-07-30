@@ -754,9 +754,16 @@ def _ai_interview_prep(title, company, description, resume_text):
         Candidate Resume:
         {resume_text}
         
-        Generate:
-        1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored to the candidate's actual experience/credentials in their resume.
-        2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
+        Generate exactly the following:
+        1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored specifically to the candidate's actual experience/credentials in their resume.
+        2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Ensure these questions are structured across these categories:
+           - Motivation & Fit for this specific domain.
+           - Customer Engagement & Ownership (handling client alignment or expectations).
+           - Core Judgment Call (how to decide configuration/prompt fix vs. core product roadmap gap).
+           - Guardrails & Compliance constraints relevant to this industry.
+           - Experimentation & Metrics (how to design A/B testing or track performance).
+           - Walkthrough of their first 30 days on this deployment.
+           - Troubleshooting (funnel analysis of a failing product/operational metric).
         
         Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
         {{
@@ -794,9 +801,16 @@ def _gemini_interview_prep(title, company, description, resume_text, api_key):
     Candidate Resume:
     {resume_text}
     
-    Generate:
-    1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored to the candidate's actual experience/credentials in their resume.
-    2. 5 to 8 'Deeper prep' questions tailored specifically to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints.
+    Generate exactly the following:
+    1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored specifically to the candidate's actual experience/credentials in their resume.
+    2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Ensure these questions are structured across these categories:
+       - Motivation & Fit for this specific domain.
+       - Customer Engagement & Ownership (handling client alignment or expectations).
+       - Core Judgment Call (how to decide configuration/prompt fix vs. core product roadmap gap).
+       - Guardrails & Compliance constraints relevant to this industry.
+       - Experimentation & Metrics (how to design A/B testing or track performance).
+       - Walkthrough of their first 30 days on this deployment.
+       - Troubleshooting (funnel analysis of a failing product/operational metric).
     
     Return EXACTLY a JSON object matching this structure. Do not add markdown fences:
     {{
