@@ -304,14 +304,17 @@ def update_profile():
     conn = get_conn(DB_PATH)
     
     # Fetch old values to check for changes
-    old = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    old = conn.execute("SELECT resume_text, gemini_api_key, designation FROM users WHERE id = ?", (uid,)).fetchone()
     old_resume = old[0] if old else ""
     old_key = old[1] if old else ""
+    old_designation = old[2] if old else ""
     
     new_resume = d.get("resume_text", "")
     new_key = d.get("gemini_api_key", "")
+    new_designation = d.get("designation", "")
     
     should_reparse = (new_resume != old_resume) or (new_key != old_key)
+    designation_changed = (new_designation != old_designation)
     
     profile_json = None
     if should_reparse:
@@ -337,6 +340,10 @@ def update_profile():
     )
     conn.commit()
     
+    if designation_changed:
+        conn.execute("DELETE FROM jobs WHERE user_id = ? AND status = 'new'", (uid,))
+        conn.commit()
+        
     if should_reparse:
         conn.execute(
             "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",

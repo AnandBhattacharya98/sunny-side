@@ -756,7 +756,7 @@ def _ai_interview_prep(title, company, description, resume_text):
         
         Generate exactly the following:
         1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored specifically to the candidate's actual experience/credentials in their resume.
-        2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Ensure these questions are structured across these categories:
+        2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Wherever possible, structure these outlines using the STAR framework (Situation, Task, Action, Result) to guide the candidate. Ensure these questions are structured across these categories:
            - Motivation & Fit for this specific domain.
            - Customer Engagement & Ownership (handling client alignment or expectations).
            - Core Judgment Call (how to decide configuration/prompt fix vs. core product roadmap gap).
@@ -803,7 +803,7 @@ def _gemini_interview_prep(title, company, description, resume_text, api_key):
     
     Generate exactly the following:
     1. 5 warm-up 'Quick-fire' questions. For each question, draft a brief, personalized model answer draft (2-3 sentences) tailored specifically to the candidate's actual experience/credentials in their resume.
-    2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Ensure these questions are structured across these categories:
+    2. Exactly 7 'Deeper prep' questions tailored to the gaps/matches between the resume and the job description, along with bulleted model answer outlines/hints. Wherever possible, structure these outlines using the STAR framework (Situation, Task, Action, Result) to guide the candidate. Ensure these questions are structured across these categories:
        - Motivation & Fit for this specific domain.
        - Customer Engagement & Ownership (handling client alignment or expectations).
        - Core Judgment Call (how to decide configuration/prompt fix vs. core product roadmap gap).
