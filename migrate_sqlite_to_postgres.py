@@ -10,7 +10,8 @@ def migrate():
     os.environ["DATABASE_URL"] = POSTGRES_URL
     from db import init_db
     print("Initializing PostgreSQL schemas on Neon...")
-    init_db()
+    schema_conn = init_db()
+    schema_conn.close()
 
     if not os.path.exists(SQLITE_PATH):
         print(f"Local SQLite database '{SQLITE_PATH}' not found! Make sure you are in the workspace folder.")
@@ -37,6 +38,12 @@ def migrate():
         "interview_prep"
     ]
 
+    # Clear existing rows in target tables in reverse order to respect foreign keys
+    print("Clearing existing target tables on PostgreSQL...")
+    for table in reversed(tables):
+        pg_cur.execute(f"DELETE FROM {table}")
+    pg_conn.commit()
+
     for table in tables:
         print(f"Migrating table '{table}'...")
         # Get data from SQLite
@@ -48,10 +55,6 @@ def migrate():
 
         # Get column names
         cols = rows[0].keys()
-        
-        # Clear existing rows in target table to avoid unique constraint violations
-        print(f"  Clearing target table '{table}' on PostgreSQL...")
-        pg_cur.execute(f"TRUNCATE TABLE {table} CASCADE")
 
         # Construct INSERT statement
         col_list = ", ".join(cols)

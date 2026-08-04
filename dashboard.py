@@ -1253,6 +1253,112 @@ def refresh_listings():
     return jsonify({"ok": True, "message": "Sync started in background"})
 
 
+@app.route("/api/voice/transcribe", methods=["POST"])
+def voice_transcribe():
+    import base64
+    import requests
+    from ai_engine import get_fallback_gemini_key
+    uid = get_user_id()
+    
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+        
+    audio_file = request.files['file']
+    audio_bytes = audio_file.read()
+    if not audio_bytes:
+        return jsonify({"error": "Empty audio file"}), 400
+        
+    base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+    
+    conn = get_conn(DB_PATH)
+    settings = get_user_settings(conn, uid)
+    gemini_key = settings.get("gemini_api_key") or get_fallback_gemini_key()
+    conn.close()
+    
+    if not gemini_key:
+        return jsonify({"error": "No Gemini key configured", "provider_fallback": True}), 400
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+    payload = {
+        "contents": [{
+            "parts": [
+                {
+                    "inlineData": {
+                        "mimeType": "audio/webm",
+                        "data": base64_audio
+                    }
+                },
+                {
+                    "text": "Transcribe this audio clip into plain English text. Respond only with the exact transcription, without adding any introductory or concluding comments, quotes, or conversational padding. If the audio is silent or unintelligible, respond with an empty string."
+                }
+            ]
+        }]
+    }
+    
+    try:
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=8)
+        res.raise_for_status()
+        res_data = res.json()
+        transcript = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return jsonify({"transcript": transcript})
+    except Exception as e:
+        print(f"Gemini STT proxy failed: {e}")
+        return jsonify({"error": str(e), "provider_fallback": True}), 500
+
+
+@app.route("/api/voice/synthesize", methods=["POST"])
+def voice_synthesize():
+    import base64
+    import requests
+    from ai_engine import get_fallback_gemini_key
+    from voice_engine import pcm_to_wav
+    uid = get_user_id()
+    d = request.json or {}
+    text = d.get("text", "").strip()
+    
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+        
+    conn = get_conn(DB_PATH)
+    settings = get_user_settings(conn, uid)
+    gemini_key = settings.get("gemini_api_key") or get_fallback_gemini_key()
+    conn.close()
+    
+    if not gemini_key:
+        return jsonify({"error": "No Gemini key configured", "provider_fallback": True}), 400
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+    payload = {
+        "contents": [{"parts": [{"text": "Read the following response text out loud with a clear, helpful, professional voice: " + text}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {
+                    "prebuiltVoiceConfig": {
+                        "voiceName": "Puck"
+                    }
+                }
+            }
+        }
+    }
+    
+    try:
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=8)
+        res.raise_for_status()
+        res_data = res.json()
+        inline_data = res_data["candidates"][0]["content"]["parts"][0]["inlineData"]
+        pcm_base64 = inline_data["data"]
+        pcm_bytes = base64.b64decode(pcm_base64)
+        
+        # Package raw PCM into a playable WAV bytes format
+        wav_bytes = pcm_to_wav(pcm_bytes)
+        wav_base64 = base64.b64encode(wav_bytes).decode('utf-8')
+        return jsonify({"audio_base64": wav_base64})
+    except Exception as e:
+        print(f"Gemini TTS proxy failed: {e}")
+        return jsonify({"error": str(e), "provider_fallback": True}), 500
+
+
 @app.route("/api/voice/query", methods=["POST"])
 def voice_query():
     from voice_engine import classify_intent_and_slot
@@ -1262,7 +1368,7 @@ def voice_query():
     session_id = d.get("session_id", "default")
     
     if not transcript:
-        return jsonify({"intent": None, "reply_text": "I didn't hear anything. Please try again.", "requires_confirmation": False})
+        return jsonify({"intent": None, "reply_text": "I didn't hear anything. Please try again.", "requires_confirmation": False, "reply_cards": []})
         
     conn = get_conn(DB_PATH)
     settings = get_user_settings(conn, uid)
@@ -1281,62 +1387,73 @@ def voice_query():
     slots = res.get("slots", {})
     job_id = slots.get("job_id")
     
-    # Low-risk actions (thumbs up/down) or Q&A intents (read-only) execute immediately.
-    # Medium/High-risk actions require confirmation.
-    
     mutating_intents = {"move_job", "trigger_refresh", "regenerate_cover_letter", "send_email", "archive_job"}
+    reply_cards = []
     
     if intent in mutating_intents:
-        # Determine target info for confirmation message
         if intent == "move_job":
             target_status = slots.get("status")
             if not target_status:
                 conn.close()
-                return jsonify({"intent": intent, "reply_text": "Which column would you like to move it to?", "requires_confirmation": False})
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+                return jsonify({"intent": intent, "reply_text": "Which column would you like to move it to?", "requires_confirmation": False, "reply_cards": []})
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
-                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing on your board.", "requires_confirmation": False})
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing on your board.", "requires_confirmation": False, "reply_cards": []})
             reply_text = f"Move '{job[1]}' at {job[0]} to {target_status}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "trigger_refresh":
             reply_text = "Would you like me to refresh your listings and check for new jobs?"
         elif intent == "regenerate_cover_letter":
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
-                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing.", "requires_confirmation": False})
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing.", "requires_confirmation": False, "reply_cards": []})
             reply_text = f"Regenerate the cover letter for '{job[1]}' at {job[0]}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "send_email":
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
-                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False})
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False, "reply_cards": []})
             reply_text = f"Send the application email to {job[0]}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "archive_job":
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
-                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False})
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False, "reply_cards": []})
             reply_text = f"Archive the job '{job[1]}' at {job[0]}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
             
-        # Stash in session
         session['voice_pending_action'] = {"intent": intent, "slots": slots}
         conn.close()
         return jsonify({
             "intent": intent,
             "reply_text": reply_text,
             "requires_confirmation": True,
-            "action": {"intent": intent, "slots": slots}
+            "action": {"intent": intent, "slots": slots},
+            "reply_cards": reply_cards
         })
         
-    # Execute read-only and low-risk intents immediately
     reply_text = "I'm not sure how to help with that yet. You can ask about your pipeline, email matches, or say things like 'move X to applied'."
     
     if intent == "pipeline_stats":
-        stats = _stats(conn, uid)
+        stats = _stats(conn)
         total = stats.get("total", 0)
         avg = stats.get("avg_score", 0)
+        applied = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ? AND status = 'applied'", (uid,)).fetchone()[0]
+        shortlisted = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ? AND status = 'shortlist'", (uid,)).fetchone()[0]
+        offers = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ? AND status = 'offer'", (uid,)).fetchone()[0]
         reply_text = f"You have {total} total jobs in your pipeline with an average score of {avg:.1f}/10."
+        reply_cards = [{
+            "type": "stats",
+            "total": total,
+            "avg_score": avg,
+            "applied": applied,
+            "shortlisted": shortlisted,
+            "offers": offers
+        }]
         
     elif intent == "column_count":
         column = slots.get("column")
@@ -1344,24 +1461,27 @@ def voice_query():
         reply_text = f"You have {count} jobs in your {column} column."
         
     elif intent == "job_lookup":
-        job = conn.execute("SELECT company, title, location, ai_score FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            reply_text = f"Found job '{job[1]}' at {job[0]}. Location is {job[2]} and its AI fit score is {job[3]:.1f}/10."
+            reply_text = f"Found job '{job[1]}' at {job[0]}. Location is {job[5]} and its AI fit score is {job[3]:.1f}/10."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find details for that job."
             
     elif intent == "job_fit":
-        job = conn.execute("SELECT company, title, ai_score, ai_summary FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location, ai_summary FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            summary = job[3] or "No AI summary available."
-            reply_text = f"The job '{job[1]}' at {job[0]} scored {job[2]:.1f}/10 because: {summary}"
+            summary = job[6] or "No AI summary available."
+            reply_text = f"The job '{job[1]}' at {job[2]} scored {job[3]:.1f}/10 because: {summary}"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find the fit analysis for that job."
             
     elif intent == "job_status":
-        job = conn.execute("SELECT company, title, status FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            reply_text = f"The job '{job[1]}' at {job[0]} is currently in the '{job[2]}' column."
+            reply_text = f"The job '{job[1]}' at {job[2]} is currently in the '{job[4]}' column."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't verify the status of that job."
             
@@ -1373,11 +1493,12 @@ def voice_query():
             
         if company:
             email = conn.execute(
-                "SELECT subject, snippet FROM received_emails WHERE user_id = ? AND (sender LIKE ? OR body LIKE ?) ORDER BY received_at DESC LIMIT 1",
+                "SELECT sender, subject, body FROM received_emails WHERE user_id = ? AND (sender LIKE ? OR body LIKE ?) ORDER BY received_at DESC LIMIT 1",
                 (uid, f"%{company}%", f"%{company}%")
             ).fetchone()
             if email:
-                reply_text = f"Found a recent email from {company}. Subject: {email[0]}. Snippet: {email[1]}"
+                reply_text = f"Found a recent email from {company}. Subject: {email[1]}."
+                reply_cards = [{"type": "email", "sender": email[0], "subject": email[1], "body": email[2]}]
             else:
                 reply_text = f"No recent emails found from {company}."
         else:
@@ -1401,37 +1522,43 @@ def voice_query():
             
     elif intent == "top_matches":
         matches = conn.execute(
-            "SELECT title, company, ai_score FROM jobs WHERE user_id = ? AND status != 'archived' AND ai_score IS NOT NULL ORDER BY ai_score DESC LIMIT 3",
+            "SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE user_id = ? AND status != 'archived' AND ai_score IS NOT NULL ORDER BY ai_score DESC LIMIT 3",
             (uid,)
         ).fetchall()
         if matches:
-            list_str = ", ".join([f"{m[0]} at {m[1]} with a score of {m[2]:.1f}" for m in matches])
+            list_str = ", ".join([f"{m[1]} at {m[2]} with a score of {m[3]:.1f}" for m in matches])
             reply_text = f"Your top matches are: {list_str}."
+            reply_cards = [{"type": "job", "job_id": m[0], "title": m[1], "company": m[2], "score": m[3], "status": m[4], "location": m[5]} for m in matches]
         else:
             reply_text = "You don't have any scored job listings on your board."
             
     elif intent == "cover_letter_status":
         cl = conn.execute("SELECT 1 FROM cover_letters WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if cl:
             reply_text = "Yes, you have a cover letter generated for this job."
         else:
             reply_text = "No cover letter has been generated for this job yet."
+        if job:
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
             
     elif intent == "thumbs_up":
-        job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
             conn.execute("UPDATE jobs SET feedback = 1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
             conn.commit()
-            reply_text = f"Marked '{job[1]}' at {job[0]} as liked."
+            reply_text = f"Marked '{job[1]}' at {job[2]} as liked."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find that job."
             
     elif intent == "thumbs_down":
-        job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
             conn.execute("UPDATE jobs SET feedback = -1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
             conn.commit()
-            reply_text = f"Marked '{job[1]}' at {job[0]} as disliked."
+            reply_text = f"Marked '{job[1]}' at {job[2]} as disliked."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find that job."
             
@@ -1439,7 +1566,8 @@ def voice_query():
     return jsonify({
         "intent": intent,
         "reply_text": reply_text,
-        "requires_confirmation": False
+        "requires_confirmation": False,
+        "reply_cards": reply_cards
     })
 
 
@@ -1455,11 +1583,12 @@ def voice_confirm():
     job_id = slots.get("job_id")
     
     conn = get_conn(DB_PATH)
+    reply_cards = []
     
     try:
         if intent == "move_job":
             status = slots.get("status")
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 return jsonify({"ok": False, "error": "Job not found"}), 404
             conn.execute("UPDATE jobs SET status = ? WHERE job_id = ? AND user_id = ?", (status, job_id, uid))
@@ -1471,7 +1600,8 @@ def voice_confirm():
                 (uid,)
             )
             conn.commit()
-            reply_text = f"Successfully moved '{job[1]}' at {job[0]} to {status}."
+            reply_text = f"Successfully moved '{job[1]}' at {job[2]} to {status}."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": status, "location": job[5]}]
             
         elif intent == "trigger_refresh":
             import threading
@@ -1527,6 +1657,7 @@ def voice_confirm():
             add_timeline(conn, job_id, "Regenerated cover letter (Voice)")
             conn.commit()
             reply_text = f"Successfully regenerated cover letter for '{j['title']}' at {j['company']}."
+            reply_cards = [{"type": "job", "job_id": j["job_id"], "title": j["title"], "company": j["company"], "score": score_data["score"], "status": j["status"], "location": j.get("location","")}]
             
         elif intent == "send_email":
             from notifier import send_email_digest
@@ -1555,23 +1686,25 @@ def voice_confirm():
                 add_timeline(conn, job_id, "Email sent → applied (Voice)")
                 conn.commit()
                 reply_text = f"Email sent successfully and job status updated to applied."
+                reply_cards = [{"type": "job", "job_id": j["job_id"], "title": j["title"], "company": j["company"], "score": j.get("ai_score", 0), "status": "applied", "location": j.get("location","")}]
             else:
                 reply_text = "Failed to send email. Ensure SENDER_EMAIL and SENDER_PASSWORD are in your configuration."
                 
         elif intent == "archive_job":
-            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 return jsonify({"ok": False, "error": "Job not found"}), 404
             conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (job_id, uid))
             add_timeline(conn, job_id, "Pipeline → archived (Voice)")
             conn.commit()
-            reply_text = f"Successfully archived the job '{job[1]}' at {job[0]}."
+            reply_text = f"Successfully archived the job '{job[1]}' at {job[2]}."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": "archived", "location": job[5]}]
             
         else:
             return jsonify({"ok": False, "error": "Invalid pending action"}), 400
             
         conn.close()
-        return jsonify({"ok": True, "reply_text": reply_text})
+        return jsonify({"ok": True, "reply_text": reply_text, "reply_cards": reply_cards})
         
     except Exception as e:
         conn.close()
@@ -1587,19 +1720,21 @@ def voice_digest():
     last_read = user_row[0] if user_row and user_row[0] else None
     
     if last_read:
-        query = "SELECT job_id, title, company, ai_score FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
+        query = "SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
         params = (uid, last_read)
     else:
         from datetime import timedelta
         yesterday = (datetime.now() - timedelta(days=1)).isoformat()
-        query = "SELECT job_id, title, company, ai_score FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
+        query = "SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
         params = (uid, yesterday)
         
     rows = conn.execute(query, params).fetchall()
     
-    now_str = datetime.now().isoformat()
-    conn.execute("UPDATE users SET last_digest_read_at = ? WHERE id = ?", (now_str, uid))
-    conn.commit()
+    peek = request.args.get("peek") == "true"
+    if not peek:
+        now_str = datetime.now().isoformat()
+        conn.execute("UPDATE users SET last_digest_read_at = ? WHERE id = ?", (now_str, uid))
+        conn.commit()
     conn.close()
     
     count = len(rows)
@@ -1616,7 +1751,8 @@ def voice_digest():
         "ok": True,
         "count": count,
         "reply_text": reply_text,
-        "jobs": [{"job_id": r[0], "title": r[1], "company": r[2], "score": r[3]} for r in rows]
+        "jobs": [{"job_id": r[0], "title": r[1], "company": r[2], "score": r[3]} for r in rows],
+        "reply_cards": [{"type": "job", "job_id": r[0], "title": r[1], "company": r[2], "score": r[3], "status": r[4], "location": r[5]} for r in rows]
     })
 
 

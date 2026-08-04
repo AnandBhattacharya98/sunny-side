@@ -193,3 +193,27 @@ def _resolve_job_locally(transcript: str, jobs_snapshot: list[dict]) -> dict:
     if max_score >= 3:
         return best_match
     return None
+
+def pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, num_channels: int = 1, bits_per_sample: int = 16) -> bytes:
+    import struct
+    num_samples = len(pcm_data) // (bits_per_sample // 8)
+    byte_rate = sample_rate * num_channels * bits_per_sample // 8
+    block_align = num_channels * bits_per_sample // 8
+    
+    header = struct.pack(
+        '<4sI4s4sIHHIIHH4sI',
+        b'RIFF',
+        36 + len(pcm_data),
+        b'WAVE',
+        b'fmt ',
+        16,
+        1,  # PCM format
+        num_channels,
+        sample_rate,
+        byte_rate,
+        block_align,
+        bits_per_sample,
+        b'data',
+        len(pcm_data)
+    )
+    return header + pcm_data
