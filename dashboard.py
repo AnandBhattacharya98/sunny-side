@@ -1253,6 +1253,373 @@ def refresh_listings():
     return jsonify({"ok": True, "message": "Sync started in background"})
 
 
+@app.route("/api/voice/query", methods=["POST"])
+def voice_query():
+    from voice_engine import classify_intent_and_slot
+    uid = get_user_id()
+    d = request.json or {}
+    transcript = d.get("transcript", "").strip()
+    session_id = d.get("session_id", "default")
+    
+    if not transcript:
+        return jsonify({"intent": None, "reply_text": "I didn't hear anything. Please try again.", "requires_confirmation": False})
+        
+    conn = get_conn(DB_PATH)
+    settings = get_user_settings(conn, uid)
+    gemini_key = settings.get("gemini_api_key")
+    
+    # Query current jobs snapshot
+    rows = conn.execute(
+        "SELECT job_id, title, company, status, ai_score FROM jobs WHERE user_id = ? AND status != 'archived' ORDER BY scraped_at DESC LIMIT 50",
+        (uid,)
+    ).fetchall()
+    jobs_snapshot = [{"job_id": r[0], "title": r[1], "company": r[2], "status": r[3], "score": r[4]} for r in rows]
+    
+    # Classify intent
+    res = classify_intent_and_slot(transcript, jobs_snapshot, api_key=gemini_key)
+    intent = res.get("intent")
+    slots = res.get("slots", {})
+    job_id = slots.get("job_id")
+    
+    # Low-risk actions (thumbs up/down) or Q&A intents (read-only) execute immediately.
+    # Medium/High-risk actions require confirmation.
+    
+    mutating_intents = {"move_job", "trigger_refresh", "regenerate_cover_letter", "send_email", "archive_job"}
+    
+    if intent in mutating_intents:
+        # Determine target info for confirmation message
+        if intent == "move_job":
+            target_status = slots.get("status")
+            if not target_status:
+                conn.close()
+                return jsonify({"intent": intent, "reply_text": "Which column would you like to move it to?", "requires_confirmation": False})
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                conn.close()
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing on your board.", "requires_confirmation": False})
+            reply_text = f"Move '{job[1]}' at {job[0]} to {target_status}?"
+        elif intent == "trigger_refresh":
+            reply_text = "Would you like me to refresh your listings and check for new jobs?"
+        elif intent == "regenerate_cover_letter":
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                conn.close()
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing.", "requires_confirmation": False})
+            reply_text = f"Regenerate the cover letter for '{job[1]}' at {job[0]}?"
+        elif intent == "send_email":
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                conn.close()
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False})
+            reply_text = f"Send the application email to {job[0]}?"
+        elif intent == "archive_job":
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                conn.close()
+                return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False})
+            reply_text = f"Archive the job '{job[1]}' at {job[0]}?"
+            
+        # Stash in session
+        session['voice_pending_action'] = {"intent": intent, "slots": slots}
+        conn.close()
+        return jsonify({
+            "intent": intent,
+            "reply_text": reply_text,
+            "requires_confirmation": True,
+            "action": {"intent": intent, "slots": slots}
+        })
+        
+    # Execute read-only and low-risk intents immediately
+    reply_text = "I'm not sure how to help with that yet. You can ask about your pipeline, email matches, or say things like 'move X to applied'."
+    
+    if intent == "pipeline_stats":
+        stats = _stats(conn, uid)
+        total = stats.get("total", 0)
+        avg = stats.get("avg_score", 0)
+        reply_text = f"You have {total} total jobs in your pipeline with an average score of {avg:.1f}/10."
+        
+    elif intent == "column_count":
+        column = slots.get("column")
+        count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ? AND status = ?", (uid, column)).fetchone()[0]
+        reply_text = f"You have {count} jobs in your {column} column."
+        
+    elif intent == "job_lookup":
+        job = conn.execute("SELECT company, title, location, ai_score FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            reply_text = f"Found job '{job[1]}' at {job[0]}. Location is {job[2]} and its AI fit score is {job[3]:.1f}/10."
+        else:
+            reply_text = "Sorry, I couldn't find details for that job."
+            
+    elif intent == "job_fit":
+        job = conn.execute("SELECT company, title, ai_score, ai_summary FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            summary = job[3] or "No AI summary available."
+            reply_text = f"The job '{job[1]}' at {job[0]} scored {job[2]:.1f}/10 because: {summary}"
+        else:
+            reply_text = "Sorry, I couldn't find the fit analysis for that job."
+            
+    elif intent == "job_status":
+        job = conn.execute("SELECT company, title, status FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            reply_text = f"The job '{job[1]}' at {job[0]} is currently in the '{job[2]}' column."
+        else:
+            reply_text = "Sorry, I couldn't verify the status of that job."
+            
+    elif intent == "email_lookup":
+        company = slots.get("company")
+        if not company and job_id:
+            j = conn.execute("SELECT company FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+            company = j[0] if j else None
+            
+        if company:
+            email = conn.execute(
+                "SELECT subject, snippet FROM received_emails WHERE user_id = ? AND (sender LIKE ? OR body LIKE ?) ORDER BY received_at DESC LIMIT 1",
+                (uid, f"%{company}%", f"%{company}%")
+            ).fetchone()
+            if email:
+                reply_text = f"Found a recent email from {company}. Subject: {email[0]}. Snippet: {email[1]}"
+            else:
+                reply_text = f"No recent emails found from {company}."
+        else:
+            reply_text = "Which company's emails would you like to check?"
+            
+    elif intent == "email_count":
+        count = conn.execute("SELECT COUNT(*) FROM received_emails WHERE user_id = ?", (uid,)).fetchone()[0]
+        reply_text = f"You have {count} synced emails."
+        
+    elif intent == "last_sync":
+        user = conn.execute("SELECT last_scraped_at FROM users WHERE id = ?", (uid,)).fetchone()
+        if user and user[0]:
+            try:
+                dt = datetime.fromisoformat(user[0].split('.')[0])
+                date_str = dt.strftime("%b %d at %I:%M %p")
+                reply_text = f"Your board was last refreshed on {date_str}."
+            except Exception:
+                reply_text = f"Your board was last refreshed on {user[0]}."
+        else:
+            reply_text = "Your board has not been refreshed yet."
+            
+    elif intent == "top_matches":
+        matches = conn.execute(
+            "SELECT title, company, ai_score FROM jobs WHERE user_id = ? AND status != 'archived' AND ai_score IS NOT NULL ORDER BY ai_score DESC LIMIT 3",
+            (uid,)
+        ).fetchall()
+        if matches:
+            list_str = ", ".join([f"{m[0]} at {m[1]} with a score of {m[2]:.1f}" for m in matches])
+            reply_text = f"Your top matches are: {list_str}."
+        else:
+            reply_text = "You don't have any scored job listings on your board."
+            
+    elif intent == "cover_letter_status":
+        cl = conn.execute("SELECT 1 FROM cover_letters WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if cl:
+            reply_text = "Yes, you have a cover letter generated for this job."
+        else:
+            reply_text = "No cover letter has been generated for this job yet."
+            
+    elif intent == "thumbs_up":
+        job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            conn.execute("UPDATE jobs SET feedback = 1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
+            conn.commit()
+            reply_text = f"Marked '{job[1]}' at {job[0]} as liked."
+        else:
+            reply_text = "Sorry, I couldn't find that job."
+            
+    elif intent == "thumbs_down":
+        job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            conn.execute("UPDATE jobs SET feedback = -1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
+            conn.commit()
+            reply_text = f"Marked '{job[1]}' at {job[0]} as disliked."
+        else:
+            reply_text = "Sorry, I couldn't find that job."
+            
+    conn.close()
+    return jsonify({
+        "intent": intent,
+        "reply_text": reply_text,
+        "requires_confirmation": False
+    })
+
+
+@app.route("/api/voice/confirm", methods=["POST"])
+def voice_confirm():
+    uid = get_user_id()
+    pending = session.pop('voice_pending_action', None)
+    if not pending:
+        return jsonify({"ok": False, "error": "No pending action found or session expired"}), 400
+        
+    intent = pending.get("intent")
+    slots = pending.get("slots", {})
+    job_id = slots.get("job_id")
+    
+    conn = get_conn(DB_PATH)
+    
+    try:
+        if intent == "move_job":
+            status = slots.get("status")
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                return jsonify({"ok": False, "error": "Job not found"}), 404
+            conn.execute("UPDATE jobs SET status = ? WHERE job_id = ? AND user_id = ?", (status, job_id, uid))
+            add_timeline(conn, job_id, f"Pipeline → {status} (Voice)")
+            conn.commit()
+            
+            conn.execute(
+                "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+                (uid,)
+            )
+            conn.commit()
+            reply_text = f"Successfully moved '{job[1]}' at {job[0]} to {status}."
+            
+        elif intent == "trigger_refresh":
+            import threading
+            from scraper import run_all_scrapers
+            from linkedin_finder import enrich_jobs_with_contacts
+            from ai_engine import process_new_jobs
+            
+            def run_sync():
+                try:
+                    thread_conn = get_conn(DB_PATH)
+                    run_all_scrapers(DB_PATH, user_id=uid)
+                    thread_conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+                    thread_conn.commit()
+                    enrich_jobs_with_contacts(DB_PATH)
+                    thread_conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+                    thread_conn.commit()
+                    
+                    from email_scraper import sync_job_statuses_from_email
+                    sync_job_statuses_from_email(DB_PATH, user_id=uid)
+                    thread_conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
+                    thread_conn.commit()
+                    
+                    min_score = float(os.getenv("MIN_SCORE", "0.0"))
+                    process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
+                    thread_conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
+                    thread_conn.commit()
+                    thread_conn.close()
+                except Exception as err:
+                    print("Voice refresh failed:", err)
+                    
+            threading.Thread(target=run_sync).start()
+            reply_text = "Sync started in the background. It will reload when completed."
+            
+        elif intent == "regenerate_cover_letter":
+            job = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                return jsonify({"ok": False, "error": "Job not found"}), 404
+            j = dict(job)
+            contact = conn.execute("SELECT name, title FROM contacts WHERE job_id = ? AND user_id = ? LIMIT 1", (job_id, uid)).fetchone()
+            cn = contact[0] if contact else "Hiring Team"
+            ct = contact[1] if contact else "Recruiter"
+            
+            settings = get_user_settings(conn, uid)
+            from ai_engine import score_job, generate_cover_letter, generate_linkedin_note
+            score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+            letter = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+            li_note = generate_linkedin_note(cn, ct, j["company"], j["title"], api_key=settings.get("gemini_api_key"))
+            
+            conn.execute("UPDATE jobs SET ai_score = ?, ai_summary = ?, key_reqs = ? WHERE job_id = ? AND user_id = ?",
+                         (score_data["score"], score_data["fit_summary"], json.dumps(score_data.get("key_requirements", [])), job_id, uid))
+            conn.execute("INSERT OR REPLACE INTO cover_letters (job_id, subject, body, linkedin_note, created_at, user_id) VALUES (?,?,?,?,?,?)",
+                         (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid))
+            add_timeline(conn, job_id, "Regenerated cover letter (Voice)")
+            conn.commit()
+            reply_text = f"Successfully regenerated cover letter for '{j['title']}' at {j['company']}."
+            
+        elif intent == "send_email":
+            from notifier import send_email_digest
+            j_row = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not j_row:
+                return jsonify({"ok": False, "error": "Job not found"}), 404
+            j = dict(j_row)
+            cl = conn.execute("SELECT * FROM cover_letters WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            c = conn.execute("SELECT * FROM contacts WHERE job_id = ? AND user_id = ? LIMIT 1", (job_id, uid)).fetchone()
+            if not cl:
+                return jsonify({"ok": False, "error": "No cover letter found to send"}), 400
+                
+            item = {
+                **j, "score": j.get("ai_score", 0),
+                "fit_summary": j.get("ai_summary", ""),
+                "key_requirements": json.loads(j.get("key_reqs") or "[]"),
+                "cover_letter_subject": cl["subject"],
+                "cover_letter_body": cl["body"],
+                "contact_name": c["name"] if c else "Hiring Team",
+                "contact_title": c["title"] if c else "",
+                "linkedin_note": cl.get("linkedin_note", "")
+            }
+            ok = send_email_digest([item])
+            if ok:
+                conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ? AND user_id = ?", (job_id, uid))
+                add_timeline(conn, job_id, "Email sent → applied (Voice)")
+                conn.commit()
+                reply_text = f"Email sent successfully and job status updated to applied."
+            else:
+                reply_text = "Failed to send email. Ensure SENDER_EMAIL and SENDER_PASSWORD are in your configuration."
+                
+        elif intent == "archive_job":
+            job = conn.execute("SELECT company, title FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+            if not job:
+                return jsonify({"ok": False, "error": "Job not found"}), 404
+            conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (job_id, uid))
+            add_timeline(conn, job_id, "Pipeline → archived (Voice)")
+            conn.commit()
+            reply_text = f"Successfully archived the job '{job[1]}' at {job[0]}."
+            
+        else:
+            return jsonify({"ok": False, "error": "Invalid pending action"}), 400
+            
+        conn.close()
+        return jsonify({"ok": True, "reply_text": reply_text})
+        
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/voice/digest", methods=["GET"])
+def voice_digest():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    
+    user_row = conn.execute("SELECT last_digest_read_at FROM users WHERE id = ?", (uid,)).fetchone()
+    last_read = user_row[0] if user_row and user_row[0] else None
+    
+    if last_read:
+        query = "SELECT job_id, title, company, ai_score FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
+        params = (uid, last_read)
+    else:
+        from datetime import timedelta
+        yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+        query = "SELECT job_id, title, company, ai_score FROM jobs WHERE user_id = ? AND scraped_at > ? AND status != 'archived' ORDER BY ai_score DESC LIMIT 5"
+        params = (uid, yesterday)
+        
+    rows = conn.execute(query, params).fetchall()
+    
+    now_str = datetime.now().isoformat()
+    conn.execute("UPDATE users SET last_digest_read_at = ? WHERE id = ?", (now_str, uid))
+    conn.commit()
+    conn.close()
+    
+    count = len(rows)
+    if count == 0:
+        reply_text = "You have no new job recommendations since you last checked."
+    else:
+        top_job = rows[0]
+        reply_text = f"You have {count} new job recommendations since you last checked. Your top match is {top_job[1]} at {top_job[2]} with an AI score of {top_job[3]:.1f}/10."
+        if count > 1:
+            other_jobs = ", and ".join([f"{r[1]} at {r[2]}" for r in rows[1:]])
+            reply_text += f" Other new recommendations include: {other_jobs}."
+            
+    return jsonify({
+        "ok": True,
+        "count": count,
+        "reply_text": reply_text,
+        "jobs": [{"job_id": r[0], "title": r[1], "company": r[2], "score": r[3]} for r in rows]
+    })
+
+
 def scrape_job_url(url: str) -> dict:
     """Fetches a job URL and extracts company, title, description, and location."""
     import requests
