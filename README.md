@@ -8,14 +8,17 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 
 1. **Clone & Install Dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip3 install -r requirements.txt
    ```
 
 2. **Database Configuration**:
    By default, the application runs on a local SQLite database (`jobs.db`). To scale to a production setup, specify a PostgreSQL connection string in the `DATABASE_URL` environment variable.
 
 3. **API Keys**:
-   Create a `.env` file in the root directory to specify API keys for AI evaluations and auxiliary services.
+   Copy `.env.example` to `.env` in the root directory and add your keys/credentials:
+   ```bash
+   cp .env.example .env
+   ```
 
 ---
 
