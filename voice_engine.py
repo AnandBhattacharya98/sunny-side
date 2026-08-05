@@ -6,7 +6,7 @@ from datetime import datetime
 from db import get_conn, DB_PATH
 from ai_engine import get_fallback_gemini_key, _call_gemini, ANTHROPIC_API_KEY, GEMINI_API_KEY
 
-def classify_intent_and_slot(transcript: str, jobs_snapshot: list[dict], api_key: str = None) -> dict:
+def classify_intent_and_slot(transcript: str, jobs_snapshot: list[dict], chat_history: list[dict] = None, api_key: str = None) -> dict:
     """
     Classifies a spoken transcript into a structured intent and slot dictionary.
     Falls back to a local rules-based parsing engine if no API keys are available.
@@ -20,7 +20,7 @@ def classify_intent_and_slot(transcript: str, jobs_snapshot: list[dict], api_key
     # Try using Gemini if API key exists
     if key_to_use:
         try:
-            return _gemini_classify(transcript, jobs_snapshot, key_to_use)
+            return _gemini_classify(transcript, jobs_snapshot, chat_history, key_to_use)
         except Exception as e:
             print(f"Gemini voice classification failed: {e}. Falling back to local rules.")
             
@@ -28,10 +28,20 @@ def classify_intent_and_slot(transcript: str, jobs_snapshot: list[dict], api_key
     return _local_classify(transcript_clean, jobs_snapshot)
 
 
-def _gemini_classify(transcript: str, jobs_snapshot: list[dict], api_key: str) -> dict:
+def _gemini_classify(transcript: str, jobs_snapshot: list[dict], chat_history: list[dict], api_key: str) -> dict:
+    history_str = ""
+    if chat_history:
+        history_str = "\n    CONVERSATION HISTORY:\n"
+        for turn in chat_history:
+            role = "User" if turn.get("role") == "user" else "Assistant"
+            text = turn.get("text", "")
+            history_str += f"    - {role}: \"{text}\"\n"
+
     prompt = f"""
     You are the voice assistant router for the Job Hunter Board.
     Analyze the user's spoken transcript, slot-fill any references to jobs in the provided snapshot, and return a JSON object.
+    You must use the CONVERSATION HISTORY (if present) to resolve context, pronouns (like "it", "that", "that one", "first one"), and references from previous turns.
+    {history_str}
     
     SUPPORTED INTENTS:
     - "pipeline_stats": stats queries (e.g. "How is my pipeline?", "what is my average score?")

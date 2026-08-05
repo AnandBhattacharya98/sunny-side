@@ -1366,6 +1366,7 @@ def voice_query():
     d = request.json or {}
     transcript = d.get("transcript", "").strip()
     session_id = d.get("session_id", "default")
+    chat_history = d.get("chat_history", [])
     
     if not transcript:
         return jsonify({"intent": None, "reply_text": "I didn't hear anything. Please try again.", "requires_confirmation": False, "reply_cards": []})
@@ -1382,7 +1383,7 @@ def voice_query():
     jobs_snapshot = [{"job_id": r[0], "title": r[1], "company": r[2], "status": r[3], "score": r[4]} for r in rows]
     
     # Classify intent
-    res = classify_intent_and_slot(transcript, jobs_snapshot, api_key=gemini_key)
+    res = classify_intent_and_slot(transcript, jobs_snapshot, chat_history=chat_history, api_key=gemini_key)
     intent = res.get("intent")
     slots = res.get("slots", {})
     job_id = slots.get("job_id")
