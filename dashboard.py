@@ -1359,9 +1359,49 @@ def voice_synthesize():
         return jsonify({"error": str(e), "provider_fallback": True}), 500
 
 
+def shorten_title(title):
+    if not title:
+        return ""
+    # Strip any suffix after dash, pipe, or parens
+    for separator in (" - ", " — ", " | ", " ("):
+        if separator in title:
+            title = title.split(separator)[0]
+    # Truncate if still too long
+    if len(title) > 35:
+        title = title[:32] + "..."
+    return title.strip()
+
+def clean_company(company):
+    if not company:
+        return ""
+    if "demo_" in company:
+        company = company.replace("demo_", "")
+    for separator in ("_pm_", "_dev_", "_u"):
+        if separator in company:
+            company = company.split(separator)[0]
+    if "_" in company:
+        company = company.split("_")[0]
+    
+    special_cases = {
+        "phonepe": "PhonePe",
+        "razorpay": "Razorpay",
+        "meesho": "Meesho",
+        "groww": "Groww",
+        "cred": "CRED",
+        "swiggy": "Swiggy",
+        "zepto": "Zepto",
+        "itc": "ITC",
+        "nike": "Nike"
+    }
+    company_lower = company.lower().strip()
+    if company_lower in special_cases:
+        return special_cases[company_lower]
+    return company.capitalize()
+
+
 @app.route("/api/voice/query", methods=["POST"])
 def voice_query():
-    from voice_engine import classify_intent_and_slot
+    from voice_engine import classify_intent_and_slot, _resolve_job_locally
     uid = get_user_id()
     d = request.json or {}
     transcript = d.get("transcript", "").strip()
@@ -1388,6 +1428,15 @@ def voice_query():
     slots = res.get("slots", {})
     job_id = slots.get("job_id")
     
+    # Fallback to resolve job_id from context/history if missing but intent is set
+    if intent and not job_id and chat_history:
+        for turn in reversed(chat_history):
+            turn_text = turn.get("text", "").lower()
+            prev_match = _resolve_job_locally(turn_text, jobs_snapshot)
+            if prev_match:
+                job_id = prev_match["job_id"]
+                break
+    
     mutating_intents = {"move_job", "trigger_refresh", "regenerate_cover_letter", "send_email", "archive_job"}
     reply_cards = []
     
@@ -1401,8 +1450,10 @@ def voice_query():
             if not job:
                 conn.close()
                 return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing on your board.", "requires_confirmation": False, "reply_cards": []})
-            reply_text = f"Move '{job[1]}' at {job[0]} to {target_status}?"
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Move '{s_title}' at {c_comp} to {target_status}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "trigger_refresh":
             reply_text = "Would you like me to refresh your listings and check for new jobs?"
         elif intent == "regenerate_cover_letter":
@@ -1410,22 +1461,28 @@ def voice_query():
             if not job:
                 conn.close()
                 return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job listing.", "requires_confirmation": False, "reply_cards": []})
-            reply_text = f"Regenerate the cover letter for '{job[1]}' at {job[0]}?"
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Regenerate the cover letter for '{s_title}' at {c_comp}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "send_email":
             job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
                 return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False, "reply_cards": []})
-            reply_text = f"Send the application email to {job[0]}?"
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Send the application email for '{s_title}' at {c_comp}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         elif intent == "archive_job":
             job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not job:
                 conn.close()
                 return jsonify({"intent": intent, "reply_text": "Sorry, I couldn't find that job.", "requires_confirmation": False, "reply_cards": []})
-            reply_text = f"Archive the job '{job[1]}' at {job[0]}?"
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Archive the job '{s_title}' at {c_comp}?"
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
             
         session['voice_pending_action'] = {"intent": intent, "slots": slots}
         conn.close()
@@ -1464,27 +1521,49 @@ def voice_query():
     elif intent == "job_lookup":
         job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            reply_text = f"Found job '{job[1]}' at {job[0]}. Location is {job[5]} and its AI fit score is {job[3]:.1f}/10."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Found job '{s_title}' at {c_comp}."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find details for that job."
             
     elif intent == "job_fit":
         job = conn.execute("SELECT job_id, title, company, ai_score, status, location, ai_summary FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            summary = job[6] or "No AI summary available."
-            reply_text = f"The job '{job[1]}' at {job[2]} scored {job[3]:.1f}/10 because: {summary}"
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"The job '{s_title}' at {c_comp} scored {job[3]:.1f}/10."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find the fit analysis for that job."
             
     elif intent == "job_status":
         job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
-            reply_text = f"The job '{job[1]}' at {job[2]} is currently in the '{job[4]}' column."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"The job '{s_title}' at {c_comp} is currently in the '{job[4]}' column."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't verify the status of that job."
+            
+    elif intent == "quiz_mode":
+        job = conn.execute("SELECT job_id, title, company FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if job:
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Opening Quiz Mode for '{s_title}' at {c_comp}."
+            conn.close()
+            return jsonify({
+                "intent": intent,
+                "reply_text": reply_text,
+                "requires_confirmation": False,
+                "action": {"type": "open_quiz", "job_id": job_id},
+                "reply_cards": []
+            })
+        else:
+            reply_text = "Which job's quiz would you like to open?"
             
     elif intent == "email_lookup":
         company = slots.get("company")
@@ -1527,9 +1606,9 @@ def voice_query():
             (uid,)
         ).fetchall()
         if matches:
-            list_str = ", ".join([f"{m[1]} at {m[2]} with a score of {m[3]:.1f}" for m in matches])
+            list_str = ", ".join([f"{shorten_title(m[1])} at {clean_company(m[2])} with a score of {m[3]:.1f}" for m in matches])
             reply_text = f"Your top matches are: {list_str}."
-            reply_cards = [{"type": "job", "job_id": m[0], "title": m[1], "company": m[2], "score": m[3], "status": m[4], "location": m[5]} for m in matches]
+            reply_cards = [{"type": "job", "job_id": m[0], "title": shorten_title(m[1]), "company": clean_company(m[2]), "score": m[3], "status": m[4], "location": m[5]} for m in matches]
         else:
             reply_text = "You don't have any scored job listings on your board."
             
@@ -1541,15 +1620,17 @@ def voice_query():
         else:
             reply_text = "No cover letter has been generated for this job yet."
         if job:
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            reply_cards = [{"type": "job", "job_id": job[0], "title": shorten_title(job[1]), "company": clean_company(job[2]), "score": job[3], "status": job[4], "location": job[5]}]
             
     elif intent == "thumbs_up":
         job = conn.execute("SELECT job_id, title, company, ai_score, status, location FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
         if job:
             conn.execute("UPDATE jobs SET feedback = 1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
             conn.commit()
-            reply_text = f"Marked '{job[1]}' at {job[2]} as liked."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Marked '{s_title}' at {c_comp} as liked."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find that job."
             
@@ -1558,8 +1639,10 @@ def voice_query():
         if job:
             conn.execute("UPDATE jobs SET feedback = -1 WHERE job_id = ? AND user_id = ?", (job_id, uid))
             conn.commit()
-            reply_text = f"Marked '{job[1]}' at {job[2]} as disliked."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": job[4], "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Marked '{s_title}' at {c_comp} as disliked."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": job[4], "location": job[5]}]
         else:
             reply_text = "Sorry, I couldn't find that job."
             
@@ -1601,8 +1684,10 @@ def voice_confirm():
                 (uid,)
             )
             conn.commit()
-            reply_text = f"Successfully moved '{job[1]}' at {job[2]} to {status}."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": status, "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Successfully moved '{s_title}' at {c_comp} to {status}."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": status, "location": job[5]}]
             
         elif intent == "trigger_refresh":
             import threading
@@ -1657,8 +1742,10 @@ def voice_confirm():
                          (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid))
             add_timeline(conn, job_id, "Regenerated cover letter (Voice)")
             conn.commit()
-            reply_text = f"Successfully regenerated cover letter for '{j['title']}' at {j['company']}."
-            reply_cards = [{"type": "job", "job_id": j["job_id"], "title": j["title"], "company": j["company"], "score": score_data["score"], "status": j["status"], "location": j.get("location","")}]
+            s_title = shorten_title(j["title"])
+            c_comp = clean_company(j["company"])
+            reply_text = f"Successfully regenerated cover letter for '{s_title}' at {c_comp}."
+            reply_cards = [{"type": "job", "job_id": j["job_id"], "title": s_title, "company": c_comp, "score": score_data["score"], "status": j["status"], "location": j.get("location","")}]
             
         elif intent == "send_email":
             from notifier import send_email_digest
@@ -1686,8 +1773,10 @@ def voice_confirm():
                 conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ? AND user_id = ?", (job_id, uid))
                 add_timeline(conn, job_id, "Email sent → applied (Voice)")
                 conn.commit()
+                s_title = shorten_title(j["title"])
+                c_comp = clean_company(j["company"])
                 reply_text = f"Email sent successfully and job status updated to applied."
-                reply_cards = [{"type": "job", "job_id": j["job_id"], "title": j["title"], "company": j["company"], "score": j.get("ai_score", 0), "status": "applied", "location": j.get("location","")}]
+                reply_cards = [{"type": "job", "job_id": j["job_id"], "title": s_title, "company": c_comp, "score": j.get("ai_score", 0), "status": "applied", "location": j.get("location","")}]
             else:
                 reply_text = "Failed to send email. Ensure SENDER_EMAIL and SENDER_PASSWORD are in your configuration."
                 
@@ -1698,8 +1787,10 @@ def voice_confirm():
             conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (job_id, uid))
             add_timeline(conn, job_id, "Pipeline → archived (Voice)")
             conn.commit()
-            reply_text = f"Successfully archived the job '{job[1]}' at {job[2]}."
-            reply_cards = [{"type": "job", "job_id": job[0], "title": job[1], "company": job[2], "score": job[3], "status": "archived", "location": job[5]}]
+            s_title = shorten_title(job[1])
+            c_comp = clean_company(job[2])
+            reply_text = f"Successfully archived the job '{s_title}' at {c_comp}."
+            reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": "archived", "location": job[5]}]
             
         else:
             return jsonify({"ok": False, "error": "Invalid pending action"}), 400
@@ -1743,17 +1834,19 @@ def voice_digest():
         reply_text = "You have no new job recommendations since you last checked."
     else:
         top_job = rows[0]
-        reply_text = f"You have {count} new job recommendations since you last checked. Your top match is {top_job[1]} at {top_job[2]} with an AI score of {top_job[3]:.1f}/10."
+        s_title = shorten_title(top_job[1])
+        c_comp = clean_company(top_job[2])
+        reply_text = f"You have {count} new job recommendations since you last checked. Your top match is {s_title} at {c_comp} with an AI score of {top_job[3]:.1f}/10."
         if count > 1:
-            other_jobs = ", and ".join([f"{r[1]} at {r[2]}" for r in rows[1:]])
+            other_jobs = ", and ".join([f"{shorten_title(r[1])} at {clean_company(r[2])}" for r in rows[1:]])
             reply_text += f" Other new recommendations include: {other_jobs}."
             
     return jsonify({
         "ok": True,
         "count": count,
         "reply_text": reply_text,
-        "jobs": [{"job_id": r[0], "title": r[1], "company": r[2], "score": r[3]} for r in rows],
-        "reply_cards": [{"type": "job", "job_id": r[0], "title": r[1], "company": r[2], "score": r[3], "status": r[4], "location": r[5]} for r in rows]
+        "jobs": [{"job_id": r[0], "title": shorten_title(r[1]), "company": clean_company(r[2]), "score": r[3]} for r in rows],
+        "reply_cards": [{"type": "job", "job_id": r[0], "title": shorten_title(r[1]), "company": clean_company(r[2]), "score": r[3], "status": r[4], "location": r[5]} for r in rows]
     })
 
 

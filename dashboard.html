@@ -2072,6 +2072,28 @@ function handleFinalQuery(text) {
     addMessageBubble(res.reply_text, 'assistant', false, res.reply_cards, res.requires_confirmation);
     speakResponse(res.reply_text);
     
+    if (res.action && res.action.type === 'open_quiz') {
+      let jobId = res.action.job_id;
+      if (!jobId) {
+        const openBackdrop = document.querySelector('div[id^="modal-backdrop-"][style*="display: flex"]');
+        if (openBackdrop) {
+          jobId = openBackdrop.id.replace('modal-backdrop-', '');
+        }
+      }
+      if (jobId) {
+        openJobModal(jobId);
+        setTimeout(() => {
+          const modal = document.getElementById('modal-backdrop-' + jobId);
+          if (modal) {
+            const quizBtn = modal.querySelector('button[onclick*="quiz"]');
+            if (quizBtn) {
+              quizBtn.click();
+            }
+          }
+        }, 200);
+      }
+    }
+    
     if (res.requires_confirmation) {
       isWaitingForConfirmation = true;
     } else {

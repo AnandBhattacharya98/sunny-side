@@ -20,12 +20,14 @@ def classify_intent_and_slot(transcript: str, jobs_snapshot: list[dict], chat_hi
     # Try using Gemini if API key exists
     if key_to_use:
         try:
-            return _gemini_classify(transcript, jobs_snapshot, chat_history, key_to_use)
+            res = _gemini_classify(transcript, jobs_snapshot, chat_history, key_to_use)
+            if res and res.get("intent"):
+                return res
         except Exception as e:
             print(f"Gemini voice classification failed: {e}. Falling back to local rules.")
             
     # Fallback to local parsing engine
-    return _local_classify(transcript_clean, jobs_snapshot)
+    return _local_classify(transcript_clean, jobs_snapshot, chat_history)
 
 
 def _gemini_classify(transcript: str, jobs_snapshot: list[dict], chat_history: list[dict], api_key: str) -> dict:
@@ -61,6 +63,7 @@ def _gemini_classify(transcript: str, jobs_snapshot: list[dict], chat_history: l
     - "regenerate_cover_letter": refresh cover letter (e.g. "regenerate the cover letter for Swiggy"). Required slot: "job_id"
     - "send_email": email cover letter (e.g. "send the application to Razorpay"). Required slot: "job_id"
     - "archive_job": remove/archive a job (e.g. "remove the BrowserStack job"). Required slot: "job_id"
+    - "quiz_mode": open the quiz tab/mode for a job card (e.g. "quiz me on this", "open quiz for Swiggy", "practice interview"). Required slot: "job_id"
     
     JOBS SNAPSHOT (last 50 active jobs):
     {json.dumps(jobs_snapshot)}
@@ -89,12 +92,22 @@ def _gemini_classify(transcript: str, jobs_snapshot: list[dict], chat_history: l
     return json.loads(res_text.strip())
 
 
-def _local_classify(transcript: str, jobs_snapshot: list[dict]) -> dict:
+def _local_classify(transcript: str, jobs_snapshot: list[dict], chat_history: list[dict] = None) -> dict:
     slots = {"job_id": None, "column": None, "status": None, "company": None}
     intent = None
     
     # 1. Resolve job reference if any
     matched_job = _resolve_job_locally(transcript, jobs_snapshot)
+    
+    # If no direct match in transcript, try resolving from previous turns (context)
+    if not matched_job and chat_history:
+        for turn in reversed(chat_history):
+            turn_text = turn.get("text", "").lower()
+            prev_match = _resolve_job_locally(turn_text, jobs_snapshot)
+            if prev_match:
+                matched_job = prev_match
+                break
+                
     if matched_job:
         slots["job_id"] = matched_job["job_id"]
         slots["company"] = matched_job["company"]
@@ -128,6 +141,8 @@ def _local_classify(transcript: str, jobs_snapshot: list[dict]) -> dict:
             intent = "thumbs_up"
     elif "not interested" in transcript or "thumbs down" in transcript:
         intent = "thumbs_down"
+    elif "quiz" in transcript or "practice" in transcript or "interview prep" in transcript or "coach" in transcript or "test me" in transcript or "ask me" in transcript:
+        intent = "quiz_mode"
     elif "remove" in transcript or "delete" in transcript or "archive" in transcript:
         intent = "archive_job"
     elif "move" in transcript or "put" in transcript or "set" in transcript or "drag" in transcript:
