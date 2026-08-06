@@ -2247,6 +2247,12 @@ def serve_favicon():
     return send_file(os.path.join(base_dir, "logo.svg"), mimetype="image/svg+xml")
 
 
+@app.route("/hero_background.png")
+def serve_hero_background():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_file(os.path.join(base_dir, "hero_background.png"), mimetype="image/png")
+
+
 @app.route("/api/debug/db")
 def debug_db():
     uid = session.get("user_id")

@@ -4,48 +4,62 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sunny Side — A Job Hunter's Board</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root {
-  --bg: #FFFFFF;           /* Pure white background */
-  --sur: #FDFDFD;          /* Clean white card surface */
-  --bdr: rgba(42, 35, 21, 0.08); /* Soft chocolate border */
-  --txt: #2A2315;          /* Deep warm charcoal/chocolate text */
-  --mut: #706550;          /* Muted organic olive-brown */
-  --hin: #A59A84;          /* Soft gray-sand */
+  --bg: #0D0C0A;           /* Starts near-black */
+  --sur: rgba(255, 255, 255, 0.03);
+  --bdr: rgba(255, 255, 255, 0.08);
+  --txt: #F5F2EB;          /* Starts warm off-white */
+  --mut: #A59A84;          /* Warm sand */
+  --hin: #5C5446;
   --pur: #FFA700;          /* Yolk yellow accent */
   --purl: rgba(255, 167, 0, 0.08);
   --purt: #E08500;
-  --glow-1: rgba(255, 167, 0, 0.04);
-  --glow-2: rgba(255, 126, 6, 0.03);
-}
-[data-theme="dark"] {
-  --bg: #12100E;           /* Deep dark roasted coffee background */
-  --sur: rgba(30, 27, 23, 0.7); /* Translucent warm dark card */
-  --bdr: rgba(255, 255, 255, 0.05);
-  --txt: #FAF6EE;          /* Warm cream text */
-  --mut: #A59A84;          /* Warm sand */
-  --hin: #5C5446;
-  --pur: #FFA700;          /* Glowing yolk yellow */
-  --purl: rgba(255, 167, 0, 0.15);
-  --purt: #FFC04D;
-  --glow-1: rgba(255, 167, 0, 0.08);
-  --glow-2: rgba(255, 126, 6, 0.05);
+  
+  /* 3 colors limits */
+  --c-black: #0D0C0A;
+  --c-white: #F5F2EB;
+  --c-accent: #FFA700;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%),
-              radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%),
-              var(--bg);
+  font-family: 'Space Mono', monospace;
+  background: var(--bg);
   color: var(--txt);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.6;
   overflow-x: hidden;
   position: relative;
   min-height: 100vh;
-  transition: background-color 0.3s, color 0.3s;
+  /* Physical, weighted transition on background and text colors */
+  transition: background-color 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              color 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hero-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -2;
+  overflow: hidden;
+  will-change: transform, border-radius, width, height, top, left;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              border-radius 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              width 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              height 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              top 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              left 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.hero-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(0.5);
 }
 
 /* Nav */
@@ -55,7 +69,7 @@ nav {
   left: 0;
   right: 0;
   height: 72px;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(13, 12, 10, 0.85);
   border-bottom: 1px solid var(--bdr);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -64,17 +78,15 @@ nav {
   align-items: center;
   padding: 0 40px;
   z-index: 1000;
-  transition: background-color 0.3s, border-color 0.3s;
-}
-[data-theme="dark"] nav {
-  background: rgba(18, 16, 14, 0.8);
+  transition: background-color 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              border-color 0.6s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .logo {
   font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 900;
+  letter-spacing: -0.04em;
   font-family: 'Space Grotesk', sans-serif;
-  background: linear-gradient(135deg, var(--pur), #FF5E00);
+  background: linear-gradient(135deg, var(--pur), #FF7E06);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-decoration: none;
@@ -115,16 +127,16 @@ nav {
 }
 .btn {
   padding: 10px 20px;
-  border-radius: 20px; /* B-Egg organic rounded pill */
+  border-radius: 8px; /* High-contrast card border radius */
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   border: 1px solid var(--bdr);
   background: var(--sur);
   color: var(--txt);
-  transition: all .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all .2s cubic-bezier(0.25, 1, 0.5, 1);
   text-decoration: none;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Mono', monospace;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -178,10 +190,10 @@ nav {
 }
 .hero h1 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 54px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
+  font-size: 64px;
+  font-weight: 850;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
   margin-bottom: 24px;
   max-width: 850px;
   margin-left: auto;
@@ -392,6 +404,9 @@ footer {
 </head>
 <body>
 
+<div class="hero-bg-container">
+  <img class="hero-bg-img" src="/hero_background.png" alt="background">
+</div>
 <!-- Floating Yolk Background Shapes -->
 <div class="yolk-bg yolk-1"></div>
 <div class="yolk-bg yolk-2"></div>
@@ -529,5 +544,60 @@ footer {
   </div>
 </footer>
 
+<script>
+  const heroBg = document.querySelector('.hero-bg-container');
+  const body = document.body;
+  const nav = document.querySelector('nav');
+  
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY;
+    const maxScroll = window.innerHeight * 0.8;
+    const progress = Math.min(scrolled / maxScroll, 1);
+    
+    // Physics weighted transition curve (cubic ease-out)
+    const easeProgress = 1 - Math.pow(1 - progress, 2.5);
+    
+    // 1. BG Image transform from full-bleed to contained card
+    if (heroBg) {
+      const scale = 1 - (0.25 * easeProgress);
+      const borderRadius = easeProgress * 32;
+      const width = 100 - (30 * easeProgress);
+      const height = 100 - (45 * easeProgress);
+      const top = easeProgress * 15;
+      const left = (100 - width) / 2;
+      
+      heroBg.style.transform = `scale(${scale})`;
+      heroBg.style.borderRadius = `${borderRadius}px`;
+      heroBg.style.width = `${width}vw`;
+      heroBg.style.height = `${height}vh`;
+      heroBg.style.top = `${top}vh`;
+      heroBg.style.left = `${left}vw`;
+    }
+    
+    // 2. Color Palette Shift from near-black (#0D0C0A) to warm off-white (#F5F2EB)
+    const textR = Math.round(245 - (245 - 13) * easeProgress);
+    const textG = Math.round(242 - (242 - 12) * easeProgress);
+    const textB = Math.round(235 - (235 - 10) * easeProgress);
+    
+    const bgR = Math.round(13 + (245 - 13) * easeProgress);
+    const bgG = Math.round(12 + (242 - 12) * easeProgress);
+    const bgB = Math.round(10 + (235 - 10) * easeProgress);
+    
+    // Set custom CSS variables on document root
+    document.documentElement.style.setProperty('--bg', `rgb(${bgR}, ${bgG}, ${bgB})`);
+    document.documentElement.style.setProperty('--txt', `rgb(${textR}, ${textG}, ${textB})`);
+    
+    // Interpolate borders and card background
+    const borderAlpha = 0.05 + 0.05 * easeProgress;
+    document.documentElement.style.setProperty('--bdr', `rgba(${textR}, ${textG}, ${textB}, ${borderAlpha})`);
+    document.documentElement.style.setProperty('--sur', easeProgress > 0.5 ? 'rgba(13, 12, 10, 0.03)' : 'rgba(255, 255, 255, 0.03)');
+    
+    // Update nav background dynamically
+    if (nav) {
+      nav.style.background = `rgba(${bgR}, ${bgG}, ${bgB}, 0.85)`;
+      nav.style.borderBottom = `1px solid rgba(${textR}, ${textG}, ${textB}, ${borderAlpha})`;
+    }
+  });
+</script>
 </body>
 </html>
