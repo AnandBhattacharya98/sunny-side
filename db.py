@@ -267,6 +267,7 @@ def migrate_db(conn) -> None:
     conn.commit()
 
     _encrypt_legacy_secrets(conn)
+    _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
 
     if IS_POSTGRES:
         seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep"]
@@ -311,6 +312,29 @@ def _ensure_admin(conn) -> None:
         conn.commit()
         print(f"Admin still had the default password 'admin'; it has been replaced. New password: {pw}  "
               f"(set ADMIN_PASSWORD to choose your own)")
+
+
+def _run_once(conn, key: str, fn) -> None:
+    """Runs a one-time data fix and records it in app_meta so it never repeats."""
+    conn.execute("CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.commit()
+    if conn.execute("SELECT 1 FROM app_meta WHERE key = ?", (key,)).fetchone():
+        return
+    fn(conn)
+    from datetime import datetime
+    try:
+        conn.execute("INSERT INTO app_meta (key, value) VALUES (?, ?)", (key, datetime.now().isoformat()))
+        conn.commit()
+    except Exception:
+        # Another worker recorded it at the same moment; the fix itself is idempotent
+        conn.rollback()
+
+
+def _reset_landing_wall_optin(conn) -> None:
+    """Social sign-ins used to be added to the public landing page automatically, and the
+    signup checkbox was pre-ticked. Hide everyone once; people can opt back in from settings."""
+    conn.execute("UPDATE users SET share_profile = 0 WHERE share_profile = 1")
+    conn.commit()
 
 
 def _encrypt_legacy_secrets(conn) -> None:
