@@ -51,74 +51,97 @@ YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
 
 # ── Scoring ────────────────────────────────────────────────────────────────
 
+_TITLE_STOPWORDS = {"and", "the", "of", "for", "in", "at", "to", "a", "an", "with", "i", "ii", "iii", "iv",
+                    "sr", "senior", "jr", "junior", "lead", "principal", "staff", "associate", "head", "remote",
+                    "hybrid", "india", "team", "role", "position", "job"}
+_SENIOR_WORDS = re.compile(r"\b(senior|sr\.?|lead|principal|staff|head|director|vp|vice president)\b", re.IGNORECASE)
+_JUNIOR_WORDS = re.compile(r"\b(intern|internship|junior|jr\.?|associate|apm|trainee|fresher|graduate)\b", re.IGNORECASE)
+
+
+def _title_tokens(text: str) -> set:
+    return {w for w in re.findall(r"[a-z0-9+#]+", (text or "").lower()) if w not in _TITLE_STOPWORDS and len(w) > 1}
+
+
+def _title_similarity(a: str, b: str) -> float:
+    """Overlap of meaningful title words, relative to the shorter title (0..1)."""
+    ta, tb = _title_tokens(a), _title_tokens(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / min(len(ta), len(tb))
+
+
 def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None,
                  w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5, resume_text: str = None,
-                 years_exp: float = None) -> dict:
-    """Rule-based fallback scoring — no API needed."""
+                 years_exp: float = None, target_titles: list = None, user_skills: set = None,
+                 job_skills: set = None) -> dict:
+    """Rule-based fallback scoring — no API needed.
+
+    Every component is bounded, so scores spread across the 1-10 range instead of
+    piling up at 10 when a user has many similar liked jobs or a long resume:
+      base 3.5 · title fit up to +3 · skill coverage up to +2.5 · experience -1.5..+0.5
+      · seniority mismatch up to -1 · remote +0.3 · preference similarity about -1.25..+1
+    """
     text = f"{title} {description}".lower()
-    score = 5.0
+    has_resume = bool(resume_text) and not resume_text.startswith("(No resume provided")
+    score = 3.5
 
-    # Build dynamic positive signals based on resume content keywords
-    custom_signals = dict(POSITIVE_SIGNALS)
-    if resume_text and len(resume_text.strip()) > 50:
-        first_part = resume_text[:600].lower()
-        roles = ["software engineer", "frontend", "backend", "full stack", "data scientist", "product manager", "designer", "analyst", "developer", "marketing", "sales", "consultant"]
-        for r in roles:
-            if r in first_part:
-                custom_signals[r] = 1.5
-        
-        words = re.findall(r"\b[a-zA-Z]{4,15}\b", first_part)
-        stops = {"with", "that", "this", "from", "have", "about", "their", "there", "which", "would", "could", "should"}
-        words = [w for w in words if w not in stops]
-        from collections import Counter
-        common = Counter(words).most_common(8)
-        for word, count in common:
-            if word not in custom_signals:
-                custom_signals[word] = 0.5
+    # 1. Title fit against the roles the user is targeting (designation + past titles)
+    targets = [t for t in (target_titles or []) if t and _title_tokens(t)]
+    title_fit = max((_title_similarity(title, t) for t in targets), default=0.5)
+    score += 3.0 * title_fit
 
-    for kw, weight in custom_signals.items():
+    # 2. Skill coverage: how many of the skills the job asks for are on the resume
+    job_skills = job_skills or set()
+    user_skills = user_skills or set()
+    if job_skills and has_resume:
+        coverage = len(job_skills & user_skills) / len(job_skills)
+    else:
+        coverage = 0.4  # neutral when we can't tell
+    score += 2.5 * coverage
+
+    # 3. Experience required vs. the candidate's own
+    if years_exp is None:
+        years_exp = PROFILE["years_exp"]
+        if has_resume:
+            from resume_parser import parse_resume_local
+            years_exp = parse_resume_local(resume_text).get("years_experience") or years_exp
+    required = [int(m.group(1)) for m in YEARS_PATTERN.finditer(text) if 0 < int(m.group(1)) <= 25]
+    if required:
+        req_yrs = min(required)
+        if req_yrs > years_exp + 2:
+            score -= 1.5
+        elif req_yrs > years_exp:
+            score -= 0.5
+        else:
+            score += 0.5
+
+    # 4. Seniority mismatch in the title
+    if _SENIOR_WORDS.search(title) and years_exp < 4:
+        score -= 1.0
+    elif _JUNIOR_WORDS.search(title) and years_exp > 6:
+        score -= 0.5
+
+    for kw, weight in POSITIVE_SIGNALS.items():
         if kw in text:
             score += weight
     for kw, weight in NEGATIVE_SIGNALS.items():
         if kw in text:
             score += weight  # weights are negative
 
-    # Year experience check against the candidate's own experience
-    if years_exp is None:
-        years_exp = PROFILE["years_exp"]
-        if resume_text:
-            from resume_parser import parse_resume_local
-            years_exp = parse_resume_local(resume_text).get("years_experience") or years_exp
-    for m in YEARS_PATTERN.finditer(text):
-        req_yrs = int(m.group(1))
-        if req_yrs > years_exp + 2:
-            score -= 1.5
-        elif req_yrs <= years_exp + 1:
-            score += 0.5
-
-    # Title word overlap adjustments based on liked/disliked jobs and user weights
-    score_adj = 0.0
-    title_words = set(re.findall(r"\w+", title.lower()))
-    if liked_titles:
-        for t in liked_titles:
-            overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
-            if overlap > 1:
-                weight = 0.5 * (w_up + w_app)
-                score_adj += 0.5 * (overlap - 1) * weight
-    if disliked_titles:
-        for t in disliked_titles:
-            overlap = len(title_words.intersection(set(re.findall(r"\w+", t.lower()))))
-            if overlap > 1:
-                weight = 0.5 * (w_down + w_rej)
-                score_adj += 0.5 * (overlap - 1) * weight
-    score += score_adj
+    # 5. Preferences: closest liked / disliked title (max, not sum, so it can't run away)
+    liked_sim = max((_title_similarity(title, t) for t in (liked_titles or [])), default=0.0)
+    disliked_sim = max((_title_similarity(title, t) for t in (disliked_titles or [])), default=0.0)
+    score += 0.5 * (w_up + w_app) * 0.5 * liked_sim
+    score += 0.5 * (w_down + w_rej) * 0.8 * disliked_sim
 
     score = max(1.0, min(10.0, score))
 
-    reqs = []
-    for kw in ["sql", "python", "data", "roadmap", "stakeholder", "user research", "agile", "a/b test", "communication", "leadership"]:
-        if kw in text:
-            reqs.append(kw.title())
+    reqs = sorted(job_skills)[:5] if job_skills else []
+    if not reqs:
+        for kw in ["sql", "python", "data", "roadmap", "stakeholder", "user research", "agile", "a/b test", "communication", "leadership"]:
+            if kw in text:
+                reqs.append(kw)
+    reqs = [r.upper() if len(r) <= 3 else r.title() for r in reqs]
 
     fit_parts = []
     if score >= 8:
@@ -127,7 +150,8 @@ def _local_score(title: str, company: str, description: str, liked_titles: list 
         fit_parts.append("Solid match — most requirements align with your experience.")
     else:
         fit_parts.append("Partial match — some requirements may be a stretch.")
-
+    if job_skills and has_resume:
+        fit_parts.append(f"You cover {len(job_skills & user_skills)} of {len(job_skills)} skills this role mentions.")
     if "remote" in text:
         fit_parts.append("Remote-friendly.")
 
@@ -232,15 +256,17 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
 
     liked_titles = []
     disliked_titles = []
+    designation = ""
     w_up, w_app, w_down, w_rej = 1.0, 1.0, -1.0, -1.5
     try:
         conn = get_conn(DB_PATH)
-        row = conn.execute("SELECT weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute("SELECT weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected, designation FROM users WHERE id = ?", (user_id,)).fetchone()
         if row:
             w_up = row[0] if row[0] is not None else 1.0
             w_app = row[1] if row[1] is not None else 1.0
             w_down = row[2] if row[2] is not None else -1.0
             w_rej = row[3] if row[3] is not None else -1.5
+            designation = row[4] or ""
 
         liked = conn.execute(
             "SELECT DISTINCT title FROM jobs WHERE user_id = ? AND (feedback = 1 OR status IN ('applied', 'shortlisted', 'interviewing', 'offer'))",
@@ -285,7 +311,12 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
         "tableau", "power bi", "looker", "mixpanel", "amplitude", "figma", "sketch", "wireframing", "prototyping",
         "machine learning", "deep learning", "nlp", "llm", "conversational ai", "prompt engineering", "retell", "deepgram",
         "bfsi", "fintech", "saas", "edtech", "healthcare", "e-commerce", "retail", "cloud computing", "aws", "gcp", "azure",
-        "docker", "kubernetes", "git", "github", "ci/cd", "devops"
+        "docker", "kubernetes", "git", "github", "ci/cd", "devops",
+        "react", "node.js", "django", "flask", "spring", "html", "css", "excel", "statistics", "spark", "airflow",
+        "salesforce", "hubspot", "crm", "seo", "sem", "content marketing", "performance marketing", "copywriting",
+        "b2b", "b2c", "lead generation", "negotiation", "account management", "financial modeling", "accounting",
+        "supply chain", "operations", "logistics", "project management", "six sigma", "user experience", "ux", "ui",
+        "adobe", "photoshop", "illustrator", "communication", "leadership", "customer success", "recruiting"
     ]
 
     job_skills = set()
@@ -315,8 +346,15 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
                                  liked_titles=liked_titles, disliked_titles=disliked_titles,
                                  w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
         else:
+            try:
+                years_exp = float(resume_profile.get("years_experience") or 0) or None
+            except (TypeError, ValueError):
+                years_exp = None
+            target_titles = [designation] + list(resume_profile.get("titles") or [])
             res = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                                w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
+                                w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text,
+                                years_exp=years_exp, target_titles=target_titles,
+                                user_skills=user_skills, job_skills=job_skills)
 
     # Attach matched and missing lists
     res["matched_skills"] = json.dumps(matched)
