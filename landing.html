@@ -8,21 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<script>
-  // Same theme choice as the dashboard: saved choice, else the device setting
-  (function () {
-    var t = null;
-    try { t = localStorage.getItem('theme'); } catch (e) {}
-    if (t !== 'light' && t !== 'dark') {
-      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    document.documentElement.setAttribute('data-theme', t);
-  })();
-</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-/* Same three colors and fonts as the dashboard: near-black, warm off-white, yolk */
-:root, [data-theme="light"] {
+/* Dashboard colors and fonts, light only: near-black, warm off-white, yolk */
+:root {
   --ink: #0D0C0A;
   --paper: #F5F2EB;
   --yolk: #FFA700;
@@ -38,18 +27,6 @@
   --shadow: 0 1px 2px rgba(13, 12, 10, 0.04), 0 8px 24px -12px rgba(13, 12, 10, 0.12);
   --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-[data-theme="dark"] {
-  --bg: #0D0C0A;
-  --sur: #161512;
-  --sur2: #1F1D19;
-  --bdr: rgba(245, 242, 235, 0.09);
-  --bdr-strong: rgba(245, 242, 235, 0.22);
-  --txt: #F5F2EB;
-  --mut: #B5AFA3;
-  --hin: #7F7A70;
-  --accent-txt: #FFA700;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
 }
 
 html, body { background: var(--bg); }
@@ -116,7 +93,6 @@ nav {
 .col-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
           font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
 .col-ct { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 1px 8px; font-size: 10px; }
-[data-theme="dark"] .col-ct { background: var(--paper); color: var(--ink); }
 .card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
 .card-role { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px;
@@ -138,6 +114,22 @@ nav {
 footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--font-mono); font-size: 12px; color: var(--hin); }
 .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
+/* Motion: short, eased, and only where it explains the product */
+.btn { transition: background .15s, border-color .15s, transform .15s; }
+.btn:active { transform: translateY(1px); }
+.js .reveal { opacity: 0; transform: translateY(10px); }
+.js .reveal.in { opacity: 1; transform: none;
+  transition: opacity .6s cubic-bezier(.2,.7,.2,1) var(--d, 0ms), transform .6s cubic-bezier(.2,.7,.2,1) var(--d, 0ms); }
+@media (min-width: 821px) { .col { min-height: 274px; } }  /* room for the moving card, so the board never jumps */
+.card.mover { border-color: var(--yolk); box-shadow: 0 0 0 3px rgba(255, 167, 0, 0.18); }
+.card.fade-out { opacity: 0; transform: scale(.96); transition: opacity .35s, transform .35s; }
+.col-ct.bump { animation: bump .4s cubic-bezier(.2,.7,.2,1); }
+@keyframes bump { 40% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal { opacity: 1; transform: none; }
+  .js .reveal.in { transition: none; }
+}
+
 @media (max-width: 820px) {
   .preview { grid-template-columns: repeat(2, 1fr); }
   .steps { grid-template-columns: 1fr; gap: 24px; }
@@ -152,6 +144,7 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
 </style>
 </head>
 <body>
+<script>document.documentElement.classList.add("js");</script>
 
 <nav>
   <div class="container nav-inner">
@@ -166,20 +159,20 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
 <main>
   <header class="hero">
     <div class="container">
-      <div class="eyebrow">A job hunter's board</div>
-      <h1>Every job you apply to, tracked in one place.</h1>
-      <p class="sub">Sunny Side reads your application emails, scores each role against your resume, and drafts your cover letters.</p>
-      <div class="hero-ctas">
+      <div class="eyebrow reveal" style="--d:0ms">A job hunter's board</div>
+      <h1 class="reveal" style="--d:80ms">Every job you apply to, tracked in one place.</h1>
+      <p class="sub reveal" style="--d:160ms">Sunny Side reads your application emails, scores each role against your resume, and drafts your cover letters.</p>
+      <div class="hero-ctas reveal" style="--d:240ms">
         <a class="btn btn-p btn-lg" href="/signup">Start free</a>
         <a class="btn btn-lg" href="/login">Log in</a>
       </div>
-      <div class="hero-note">Free to use. Your data stays private.</div>
+      <div class="hero-note reveal" style="--d:300ms">Free to use. Your data stays private.</div>
 
-      <div class="preview" aria-hidden="true">
+      <div class="preview reveal" style="--d:380ms" aria-hidden="true">
         <div class="col">
           <div class="col-hd">Saved <span class="col-ct">3</span></div>
           <div class="card"><div class="card-role">Product Designer</div><div class="card-meta"><span>Razorpay</span><span class="score">8.4</span></div></div>
-          <div class="card"><div class="card-role">UX Researcher</div><div class="card-meta"><span>Swiggy</span><span class="score">7.1</span></div></div>
+          <div class="card mover"><div class="card-role">UX Researcher</div><div class="card-meta"><span>Swiggy</span><span class="score">7.1</span></div></div>
         </div>
         <div class="col">
           <div class="col-hd">Applied <span class="col-ct">5</span></div>
@@ -200,19 +193,19 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
 
   <section class="how" id="how">
     <div class="container">
-      <h2>How it works</h2>
+      <h2 class="reveal">How it works</h2>
       <div class="steps">
-        <div class="step">
+        <div class="step reveal" style="--d:0ms">
           <div class="step-num">01</div>
           <h3>Connect your inbox</h3>
           <p>Applications from LinkedIn, Naukri and others land on your board on their own.</p>
         </div>
-        <div class="step">
+        <div class="step reveal" style="--d:100ms">
           <div class="step-num">02</div>
           <h3>See your fit</h3>
           <p>Each role gets a 1 to 10 score against your resume, with what you match and what you miss.</p>
         </div>
-        <div class="step">
+        <div class="step reveal" style="--d:200ms">
           <div class="step-num">03</div>
           <h3>Reach out faster</h3>
           <p>Get a tailored cover letter and LinkedIn note for any job in one click.</p>
@@ -223,7 +216,7 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
 
   <section class="cta">
     <div class="container">
-      <h2>Start your board today.</h2>
+      <h2 class="reveal">Start your board today.</h2>
       <a class="btn btn-p btn-lg" href="/signup">Start free</a>
     </div>
   </section>
@@ -236,5 +229,85 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
   </div>
 </footer>
 
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Fade sections in as they come into view
+  var items = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) {
+    items.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.15 });
+    items.forEach(function (el) { io.observe(el); });
+  }
+
+  var preview = document.querySelector('.preview');
+  if (!preview) return;
+
+  // Count the fit scores up the first time the board is seen
+  function countUp() {
+    preview.querySelectorAll('.score').forEach(function (el) {
+      var target = parseFloat(el.textContent), start = null;
+      function tick(t) {
+        if (start === null) start = t;
+        var k = Math.min((t - start) / 900, 1), eased = 1 - Math.pow(1 - k, 3);
+        el.textContent = (target * eased).toFixed(1);
+        if (k < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // Move one application across the board: Saved → Applied → Interview → Offer
+  var cols = Array.prototype.slice.call(preview.querySelectorAll('.col'));
+  var mover = preview.querySelector('.mover');
+  var at = 0;
+
+  function setCount(col, delta) {
+    var ct = col.querySelector('.col-ct');
+    ct.textContent = parseInt(ct.textContent, 10) + delta;
+    ct.classList.remove('bump'); void ct.offsetWidth; ct.classList.add('bump');
+  }
+
+  function moveTo(next) {
+    var first = mover.getBoundingClientRect();
+    cols[next].insertBefore(mover, cols[next].querySelector('.card'));
+    var last = mover.getBoundingClientRect();
+    mover.animate([
+      { transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)' },
+      { transform: 'none' }
+    ], { duration: 650, easing: 'cubic-bezier(.2,.7,.2,1)' });
+    setCount(cols[at], -1); setCount(cols[next], 1);
+    at = next;
+  }
+
+  function step() {
+    // Only animate when all four columns are side by side and the board is on screen
+    if (window.innerWidth <= 820 || document.hidden) return;
+    if (at < cols.length - 1) { moveTo(at + 1); return; }
+    mover.classList.add('fade-out');
+    setTimeout(function () {
+      setCount(cols[at], -1); setCount(cols[0], 1);
+      cols[0].insertBefore(mover, cols[0].querySelector('.card').nextSibling);
+      at = 0;
+      mover.classList.remove('fade-out');
+    }, 380);
+  }
+
+  if (reduce || !('IntersectionObserver' in window)) return;
+  var timer = null;
+  new IntersectionObserver(function (entries) {
+    var visible = entries[0].isIntersecting;
+    if (visible && !preview.dataset.counted) { preview.dataset.counted = '1'; countUp(); }
+    if (visible && !timer) timer = setInterval(step, 2400);
+    if (!visible && timer) { clearInterval(timer); timer = null; }
+  }, { threshold: 0.4 }).observe(preview);
+})();
+</script>
 </body>
 </html>
