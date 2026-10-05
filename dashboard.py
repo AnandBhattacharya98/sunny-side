@@ -21,6 +21,9 @@ app.config.update(
 # It only works when explicitly enabled for local testing.
 ALLOW_DEV_LOGIN = os.getenv("ALLOW_DEV_LOGIN", "0") == "1"
 
+# How long onboarding waits for the first job sync before returning (keep well under the gunicorn timeout)
+ONBOARD_WAIT_SECONDS = int(os.getenv("ONBOARD_WAIT_SECONDS", "25"))
+
 # Shown in the settings form instead of a stored secret; posting it back means "unchanged"
 SECRET_PLACEHOLDER = "********"
 
@@ -581,16 +584,23 @@ def onboard_resume():
     conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, resume_filename, profile_json, uid))
     conn.commit()
 
-    # Scrape live jobs matching user designation
-    from scraper import run_all_scrapers
     conn.close()
-    run_all_scrapers(DB_PATH, user_id=uid)
-    conn = get_conn(DB_PATH)
 
-    # Re-score all jobs for this user
-    from ai_engine import process_new_jobs
-    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-    
+    # Scraping + scoring can take minutes (and longer with AI scoring), which used to
+    # outlast the server's request timeout and return an HTML error page. Run it in the
+    # background and wait only briefly, so the user sees early results if there are any.
+    import time
+    run_in_background(("sync", uid), run_user_sync, uid)
+    deadline = time.time() + ONBOARD_WAIT_SECONDS
+    while time.time() < deadline:
+        with _running_lock:
+            if ("sync", uid) not in _running_jobs:
+                break
+        time.sleep(0.5)
+    with _running_lock:
+        still_syncing = ("sync", uid) in _running_jobs
+
+    conn = get_conn(DB_PATH)
     suggestions = conn.execute(
         """SELECT title, company, location, ai_score, ai_summary 
            FROM jobs WHERE user_id = ? AND ai_score IS NOT NULL 
@@ -600,7 +610,8 @@ def onboard_resume():
     conn.close()
     return jsonify({
         "ok": True,
-        "suggestions": [dict(s) for s in suggestions]
+        "suggestions": [dict(s) for s in suggestions],
+        "still_syncing": still_syncing
     })
 
 

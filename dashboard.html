@@ -3152,7 +3152,15 @@ async function startOnboardingParse(event) {
       method: 'POST',
       body: formData
     });
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      // The server answered with an error page instead of JSON (timeout, file too large, crash)
+      const reason = response.status === 413 ? 'That file is too large. Please upload a resume under 10 MB.'
+        : `The server had a problem processing your resume (error ${response.status}). Please try again.`;
+      data = { ok: false, error: reason };
+    }
     
     clearInterval(logInterval);
     
@@ -3164,6 +3172,15 @@ async function startOnboardingParse(event) {
       const grid = document.getElementById('onboard-suggestions-grid');
       grid.innerHTML = "";
       
+      if (!data.suggestions.length) {
+        const note = document.createElement('div');
+        note.style.cssText = 'background:var(--sur); border:1px dashed var(--bdr); border-radius:16px; padding:20px; font-size:13px; color:var(--mut); line-height:1.5;';
+        note.textContent = data.still_syncing
+          ? "We're still searching for jobs that match your resume. They'll show up on your dashboard in a few minutes."
+          : "No matching jobs found yet. Click Refresh on your dashboard later to search again.";
+        grid.appendChild(note);
+      }
+
       data.suggestions.forEach(job => {
         const card = document.createElement('div');
         card.style.background = 'var(--sur)';
