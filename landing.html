@@ -1,603 +1,240 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sunny Side — A Job Hunter's Board</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script>
+  // Same theme choice as the dashboard: saved choice, else the device setting
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root {
-  --bg: #0D0C0A;           /* Starts near-black */
-  --sur: rgba(255, 255, 255, 0.03);
-  --bdr: rgba(255, 255, 255, 0.08);
-  --txt: #F5F2EB;          /* Starts warm off-white */
-  --mut: #A59A84;          /* Warm sand */
-  --hin: #5C5446;
-  --pur: #FFA700;          /* Yolk yellow accent */
-  --purl: rgba(255, 167, 0, 0.08);
-  --purt: #E08500;
-  
-  /* 3 colors limits */
-  --c-black: #0D0C0A;
-  --c-white: #F5F2EB;
-  --c-accent: #FFA700;
+/* Same three colors and fonts as the dashboard: near-black, warm off-white, yolk */
+:root, [data-theme="light"] {
+  --ink: #0D0C0A;
+  --paper: #F5F2EB;
+  --yolk: #FFA700;
+  --bg: #F5F2EB;
+  --sur: #FFFDF8;
+  --sur2: #EDE9DF;
+  --bdr: rgba(13, 12, 10, 0.10);
+  --bdr-strong: rgba(13, 12, 10, 0.22);
+  --txt: #0D0C0A;
+  --mut: #57534B;
+  --hin: #8A857B;
+  --accent-txt: #A86400;
+  --shadow: 0 1px 2px rgba(13, 12, 10, 0.04), 0 8px 24px -12px rgba(13, 12, 10, 0.12);
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+[data-theme="dark"] {
+  --bg: #0D0C0A;
+  --sur: #161512;
+  --sur2: #1F1D19;
+  --bdr: rgba(245, 242, 235, 0.09);
+  --bdr-strong: rgba(245, 242, 235, 0.22);
+  --txt: #F5F2EB;
+  --mut: #B5AFA3;
+  --hin: #7F7A70;
+  --accent-txt: #FFA700;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
 }
 
+html, body { background: var(--bg); }
 body {
-  font-family: 'Space Mono', monospace;
-  background: var(--bg);
+  font-family: var(--font-sans);
   color: var(--txt);
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-x: hidden;
-  position: relative;
-  min-height: 100vh;
-  /* Physical, weighted transition on background and text colors */
-  transition: background-color 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              color 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  font-size: 16px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
 }
+::selection { background: var(--yolk); color: var(--ink); }
+a { color: inherit; }
 
-.hero-bg-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -2;
-  overflow: hidden;
-  will-change: transform, border-radius, width, height, top, left;
-  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              border-radius 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              width 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              height 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              top 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              left 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-}
-.hero-bg-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.5);
-}
+.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+.mono { font-family: var(--font-mono); }
 
 /* Nav */
 nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 72px;
-  background: rgba(13, 12, 10, 0.85);
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg);
   border-bottom: 1px solid var(--bdr);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 40px;
-  z-index: 1000;
-  transition: background-color 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-              border-color 0.6s cubic-bezier(0.25, 1, 0.5, 1);
 }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .logo {
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.04em;
-  font-family: 'Space Grotesk', sans-serif;
-  background: linear-gradient(135deg, var(--pur), #FF7E06);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: transform 0.2s;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 18px; letter-spacing: -0.03em; text-decoration: none;
 }
-.logo:hover {
-  transform: scale(1.03);
-}
-.logo-yolk {
-  width: 14px;
-  height: 14px;
-  background: #FFA700;
-  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%;
-  display: inline-block;
-  box-shadow: 0 2px 6px rgba(255, 167, 0, 0.4);
-}
-.nav-links {
-  display: flex;
-  gap: 28px;
-}
-.nav-links a {
-  color: var(--mut);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  transition: color 0.15s;
-}
-.nav-links a:hover {
-  color: var(--txt);
-}
-.nav-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
+.logo-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--yolk); }
+.nav-actions { display: flex; gap: 8px; align-items: center; }
+
 .btn {
-  padding: 10px 20px;
-  border-radius: 8px; /* High-contrast card border radius */
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid var(--bdr);
-  background: var(--sur);
-  color: var(--txt);
-  transition: all .2s cubic-bezier(0.25, 1, 0.5, 1);
-  text-decoration: none;
-  font-family: 'Space Mono', monospace;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 16px; border-radius: 10px;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+  text-decoration: none; border: 1px solid var(--bdr-strong);
+  background: transparent; color: var(--txt);
+  transition: background .15s, border-color .15s;
 }
-.btn:hover {
-  transform: translateY(-2px);
-  border-color: var(--pur);
-  box-shadow: 0 6px 16px rgba(255, 167, 0, 0.12);
-}
-.btn-p {
-  background: linear-gradient(135deg, var(--pur), #FF7E06);
-  color: #fff;
-  border: none;
-  box-shadow: 0 4px 12px rgba(255, 167, 0, 0.2);
-}
-.btn-p:hover {
-  box-shadow: 0 6px 20px rgba(255, 167, 0, 0.35);
-}
+.btn:hover { background: var(--sur2); }
+.btn-p { background: var(--yolk); color: var(--ink); border-color: var(--yolk); }
+.btn-p:hover { background: #FFB938; border-color: #FFB938; }
+.btn-lg { padding: 13px 22px; font-size: 15px; }
 
-/* Yolk Animation Backgrounds */
-.yolk-bg {
-  position: absolute;
-  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%;
-  background: radial-gradient(circle, rgba(255, 167, 0, 0.12) 0%, rgba(255, 126, 6, 0.04) 50%, transparent 100%);
-  filter: blur(20px);
-  opacity: 0.6;
-  z-index: -1;
-  animation: drift 20s infinite ease-in-out alternate;
-}
-.yolk-1 { width: 320px; height: 320px; top: 12%; left: -60px; animation-duration: 22s; }
-.yolk-2 { width: 440px; height: 420px; top: 45%; right: -120px; animation-duration: 32s; }
-.yolk-3 { width: 280px; height: 290px; top: 85%; left: 15%; animation-duration: 20s; }
-@keyframes drift {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1); border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; }
-  50% { transform: translate(50px, 80px) rotate(90deg) scale(1.15); border-radius: 40% 60% 50% 60% / 60% 40% 60% 40%; }
-  100% { transform: translate(-30px, 40px) rotate(180deg) scale(0.9); border-radius: 60% 50% 40% 50% / 45% 55% 45% 55%; }
-}
-
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-/* Hero Section */
-.hero {
-  padding: 180px 0 100px;
-  text-align: center;
-  position: relative;
-}
+/* Hero */
+.hero { padding: 88px 0 72px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-txt); margin-bottom: 16px; }
 .hero h1 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 64px;
-  font-weight: 850;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-  margin-bottom: 24px;
-  max-width: 850px;
-  margin-left: auto;
-  margin-right: auto;
-  color: var(--txt);
+  font-size: clamp(36px, 6vw, 60px); font-weight: 700; line-height: 1.05;
+  letter-spacing: -0.045em; max-width: 760px;
 }
-.hero p {
-  font-size: 17px;
-  color: var(--mut);
-  max-width: 620px;
-  margin: 0 auto 36px;
-}
-.handwritten {
-  font-family: 'Caveat', cursive;
-  color: #FF5E00;
-  font-size: 1.15em;
-  font-weight: normal;
-  display: inline-block;
-  transform: rotate(-3deg);
-  margin-left: 8px;
-}
+.hero p.sub { margin-top: 20px; font-size: 18px; color: var(--mut); max-width: 560px; }
+.hero-ctas { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
+.hero-note { margin-top: 14px; font-family: var(--font-mono); font-size: 12px; color: var(--hin); }
 
-/* Feature Grid */
-.features {
-  padding: 90px 0;
-  position: relative;
+/* Board preview: a static picture of the product, built in HTML */
+.preview {
+  margin-top: 56px;
+  background: var(--sur); border: 1px solid var(--bdr); border-radius: 18px;
+  box-shadow: var(--shadow); padding: 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
 }
-.section-header {
-  text-align: center;
-  margin-bottom: 56px;
-}
-.section-header h2 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 36px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 12px;
-}
-.section-header p {
-  color: var(--mut);
-  font-size: 16px;
-}
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-.feature-card {
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 24px; /* Organic round edges */
-  padding: 32px;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s, box-shadow 0.3s;
-  box-shadow: 0 8px 30px rgba(42, 35, 21, 0.02);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-.feature-card:hover {
-  transform: translateY(-5px) scale(1.02);
-  border-color: var(--pur);
-  box-shadow: 0 12px 32px rgba(255, 167, 0, 0.1);
-}
-.feature-icon-wrapper {
-  width: 56px;
-  height: 56px;
-  background: var(--purl);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  margin-bottom: 24px;
-}
-.feature-card h3 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 19px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-.feature-card p {
-  color: var(--mut);
-  font-size: 13.5px;
-}
+.col { background: var(--sur2); border: 1px solid var(--bdr); border-radius: 14px; padding: 12px; min-width: 0; }
+.col-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+          font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.col-ct { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 1px 8px; font-size: 10px; }
+[data-theme="dark"] .col-ct { background: var(--paper); color: var(--ink); }
+.card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+.card-role { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px;
+             font-family: var(--font-mono); font-size: 11px; color: var(--mut); }
+.score { background: var(--yolk); color: var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 700; }
 
-/* Seeker Wall */
-.seekers-section {
-  padding: 90px 0;
-  border-top: 1px solid var(--bdr);
-}
-.seekers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 20px;
-}
-.seeker-card {
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 20px;
-  padding: 24px;
-  text-align: center;
-  backdrop-filter: blur(12px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.01);
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-}
-.seeker-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--pur);
-  box-shadow: 0 8px 24px rgba(255, 167, 0, 0.08);
-}
-.seeker-avatar {
-  width: 54px;
-  height: 54px;
-  border-radius: 50% 40% 60% 50% / 50% 50% 50% 50%; /* yolk shape */
-  background: linear-gradient(135deg, var(--pur), #FF7E06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: #fff;
-  font-size: 18px;
-  font-family: 'Space Grotesk', sans-serif;
-  box-shadow: 0 3px 10px rgba(255, 167, 0, 0.3);
-}
-.seeker-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--txt);
-  margin-bottom: 2px;
-}
-.seeker-title {
-  font-size: 12.5px;
-  color: var(--mut);
-  line-height: 1.4;
-}
-.seeker-link {
-  color: var(--pur);
-  text-decoration: none;
-  font-size: 12.5px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: color 0.15s;
-}
-.seeker-link:hover {
-  color: var(--purt);
-  text-decoration: underline;
-}
+/* How it works */
+.how { padding: 72px 0; border-top: 1px solid var(--bdr); }
+.how h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 32px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.step-num { font-family: var(--font-mono); font-size: 12px; color: var(--accent-txt); margin-bottom: 10px; }
+.step h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+.step p { color: var(--mut); font-size: 15px; }
 
-/* Testimonials */
-.testimonials {
-  padding: 90px 0;
-  border-top: 1px solid var(--bdr);
-}
-.testimonial-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 28px;
-}
-.testimonial-card {
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 24px;
-  padding: 36px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.01);
-  position: relative;
-  transition: transform 0.25s;
-}
-.testimonial-card:hover {
-  transform: scale(1.01);
-}
-.testimonial-quote {
-  font-size: 15px;
-  line-height: 1.7;
-  margin-bottom: 24px;
-  font-style: italic;
-  color: var(--txt);
-}
-.testimonial-author {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.author-info h4 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--txt);
-}
-.author-info p {
-  font-size: 12px;
-  color: var(--mut);
-}
+/* Closing CTA */
+.cta { padding: 72px 0; border-top: 1px solid var(--bdr); text-align: center; }
+.cta h2 { font-size: 32px; font-weight: 700; letter-spacing: -0.035em; margin-bottom: 24px; }
 
-/* Footer */
-footer {
-  padding: 48px 0;
-  border-top: 1px solid var(--bdr);
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--mut);
+footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--font-mono); font-size: 12px; color: var(--hin); }
+.footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (max-width: 820px) {
+  .preview { grid-template-columns: repeat(2, 1fr); }
+  .steps { grid-template-columns: 1fr; gap: 24px; }
+}
+@media (max-width: 480px) {
+  .container { padding: 0 16px; }
+  .hero { padding: 56px 0 48px; }
+  .preview { grid-template-columns: 1fr; }
+  .preview .col:nth-child(n+3) { display: none; }
+  .nav-actions .btn:not(.btn-p) { display: none; }
 }
 </style>
 </head>
 <body>
 
-<div class="hero-bg-container">
-  <img class="hero-bg-img" src="/hero_background.png" alt="background">
-</div>
-<!-- Floating Yolk Background Shapes -->
-<div class="yolk-bg yolk-1"></div>
-<div class="yolk-bg yolk-2"></div>
-<div class="yolk-bg yolk-3"></div>
-
 <nav>
-  <a class="logo" href="/">
-    <span class="logo-yolk"></span>
-    Sunny Side
-  </a>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#seekers">Seekers Wall</a>
-    <a href="#testimonials">Testimonials</a>
-  </div>
-  <div class="nav-actions">
-    <a class="btn" href="/login">Log In</a>
-    <a class="btn btn-p" href="/signup">Start Free Pipeline</a>
+  <div class="container nav-inner">
+    <a class="logo" href="/"><span class="logo-dot"></span>Sunny Side</a>
+    <div class="nav-actions">
+      <a class="btn" href="/login">Log in</a>
+      <a class="btn btn-p" href="/signup">Sign up</a>
+    </div>
   </div>
 </nav>
 
-<header class="hero">
-  <div class="container">
-    <p style="text-transform:uppercase; font-size:12px; font-weight:700; letter-spacing:1.5px; color:var(--pur); margin-bottom:12px;">A Job Hunter's Board</p>
-    <h1>Land your next Role.<br><span class="handwritten">On autopilot.</span></h1>
-    <p>Automate job ingestion from your email, score application fit using AI, autogenerate cover letters, and track progress on a premium dashboard.</p>
-    <div style="display:flex; justify-content:center; gap:16px;">
-      <a class="btn btn-p" style="padding:14px 32px; font-size:14px;" href="/signup">Get Started Now</a>
-      <a class="btn" style="padding:14px 32px; font-size:14px;" href="/login">Sign In</a>
-    </div>
-  </div>
-</header>
+<main>
+  <header class="hero">
+    <div class="container">
+      <div class="eyebrow">A job hunter's board</div>
+      <h1>Every job you apply to, tracked in one place.</h1>
+      <p class="sub">Sunny Side reads your application emails, scores each role against your resume, and drafts your cover letters.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-p btn-lg" href="/signup">Start free</a>
+        <a class="btn btn-lg" href="/login">Log in</a>
+      </div>
+      <div class="hero-note">Free to use. Your data stays private.</div>
 
-<section class="features" id="features">
-  <div class="container">
-    <div class="section-header">
-      <h2>Automated Workflow for Seekers</h2>
-      <p>Stop wasting hours tracking. <span class="handwritten" style="font-size:1.3em; color:#FF7E06;">Let AI do the matching!</span></p>
-    </div>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pur)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+      <div class="preview" aria-hidden="true">
+        <div class="col">
+          <div class="col-hd">Saved <span class="col-ct">3</span></div>
+          <div class="card"><div class="card-role">Product Designer</div><div class="card-meta"><span>Razorpay</span><span class="score">8.4</span></div></div>
+          <div class="card"><div class="card-role">UX Researcher</div><div class="card-meta"><span>Swiggy</span><span class="score">7.1</span></div></div>
         </div>
-        <h3>Auto Email Scraping</h3>
-        <p>Connects securely to your inbox. Automatically extracts jobs you've applied to and auto-syncs confirmation updates directly to your board.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pur)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+        <div class="col">
+          <div class="col-hd">Applied <span class="col-ct">5</span></div>
+          <div class="card"><div class="card-role">Frontend Engineer</div><div class="card-meta"><span>Zerodha</span><span class="score">9.0</span></div></div>
+          <div class="card"><div class="card-role">Data Analyst</div><div class="card-meta"><span>CRED</span><span class="score">6.8</span></div></div>
         </div>
-        <h3>AI-Powered Match Grading</h3>
-        <p>Grades job fits from 1 to 10 against your resume. Highlight key requirements instantly and see where you match or fall short.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pur)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <div class="col">
+          <div class="col-hd">Interview <span class="col-ct">2</span></div>
+          <div class="card"><div class="card-role">Software Engineer</div><div class="card-meta"><span>Freshworks</span><span class="score">8.7</span></div></div>
         </div>
-        <h3>One-Click Outbox</h3>
-        <p>Autogenerate personalized cover letters and custom LinkedIn connection notes. Ready to copy-paste and outreach instantly.</p>
+        <div class="col">
+          <div class="col-hd">Offer <span class="col-ct">1</span></div>
+          <div class="card"><div class="card-role">Backend Engineer</div><div class="card-meta"><span>Postman</span><span class="score">9.2</span></div></div>
+        </div>
       </div>
     </div>
-  </div>
-</section>
+  </header>
 
-<section class="seekers-section" id="seekers">
-  <div class="container">
-    <div class="section-header">
-      <h2>Seeking Active Roles <span class="handwritten" style="font-size:0.7em; color:var(--pur); display:inline-block; transform:rotate(-4deg); margin-left:8px;">Fresh Candidates</span></h2>
-      <p>Candidates currently utilizing Sunny Side. Connect or view their profiles.</p>
-    </div>
-    
-    {% if seekers %}
-    <div class="seekers-grid">
-      {% for seeker in seekers %}
-      <div class="seeker-card">
-        <div class="seeker-avatar">
-          {{ seeker.name[0] if seeker.name else '?' }}
+  <section class="how" id="how">
+    <div class="container">
+      <h2>How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h3>Connect your inbox</h3>
+          <p>Applications from LinkedIn, Naukri and others land on your board on their own.</p>
         </div>
-        <div>
-          <div class="seeker-name">{{ seeker.name or 'Job Hunter' }}</div>
-          <div class="seeker-title">{{ seeker.designation or 'Active Seeker' }}</div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h3>See your fit</h3>
+          <p>Each role gets a 1 to 10 score against your resume, with what you match and what you miss.</p>
         </div>
-        {% if seeker.linkedin_profile %}
-        <a class="seeker-link" href="{{ seeker.linkedin_profile }}" target="_blank">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-          LinkedIn
-        </a>
-        {% endif %}
+        <div class="step">
+          <div class="step-num">03</div>
+          <h3>Reach out faster</h3>
+          <p>Get a tailored cover letter and LinkedIn note for any job in one click.</p>
+        </div>
       </div>
-      {% endfor %}
     </div>
-    {% else %}
-    <div style="text-align:center; padding:40px; background:var(--sur); border:1px dashed var(--bdr); border-radius:12px; color:var(--mut);">
-      <p>No seekers on the wall yet. Be the first to join by giving consent in your Profile Settings!</p>
-    </div>
-    {% endif %}
-  </div>
-</section>
+  </section>
 
-<section class="testimonials" id="testimonials">
-  <div class="container">
-    <div class="section-header">
-      <h2>Praise from Job Seekers</h2>
-      <p>Discover how candidates save time and target their search with AI insights.</p>
+  <section class="cta">
+    <div class="container">
+      <h2>Start your board today.</h2>
+      <a class="btn btn-p btn-lg" href="/signup">Start free</a>
     </div>
-    <div class="testimonial-grid">
-      <div class="testimonial-card">
-        <p class="testimonial-quote">"This completely changed how I track applications. The IMAP email integration scrapes Naukri, LinkedIn, and Instahyre updates directly. I don't have to input anything manually anymore."</p>
-        <div class="testimonial-author">
-          <div class="seeker-avatar">S</div>
-          <div class="author-info">
-            <h4>Sarah M.</h4>
-            <p>Software Engineer @ TechCorp</p>
-          </div>
-        </div>
-      </div>
-      <div class="testimonial-card">
-        <p class="testimonial-quote">"The match scoring engine compares my resume against job descriptions perfectly. I only focus my outreach efforts on jobs with scores above 8.0, saving me endless hours."</p>
-        <div class="testimonial-author">
-          <div class="seeker-avatar">M</div>
-          <div class="author-info">
-            <h4>Mark D.</h4>
-            <p>Product Designer @ WebScale</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+  </section>
+</main>
 
 <footer>
-  <div class="container">
-    <p>&copy; 2026 Sunny Side. <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Stored securely, never shared.</p>
+  <div class="container footer-inner">
+    <span>&copy; 2026 Sunny Side</span>
+    <span>Stored securely, never shared.</span>
   </div>
 </footer>
 
-<script>
-  const heroBg = document.querySelector('.hero-bg-container');
-  const body = document.body;
-  const nav = document.querySelector('nav');
-  
-  window.addEventListener('scroll', () => {
-    const scrolled = window.scrollY;
-    const maxScroll = window.innerHeight * 0.8;
-    const progress = Math.min(scrolled / maxScroll, 1);
-    
-    // Physics weighted transition curve (cubic ease-out)
-    const easeProgress = 1 - Math.pow(1 - progress, 2.5);
-    
-    // 1. BG Image transform from full-bleed to contained card
-    if (heroBg) {
-      const scale = 1 - (0.25 * easeProgress);
-      const borderRadius = easeProgress * 32;
-      const width = 100 - (30 * easeProgress);
-      const height = 100 - (45 * easeProgress);
-      const top = easeProgress * 15;
-      const left = (100 - width) / 2;
-      
-      heroBg.style.transform = `scale(${scale})`;
-      heroBg.style.borderRadius = `${borderRadius}px`;
-      heroBg.style.width = `${width}vw`;
-      heroBg.style.height = `${height}vh`;
-      heroBg.style.top = `${top}vh`;
-      heroBg.style.left = `${left}vw`;
-    }
-    
-    // 2. Color Palette Shift from near-black (#0D0C0A) to warm off-white (#F5F2EB)
-    const textR = Math.round(245 - (245 - 13) * easeProgress);
-    const textG = Math.round(242 - (242 - 12) * easeProgress);
-    const textB = Math.round(235 - (235 - 10) * easeProgress);
-    
-    const bgR = Math.round(13 + (245 - 13) * easeProgress);
-    const bgG = Math.round(12 + (242 - 12) * easeProgress);
-    const bgB = Math.round(10 + (235 - 10) * easeProgress);
-    
-    // Set custom CSS variables on document root
-    document.documentElement.style.setProperty('--bg', `rgb(${bgR}, ${bgG}, ${bgB})`);
-    document.documentElement.style.setProperty('--txt', `rgb(${textR}, ${textG}, ${textB})`);
-    
-    // Interpolate borders and card background
-    const borderAlpha = 0.05 + 0.05 * easeProgress;
-    document.documentElement.style.setProperty('--bdr', `rgba(${textR}, ${textG}, ${textB}, ${borderAlpha})`);
-    document.documentElement.style.setProperty('--sur', easeProgress > 0.5 ? 'rgba(13, 12, 10, 0.03)' : 'rgba(255, 255, 255, 0.03)');
-    
-    // Update nav background dynamically
-    if (nav) {
-      nav.style.background = `rgba(${bgR}, ${bgG}, ${bgB}, 0.85)`;
-      nav.style.borderBottom = `1px solid rgba(${textR}, ${textG}, ${textB}, ${borderAlpha})`;
-    }
-  });
-</script>
 </body>
 </html>
