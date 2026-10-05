@@ -1,13 +1,28 @@
-import os, json, sqlite3
+import os, json, sqlite3, hmac, secrets, threading
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file
-from db import get_conn, add_timeline, DB_PATH, init_db
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort
+from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job
-from notifier import send_email_digest
+from notifier import send_email_digest, recipient_for_user
 from auth import signup_user, login_user
+from crypto_util import get_app_secret, encrypt_secret
 
 app = Flask(__name__, template_folder='.')
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "pm_job_hunter_super_secret_key_123")
+app.secret_key = get_app_secret()
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # Secure cookies by default; set SESSION_COOKIE_SECURE=0 for plain-http local dev
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "1") != "0",
+    MAX_CONTENT_LENGTH=int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024,
+)
+
+# The "Dev Mode" fake Google/LinkedIn sign-in lets anyone log in as any email.
+# It only works when explicitly enabled for local testing.
+ALLOW_DEV_LOGIN = os.getenv("ALLOW_DEV_LOGIN", "0") == "1"
+
+# Shown in the settings form instead of a stored secret; posting it back means "unchanged"
+SECRET_PLACEHOLDER = "********"
 
 # Initialize database on startup (crucial for Gunicorn/Render deployments)
 init_db(DB_PATH)
@@ -17,30 +32,82 @@ from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
 
 def get_user_id() -> int:
-    return session.get("user_id", 1)
+    return session.get("user_id")
 
-def get_user_settings(conn, user_id):
+def is_admin() -> bool:
+    return session.get("user_id") == 1
+
+def get_user_settings(conn, user_id, mask_secrets=False):
     row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected FROM users WHERE id = ?", (user_id,)).fetchone()
-    if row:
-        return dict(row)
-    return {}
+    if not row:
+        return {}
+    settings = dict(row)
+    if mask_secrets:
+        for k in ("imap_password", "gemini_api_key"):
+            settings[k] = SECRET_PLACEHOLDER if settings.get(k) else ""
+    else:
+        settings.update({k: v for k, v in get_user_secrets(conn, user_id).items() if k != "imap_email"})
+    return settings
+
+# Background jobs are de-duplicated per user so repeated clicks don't stack up LLM calls
+_running_jobs = set()
+_running_lock = threading.Lock()
+
+def run_in_background(key, fn, *args):
+    with _running_lock:
+        if key in _running_jobs:
+            return False
+        _running_jobs.add(key)
+
+    def runner():
+        try:
+            fn(*args)
+        except Exception as e:
+            print(f"Background job {key} failed: {e}")
+        finally:
+            with _running_lock:
+                _running_jobs.discard(key)
+
+    threading.Thread(target=runner, daemon=True).start()
+    return True
+
+def rescore_inbox_in_background(uid):
+    def work():
+        conn = get_conn(DB_PATH)
+        conn.execute(
+            "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
+            (uid,)
+        )
+        conn.commit()
+        conn.close()
+        from ai_engine import process_new_jobs
+        process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+    return run_in_background(("rescore", uid), work)
+
+def _check_oauth_state():
+    expected = session.pop("oauth_state", None)
+    got = request.args.get("state", "")
+    return bool(expected) and hmac.compare_digest(expected, got)
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "Not signed in"}), 401
             return redirect(url_for("login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        password = request.form.get("password", "")
         conn = get_conn(DB_PATH)
         user = login_user(conn, username, password)
         conn.close()
         if user:
+            session.clear()
             session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
@@ -52,9 +119,9 @@ def login():
 def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        password = request.form.get("password", "")
         name = request.form.get("name", "").strip() or username.capitalize()
-        designation = request.form.get("designation", "").strip() or "Product Seeker"
+        designation = request.form.get("designation", "").strip() or "Product Manager"
         share_profile = 1 if request.form.get("share_profile") else 0
         linkedin_profile = request.form.get("linkedin_profile", "").strip()
         imap_email = request.form.get("imap_email", "").strip()
@@ -108,18 +175,16 @@ def signup():
                 """UPDATE users SET resume_text = ?, imap_email = ?, imap_password = ?, gemini_api_key = ?, linkedin_profile = ?,
                    name = ?, designation = ?, share_profile = ?, resume_filename = ?, resume_profile_json = ?
                    WHERE id = ?""",
-                (resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, profile_json, uid)
+                (resume_text, imap_email, encrypt_secret(imap_password), encrypt_secret(gemini_api_key), linkedin_profile, name, designation, share_profile, resume_filename, profile_json, uid)
             )
             conn.commit()
             
             # If resume is provided on signup, scrape live jobs matching user designation and score them
+            # (in the background, so signup doesn't hang on the scrapers)
             if resume_text:
-                from scraper import run_all_scrapers
-                conn.commit()
-                run_all_scrapers(DB_PATH, user_id=uid)
-                from ai_engine import process_new_jobs
-                process_new_jobs(DB_PATH, min_score=0, user_id=uid)
+                run_in_background(("sync", uid), run_user_sync, uid)
 
+            session.clear()
             session.permanent = True
             session["user_id"] = uid
             session["username"] = username
@@ -132,21 +197,35 @@ def signup():
     return render_template("dashboard.html", view_mode="signup")
 
 def handle_social_login(provider, email, name):
-    username = email.split("@")[0] + "_" + provider
+    email = (email or "").strip().lower()
+    if provider not in ("google", "linkedin") or not email or "@" not in email:
+        return "Social authentication error: invalid profile", 400
     conn = get_conn(DB_PATH)
     try:
-        row = conn.execute("SELECT id, username FROM users WHERE username = ?", (username,)).fetchone()
+        # Match on the verified email address, not just its local part, so
+        # jane@gmail.com and jane@company.com never share an account.
+        row = conn.execute("SELECT id, username FROM users WHERE email = ? AND auth_provider = ?", (email, provider)).fetchone()
+        if not row:
+            # Accounts created before emails were stored used "<local part>_<provider>" as the
+            # username; let the first verified login claim such a legacy account.
+            legacy_username = email.split("@")[0] + "_" + provider
+            row = conn.execute("SELECT id, username FROM users WHERE username = ? AND email IS NULL", (legacy_username,)).fetchone()
+            if row:
+                conn.execute("UPDATE users SET email = ?, auth_provider = ? WHERE id = ?", (email, provider, row[0]))
+                conn.commit()
         if row:
-            uid = row[0]
+            uid, username = row[0], row[1]
             is_new = False
         else:
-            import uuid
-            password = str(uuid.uuid4())
-            uid = signup_user(conn, username, password)
-            conn.execute("UPDATE users SET name = ?, share_profile = 1 WHERE id = ?", (name, uid))
+            username = f"{email}_{provider}"
+            password = secrets.token_urlsafe(24)
+            uid = signup_user(conn, username, password, validate=False)
+            # Profiles are only shown on the public landing page if the user opts in later
+            conn.execute("UPDATE users SET name = ?, email = ?, auth_provider = ?, share_profile = 0 WHERE id = ?", (name, email, provider, uid))
             conn.commit()
             is_new = True
-            
+
+        session.clear()
         session.permanent = True
         session["user_id"] = uid
         session["username"] = username
@@ -155,7 +234,8 @@ def handle_social_login(provider, email, name):
         return redirect(url_for("index"))
     except Exception as e:
         conn.close()
-        return f"Social authentication error: {str(e)}", 500
+        print(f"Social authentication error: {e}")
+        return "Social authentication error. Please try again.", 500
 
 
 @app.route("/auth/google")
@@ -165,14 +245,19 @@ def auth_google():
     load_dotenv(dotenv_path=os.path.join(base_dir, ".env"), override=True)
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
-        return render_template("dashboard.html", view_mode="mock_auth", provider="google")
+        if ALLOW_DEV_LOGIN:
+            return render_template("dashboard.html", view_mode="mock_auth", provider="google")
+        return render_template("dashboard.html", view_mode="login", error="Google sign-in isn't set up on this server yet. Please use a username and password.")
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
     redirect_uri = url_for("auth_google_callback", _external=True)
     google_auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={client_id}&"
         f"redirect_uri={redirect_uri}&"
         f"response_type=code&"
-        f"scope=openid%20email%20profile"
+        f"scope=openid%20email%20profile&"
+        f"state={state}"
     )
     return redirect(google_auth_url)
 
@@ -185,6 +270,8 @@ def auth_google_callback():
     code = request.args.get("code")
     if not code:
         return "Authorization code missing", 400
+    if not _check_oauth_state():
+        return "Sign-in session expired or invalid. Please try again.", 400
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = url_for("auth_google_callback", _external=True)
@@ -203,7 +290,8 @@ def auth_google_callback():
     token_data = token_resp.json()
     access_token = token_data.get("access_token")
     if not access_token:
-        return f"Failed to retrieve access token: {token_data}", 400
+        print(f"OAuth token exchange failed: {token_data}")
+        return "Failed to sign in. Please try again.", 400
         
     user_resp = requests.get(
         "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -211,10 +299,9 @@ def auth_google_callback():
     )
     user_info = user_resp.json()
     email = user_info.get("email")
-    name = user_info.get("name", email.split("@")[0])
-    
-    if not email:
-        return "Failed to retrieve email from Google profile", 400
+    if not email or user_info.get("verified_email") is False:
+        return "Failed to retrieve a verified email from Google profile", 400
+    name = user_info.get("name") or email.split("@")[0]
         
     return handle_social_login("google", email, name)
 
@@ -226,14 +313,19 @@ def auth_linkedin():
     load_dotenv(dotenv_path=os.path.join(base_dir, ".env"), override=True)
     client_id = os.getenv("LINKEDIN_CLIENT_ID")
     if not client_id:
-        return render_template("dashboard.html", view_mode="mock_auth", provider="linkedin")
+        if ALLOW_DEV_LOGIN:
+            return render_template("dashboard.html", view_mode="mock_auth", provider="linkedin")
+        return render_template("dashboard.html", view_mode="login", error="LinkedIn sign-in isn't set up on this server yet. Please use a username and password.")
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
     redirect_uri = url_for("auth_linkedin_callback", _external=True)
     linkedin_auth_url = (
         f"https://www.linkedin.com/oauth/v2/authorization?"
         f"client_id={client_id}&"
         f"redirect_uri={redirect_uri}&"
         f"response_type=code&"
-        f"scope=openid%20profile%20email"
+        f"scope=openid%20profile%20email&"
+        f"state={state}"
     )
     return redirect(linkedin_auth_url)
 
@@ -246,6 +338,8 @@ def auth_linkedin_callback():
     code = request.args.get("code")
     if not code:
         return "Authorization code missing", 400
+    if not _check_oauth_state():
+        return "Sign-in session expired or invalid. Please try again.", 400
     client_id = os.getenv("LINKEDIN_CLIENT_ID")
     client_secret = os.getenv("LINKEDIN_CLIENT_SECRET")
     redirect_uri = url_for("auth_linkedin_callback", _external=True)
@@ -264,7 +358,8 @@ def auth_linkedin_callback():
     token_data = token_resp.json()
     access_token = token_data.get("access_token")
     if not access_token:
-        return f"Failed to retrieve access token: {token_data}", 400
+        print(f"OAuth token exchange failed: {token_data}")
+        return "Failed to sign in. Please try again.", 400
         
     user_resp = requests.get(
         "https://api.linkedin.com/v2/userinfo",
@@ -272,16 +367,17 @@ def auth_linkedin_callback():
     )
     user_info = user_resp.json()
     email = user_info.get("email")
+    if not email or user_info.get("email_verified") is False:
+        return "Failed to retrieve a verified email from LinkedIn profile", 400
     name = user_info.get("name") or (user_info.get("given_name", "") + " " + user_info.get("family_name", "")).strip() or email.split("@")[0]
-    
-    if not email:
-        return "Failed to retrieve email from LinkedIn profile", 400
         
     return handle_social_login("linkedin", email, name)
 
 
 @app.route("/auth/mock/callback", methods=["POST"])
 def auth_mock_callback():
+    if not ALLOW_DEV_LOGIN:
+        abort(404)
     provider = request.form.get("provider")
     email = request.form.get("email")
     name = request.form.get("name")
@@ -304,13 +400,19 @@ def update_profile():
     conn = get_conn(DB_PATH)
     
     # Fetch old values to check for changes
-    old = conn.execute("SELECT resume_text, gemini_api_key, designation FROM users WHERE id = ?", (uid,)).fetchone()
+    old = conn.execute("SELECT resume_text, designation FROM users WHERE id = ?", (uid,)).fetchone()
     old_resume = old[0] if old else ""
-    old_key = old[1] if old else ""
-    old_designation = old[2] if old else ""
+    old_designation = old[1] if old else ""
+    old_secrets = get_user_secrets(conn, uid)
+    old_key = old_secrets["gemini_api_key"]
     
     new_resume = d.get("resume_text", "")
     new_key = d.get("gemini_api_key", "")
+    if new_key == SECRET_PLACEHOLDER:
+        new_key = old_key
+    new_imap_password = d.get("imap_password", "")
+    if new_imap_password == SECRET_PLACEHOLDER:
+        new_imap_password = old_secrets["imap_password"]
     new_designation = d.get("designation", "")
     
     should_reparse = (new_resume != old_resume) or (new_key != old_key)
@@ -333,7 +435,7 @@ def update_profile():
            weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?,
            daily_recs_enabled = ?, daily_recs_min_score = ?, daily_recs_time = ?
            WHERE id = ?""",
-        (new_resume, d.get("imap_email", ""), d.get("imap_password", ""), new_key, d.get("linkedin_profile", ""),
+        (new_resume, d.get("imap_email", ""), encrypt_secret(new_imap_password), encrypt_secret(new_key), d.get("linkedin_profile", ""),
          d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""), profile_json,
          float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)),
          int(d.get("daily_recs_enabled", 1)), float(d.get("daily_recs_min_score", 7.5)), d.get("daily_recs_time", "07:30"), uid)
@@ -344,16 +446,9 @@ def update_profile():
         conn.execute("DELETE FROM jobs WHERE user_id = ? AND status = 'new'", (uid,))
         conn.commit()
         
-    if should_reparse:
-        conn.execute(
-            "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
-            (uid,)
-        )
-        conn.commit()
-        from ai_engine import process_new_jobs
-        process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-        
     conn.close()
+    if should_reparse:
+        rescore_inbox_in_background(uid)
     return jsonify({"ok": True})
 
 
@@ -373,19 +468,10 @@ def update_job_feedback():
         (feedback, job_id, uid)
     )
     conn.commit()
-    
-    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
-    conn.execute(
-        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
-        (uid,)
-    )
-    conn.commit()
-    
-    # Run re-scoring
-    from ai_engine import process_new_jobs
-    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-    
     conn.close()
+    
+    # Re-score the inbox with the new preference signal, in the background
+    rescore_inbox_in_background(uid)
     return jsonify({"ok": True})
 
 @app.route("/api/profile/upload", methods=["POST"])
@@ -417,9 +503,7 @@ def upload_profile_resume():
         return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF, TXT, or DOCX."}), 400
         
     conn = get_conn(DB_PATH)
-    # Get gemini api key to use for parsing
-    p_row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
-    api_key = p_row[0] if p_row else None
+    api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
     
     from resume_parser import parse_resume
     profile_json = ""
@@ -430,20 +514,10 @@ def upload_profile_resume():
         
     conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, file.filename, profile_json, uid))
     conn.commit()
-    
-    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
-    conn.execute(
-        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
-        (uid,)
-    )
-    conn.commit()
-    
-    # Run re-scoring in a background thread to prevent gateway timeouts on large pipelines
-    import threading
-    from ai_engine import process_new_jobs
-    threading.Thread(target=process_new_jobs, args=(DB_PATH, 0, uid), daemon=True).start()
-    
     conn.close()
+    
+    # Re-score in the background to prevent gateway timeouts on large pipelines
+    rescore_inbox_in_background(uid)
     return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": file.filename})
 
 
@@ -495,9 +569,7 @@ def onboard_resume():
         return jsonify({"ok": False, "error": "Resume text is empty"}), 400
 
     conn = get_conn(DB_PATH)
-    # Get gemini api key to use for parsing
-    p_row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
-    api_key = p_row[0] if p_row else None
+    api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
     
     from resume_parser import parse_resume
     profile_json = ""
@@ -570,9 +642,8 @@ def api_resume_parse():
     try:
         uid = get_user_id()
         conn = get_conn(DB_PATH)
-        row = conn.execute("SELECT gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+        api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
         conn.close()
-        api_key = row[0] if row else None
         
         profile = parse_resume(resume_text, api_key)
         return jsonify({"ok": True, "profile": profile})
@@ -687,8 +758,8 @@ def index():
         conn.close()
         return render_template("landing.html", seekers=[dict(u) for u in users])
         
-    # Get user settings to pass to frontend profile form
-    settings = get_user_settings(conn, uid)
+    # Get user settings to pass to frontend profile form (stored secrets are never sent back)
+    settings = get_user_settings(conn, uid, mask_secrets=True)
     needs_onboarding = not settings.get("resume_text") and not session.get("skip_onboarding")
     if needs_onboarding:
         stats = _stats(conn)
@@ -765,7 +836,7 @@ def pipeline():
 
 @app.route("/users", methods=["GET", "POST"])
 def admin_users():
-    if session.get("username") != "admin":
+    if not is_admin():
         return redirect("/")
     
     conn = get_conn(DB_PATH)
@@ -783,14 +854,19 @@ def admin_users():
             else:
                 from datetime import datetime
                 from auth import hash_password
-                conn.execute(
-                    "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-                    (username, hash_password(password), datetime.now().isoformat())
-                )
-                conn.commit()
+                from auth import validate_new_credentials
+                try:
+                    validate_new_credentials(username.lower(), password)
+                    conn.execute(
+                        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                        (username.lower(), hash_password(password), datetime.now().isoformat())
+                    )
+                    conn.commit()
+                except ValueError as e:
+                    error = str(e)
                 
     # Fetch all users and calculate their job counts
-    raw_users = conn.execute("SELECT * FROM users ORDER BY username").fetchall()
+    raw_users = conn.execute("SELECT id, username, name, created_at FROM users ORDER BY username").fetchall()
     users = []
     for u in raw_users:
         u_dict = dict(u)
@@ -805,7 +881,7 @@ def admin_users():
 
 @app.route("/api/users/<int:user_id>/delete", methods=["POST"])
 def delete_user(user_id):
-    if session.get("username") != "admin":
+    if not is_admin():
         return jsonify({"error": "unauthorized"}), 403
     if user_id == 1:
         return jsonify({"error": "cannot delete admin"}), 400
@@ -819,6 +895,7 @@ def delete_user(user_id):
     conn.execute("DELETE FROM application_timeline WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM received_emails WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM tailored_resumes WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM interview_prep WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -837,19 +914,10 @@ def set_status(job_id):
     conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status, job_id, uid))
     add_timeline(conn, job_id, f"Status → {status}")
     conn.commit()
-    
-    # Reset all inbox jobs (status 'new', 'scored', 'ready') to 'new' for re-evaluation
-    conn.execute(
-        "UPDATE jobs SET status = 'new' WHERE user_id = ? AND status IN ('new', 'scored', 'ready')",
-        (uid,)
-    )
-    conn.commit()
-    
-    # Run re-scoring
-    from ai_engine import process_new_jobs
-    process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-    
     conn.close()
+    
+    # Re-score the inbox with the new preference signal, in the background
+    rescore_inbox_in_background(uid)
     return jsonify({"ok": True, "status": status})
 
 
@@ -892,8 +960,8 @@ def regenerate(job_id):
     ct = contact[1] if contact else "Recruiter"
 
     settings = get_user_settings(conn, uid)
-    score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
-    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+    score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"), user_id=uid)
+    letter     = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"), candidate_name=settings.get("name") or "")
     li_note    = generate_linkedin_note(cn, ct, j["company"], j["title"], api_key=settings.get("gemini_api_key"))
 
     conn.execute("UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=? WHERE job_id=? AND user_id=?",
@@ -932,13 +1000,13 @@ def send_email(job_id):
             "contact_name": c["name"] if c else "Hiring Team",
             "contact_title": c["title"] if c else "",
             "linkedin_note": cl.get("linkedin_note","") if cl else ""}
-    ok = send_email_digest([item])
+    ok = send_email_digest([item], recipient=recipient_for_user(uid))
     if ok:
         conn2 = get_conn(DB_PATH)
         conn2.execute("UPDATE jobs SET status='applied' WHERE job_id=? AND user_id=?", (job_id, uid))
         add_timeline(conn2, job_id, "Email sent → applied")
         conn2.commit(); conn2.close()
-    return jsonify({"ok": ok, "message": "Email sent!" if ok else "Add SENDER_EMAIL + SENDER_PASSWORD to .env"})
+    return jsonify({"ok": ok, "message": "Email sent!" if ok else "Couldn't send. Add your email address in settings, or email isn't configured on this server."})
 
 
 @app.route("/api/bulk", methods=["POST"])
@@ -973,7 +1041,7 @@ def bulk_action():
                     "contact_title": c["title"] if c else "",
                     "linkedin_note": cl.get("linkedin_note","") if cl else "",
                 })
-        send_email_digest(items)
+        send_email_digest(items, recipient=recipient_for_user(uid))
 
     conn.commit(); conn.close()
     return jsonify({"ok": True})
@@ -990,73 +1058,57 @@ def pipeline_move():
     return jsonify({"ok": True})
 
 
-@app.route("/api/cron/daily-recommendations", methods=["POST"])
-def cron_daily_recommendations():
-    auth_header = request.headers.get("X-Cron-Token")
-    expected_token = os.environ.get("CRON_SECRET", "default_cron_secret")
-    if auth_header != expected_token:
-        return jsonify({"ok": False, "error": "Unauthorized"}), 401
-
+def run_daily_recommendations():
     conn = get_conn(DB_PATH)
     users = conn.execute("SELECT id, daily_recs_min_score FROM users WHERE daily_recs_enabled = 1").fetchall()
-    
-    from scraper import run_all_scrapers
-    from linkedin_finder import enrich_jobs_with_contacts
-    from email_scraper import sync_job_statuses_from_email
-    from ai_engine import process_new_jobs
-    from datetime import datetime
+    conn.close()
 
     for user in users:
         uid = user[0]
         min_score = user[1] if user[1] is not None else 7.5
-
-        # 1. Clear old daily picks
-        conn.execute("UPDATE jobs SET is_daily_pick = 0 WHERE user_id = ?", (uid,))
-        conn.commit()
-
-        # 2. Run scrapers
-        run_all_scrapers(DB_PATH, user_id=uid)
-
-        # 3. Find contacts
-        enrich_jobs_with_contacts(DB_PATH)
-
-        # 4. Sync emails
         try:
-            sync_job_statuses_from_email(DB_PATH, user_id=uid)
-        except Exception as e:
-            print(f"Email sync failed: {e}")
-
-        # 5. Get new jobs before scoring
-        new_jobs = conn.execute("SELECT job_id FROM jobs WHERE status = 'new' AND user_id = ?", (uid,)).fetchall()
-        new_job_ids = [r[0] for r in new_jobs]
-
-        # 6. Score jobs
-        process_new_jobs(DB_PATH, min_score=0, user_id=uid)
-
-        # 7. Set daily picks
-        if new_job_ids:
-            placeholders = ",".join(["?"] * len(new_job_ids))
-            query = f"""
-                UPDATE jobs 
-                SET is_daily_pick = 1, picked_at = ? 
-                WHERE user_id = ? AND job_id IN ({placeholders}) AND ai_score >= ?
-            """
-            conn.execute(query, (datetime.now().isoformat(), uid, *new_job_ids, min_score))
+            # 1. Clear old daily picks and remember which jobs already existed
+            conn = get_conn(DB_PATH)
+            conn.execute("UPDATE jobs SET is_daily_pick = 0 WHERE user_id = ?", (uid,))
             conn.commit()
+            before = {r[0] for r in conn.execute("SELECT job_id FROM jobs WHERE user_id = ?", (uid,)).fetchall()}
+            conn.close()
 
-        # 8. Fire email digest
-        try:
-            from notifier import send_email_digest
-            send_email_digest(uid)
+            # 2. Scrape, enrich, sync email, score
+            run_user_sync(uid, min_score=0)
+
+            # 3. Today's picks: jobs added in this run that clear the user's bar
+            conn = get_conn(DB_PATH)
+            rows = conn.execute(
+                "SELECT job_id, title, company, location, url, ai_score, ai_summary FROM jobs WHERE user_id = ? AND ai_score >= ?",
+                (uid, min_score)
+            ).fetchall()
+            picks = [dict(r) for r in rows if r[0] not in before]
+            now = datetime.now().isoformat()
+            for pick in picks:
+                conn.execute("UPDATE jobs SET is_daily_pick = 1, picked_at = ? WHERE job_id = ? AND user_id = ?", (now, pick["job_id"], uid))
+            conn.commit()
+            conn.close()
+
+            # 4. Email digest to this user only
+            to = recipient_for_user(uid)
+            if picks and to:
+                send_email_digest([{**pick, "score": pick.get("ai_score") or 0, "fit_summary": pick.get("ai_summary") or ""} for pick in picks], recipient=to)
         except Exception as e:
-            print(f"Failed to send email digest: {e}")
+            print(f"Daily recommendations failed for user {uid}: {e}")
 
-        # 9. Update last scraped time
-        conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
-        conn.commit()
 
-    conn.close()
-    return jsonify({"ok": True})
+@app.route("/api/cron/daily-recommendations", methods=["POST"])
+def cron_daily_recommendations():
+    expected_token = os.environ.get("CRON_SECRET", "")
+    if not expected_token:
+        return jsonify({"ok": False, "error": "CRON_SECRET is not configured"}), 503
+    auth_header = request.headers.get("X-Cron-Token", "")
+    if not hmac.compare_digest(auth_header, expected_token):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    started = run_in_background(("daily-recs",), run_daily_recommendations)
+    return jsonify({"ok": True, "started": started})
 
 
 @app.route("/api/recommendations/today", methods=["GET"])
@@ -1129,9 +1181,9 @@ def get_job_interview_prep(job_id):
         conn.close()
         return jsonify({"ok": False, "error": "Job not found"}), 404
         
-    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    row = conn.execute("SELECT resume_text FROM users WHERE id = ?", (uid,)).fetchone()
     resume_text = row[0] if row else None
-    api_key = row[1] if row else None
+    api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
     
     from ai_engine import generate_interview_prep
     from datetime import datetime
@@ -1173,9 +1225,9 @@ def regenerate_job_interview_prep(job_id):
         conn.close()
         return jsonify({"ok": False, "error": "Job not found"}), 404
         
-    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (uid,)).fetchone()
+    row = conn.execute("SELECT resume_text FROM users WHERE id = ?", (uid,)).fetchone()
     resume_text = row[0] if row else None
-    api_key = row[1] if row else None
+    api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
     
     from ai_engine import generate_interview_prep
     from datetime import datetime
@@ -1211,46 +1263,37 @@ def api_stats():
     return jsonify(s)
 
 
-@app.route("/api/refresh", methods=["POST"])
-def refresh_listings():
-    import threading
-    from datetime import datetime
+def run_user_sync(uid, min_score=None):
+    """Scrape → contacts → email sync → score for one user. Every step is scoped to uid."""
     from scraper import run_all_scrapers
     from linkedin_finder import enrich_jobs_with_contacts
+    from email_scraper import sync_job_statuses_from_email
     from ai_engine import process_new_jobs
-    
+
+    print(f"Background sync started for user {uid}")
+    run_all_scrapers(DB_PATH, user_id=uid)
+    enrich_jobs_with_contacts(DB_PATH, user_id=uid)
+    try:
+        sync_job_statuses_from_email(DB_PATH, user_id=uid)
+    except Exception as e:
+        print(f"Email sync failed for user {uid}: {e}")
+    if min_score is None:
+        min_score = float(os.getenv("MIN_SCORE", "0.0"))
+    digest = process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
+
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
+    conn.commit()
+    conn.close()
+    print(f"Background sync completed for user {uid}")
+    return digest
+
+
+@app.route("/api/refresh", methods=["POST"])
+def refresh_listings():
     uid = get_user_id()
-    
-    def run_sync():
-        try:
-            print(f"Background sync started for user {uid}")
-            run_all_scrapers(DB_PATH, user_id=uid)
-            
-            conn = get_conn(DB_PATH)
-            conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-            conn.commit()
-            
-            enrich_jobs_with_contacts(DB_PATH)
-            conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-            conn.commit()
-            
-            from email_scraper import sync_job_statuses_from_email
-            sync_job_statuses_from_email(DB_PATH, user_id=uid)
-            conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-            conn.commit()
-            
-            min_score = float(os.getenv("MIN_SCORE", "0.0"))
-            process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
-            
-            conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
-            conn.commit()
-            conn.close()
-            print(f"Background sync successfully completed for user {uid}")
-        except Exception as err:
-            print(f"Background sync failed for user {uid}: {err}")
-            
-    threading.Thread(target=run_sync).start()
-    return jsonify({"ok": True, "message": "Sync started in background"})
+    started = run_in_background(("sync", uid), run_user_sync, uid)
+    return jsonify({"ok": True, "message": "Sync started in background" if started else "A sync is already running"})
 
 
 @app.route("/api/voice/transcribe", methods=["POST"])
@@ -1690,35 +1733,7 @@ def voice_confirm():
             reply_cards = [{"type": "job", "job_id": job[0], "title": s_title, "company": c_comp, "score": job[3], "status": status, "location": job[5]}]
             
         elif intent == "trigger_refresh":
-            import threading
-            from scraper import run_all_scrapers
-            from linkedin_finder import enrich_jobs_with_contacts
-            from ai_engine import process_new_jobs
-            
-            def run_sync():
-                try:
-                    thread_conn = get_conn(DB_PATH)
-                    run_all_scrapers(DB_PATH, user_id=uid)
-                    thread_conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-                    thread_conn.commit()
-                    enrich_jobs_with_contacts(DB_PATH)
-                    thread_conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-                    thread_conn.commit()
-                    
-                    from email_scraper import sync_job_statuses_from_email
-                    sync_job_statuses_from_email(DB_PATH, user_id=uid)
-                    thread_conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (uid,))
-                    thread_conn.commit()
-                    
-                    min_score = float(os.getenv("MIN_SCORE", "0.0"))
-                    process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
-                    thread_conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
-                    thread_conn.commit()
-                    thread_conn.close()
-                except Exception as err:
-                    print("Voice refresh failed:", err)
-                    
-            threading.Thread(target=run_sync).start()
+            run_in_background(("sync", uid), run_user_sync, uid)
             reply_text = "Sync started in the background. It will reload when completed."
             
         elif intent == "regenerate_cover_letter":
@@ -1732,8 +1747,8 @@ def voice_confirm():
             
             settings = get_user_settings(conn, uid)
             from ai_engine import score_job, generate_cover_letter, generate_linkedin_note
-            score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
-            letter = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+            score_data = score_job(j["title"], j["company"], j.get("description",""), resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"), user_id=uid)
+            letter = generate_cover_letter(j["title"], j["company"], j.get("description",""), cn, ct, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"), candidate_name=settings.get("name") or "")
             li_note = generate_linkedin_note(cn, ct, j["company"], j["title"], api_key=settings.get("gemini_api_key"))
             
             conn.execute("UPDATE jobs SET ai_score = ?, ai_summary = ?, key_reqs = ? WHERE job_id = ? AND user_id = ?",
@@ -1748,7 +1763,6 @@ def voice_confirm():
             reply_cards = [{"type": "job", "job_id": j["job_id"], "title": s_title, "company": c_comp, "score": score_data["score"], "status": j["status"], "location": j.get("location","")}]
             
         elif intent == "send_email":
-            from notifier import send_email_digest
             j_row = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not j_row:
                 return jsonify({"ok": False, "error": "Job not found"}), 404
@@ -1768,7 +1782,7 @@ def voice_confirm():
                 "contact_title": c["title"] if c else "",
                 "linkedin_note": cl.get("linkedin_note", "")
             }
-            ok = send_email_digest([item])
+            ok = send_email_digest([item], recipient=recipient_for_user(uid))
             if ok:
                 conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ? AND user_id = ?", (job_id, uid))
                 add_timeline(conn, job_id, "Email sent → applied (Voice)")
@@ -2033,7 +2047,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
         # Calculate real score if description and title are present
         try:
             settings = get_user_settings(conn, uid)
-            score_data = score_job(title, company, desc, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
+            score_data = score_job(title, company, desc, resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"), user_id=uid)
             auto_score = score_data.get("score", 7.0)
             ai_summary = score_data.get("summary", "Imported from WhatsApp.")
             key_reqs = json.dumps(score_data.get("key_requirements", []))
@@ -2073,7 +2087,7 @@ def get_resume(job_id):
             
         from ai_engine import generate_tailored_resume
         settings = get_user_settings(conn, uid)
-        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"))
+        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
         
         # Save to DB cache
         conn.execute(
@@ -2099,7 +2113,7 @@ def print_resume(job_id):
             return "Job not found", 404
         from ai_engine import generate_tailored_resume
         settings = get_user_settings(conn, uid)
-        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"))
+        resume = generate_tailored_resume(job["description"] or "", job["title"] or "", job["company"] or "", resume_text=settings.get("resume_text"), api_key=settings.get("gemini_api_key"))
         conn.execute(
             "INSERT OR REPLACE INTO tailored_resumes (job_id, resume_content, created_at, user_id) VALUES (?, ?, ?, ?)",
             (job_id, resume, datetime.now().isoformat(), uid)
@@ -2255,9 +2269,9 @@ def serve_hero_background():
 
 @app.route("/api/debug/db")
 def debug_db():
-    uid = session.get("user_id")
-    if not uid:
+    if not is_admin():
         return "Unauthorized", 401
+    from db import IS_POSTGRES, DATABASE_URL
     import re
     conn = get_conn(DB_PATH)
     try:

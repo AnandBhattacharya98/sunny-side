@@ -22,68 +22,28 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 def get_fallback_gemini_key() -> str:
-    key = os.getenv("GEMINI_API_KEY", "")
-    if key:
-        return key
-    try:
-        from db import get_conn, DB_PATH
-        conn = get_conn(DB_PATH)
-        row = conn.execute("SELECT gemini_api_key FROM users WHERE id = 1").fetchone()
-        conn.close()
-        if row and row[0]:
-            return row[0]
-    except Exception:
-        pass
-    return ""
+    """The server-wide Gemini key (GEMINI_API_KEY), used when a user hasn't added their own.
+    A key someone saved in their personal settings is never shared with other users."""
+    return os.getenv("GEMINI_API_KEY", "")
 
-# ── Your profile — edit this section ──────────────────────────────────────
+# ── Fallback profile ───────────────────────────────────────────────────────
+# Only used when a user hasn't uploaded a resume yet. Every real user's scoring,
+# cover letters and prep come from their own resume.
 PROFILE = {
-    "name": os.getenv("YOUR_NAME", "Anand Bhattacharya"),
-    "years_exp": int(os.getenv("YEARS_EXPERIENCE", "1")),
-    "location": os.getenv("LOCATION", "Bengaluru"),
-    "current_role": "Software Engineer",
-    "domain": "web development, API design, and cloud architecture",
-    "strengths": [
-        "full stack web development",
-        "API integrations",
-        "database scaling",
-        "system performance tuning",
-        "CI/CD workflows"
-    ],
-    "tools": ["Python", "Flask", "JavaScript", "SQL", "Docker", "Git", "Jira"],
-    "achievements": [
-        "Designed and optimized backend APIs for scale, reducing response latency by 20%",
-        "Developed auto-ingestion pipelines, cutting data syncing cycle time by 30%",
-        "Collaborated with cross-functional teams to ship new client dashboards, increasing engagement by 40%"
-    ],
-    "education": "BE in Computer Science",
+    "name": os.getenv("YOUR_NAME", ""),
+    "years_exp": int(os.getenv("YEARS_EXPERIENCE", "2")),
+    "location": os.getenv("LOCATION", ""),
+    "domain": "professional",
 }
 
-RESUME_TEXT = f"""
-Name: {PROFILE['name']}
-Role: {PROFILE['current_role']} | {PROFILE['years_exp']}+ years
-Location: {PROFILE['location']}
-Domain: {PROFILE['domain']}
-
-Strengths: {', '.join(PROFILE['strengths'])}
-Tools: {', '.join(PROFILE['tools'])}
-Education: {PROFILE['education']}
-
-Key achievements:
-""" + "\n".join(f"- {a}" for a in PROFILE["achievements"])
+RESUME_TEXT = ""
 
 # ── Keyword scoring weights ────────────────────────────────────────────────
-# Updated weights to match Anand's AI APM profile
+# Role-neutral signals; resume keywords are added per user in _local_score.
 POSITIVE_SIGNALS = {
-    "ai": 1.5, "machine learning": 1.2, "voice": 1.5, "conversational": 1.5,
-    "llm": 1.2, "speech": 1.2, "tts": 1.0, "stt": 1.0, "bfsi": 1.2,
-    "nlp": 1.0, "data science": 0.8, "python": 0.6, "sql": 0.5,
-    "product manager": 0.8, "apm": 0.8, "associate product manager": 1.0,
-    "bengaluru": 0.5, "bangalore": 0.5, "remote": 0.4,
-    "roadmap": 0.4, "stakeholder": 0.4, "user research": 0.5,
+    "remote": 0.4, "hybrid": 0.2,
 }
 NEGATIVE_SIGNALS = {
-    "5+ years": -1.5, "8+ years": -2.0, "10+ years": -2.5, "12+ years": -3.0,
     "unpaid": -5.0,
 }
 YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
@@ -92,7 +52,8 @@ YEARS_PATTERN = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
 # ── Scoring ────────────────────────────────────────────────────────────────
 
 def _local_score(title: str, company: str, description: str, liked_titles: list = None, disliked_titles: list = None,
-                 w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5, resume_text: str = None) -> dict:
+                 w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5, resume_text: str = None,
+                 years_exp: float = None) -> dict:
     """Rule-based fallback scoring — no API needed."""
     text = f"{title} {description}".lower()
     score = 5.0
@@ -122,12 +83,17 @@ def _local_score(title: str, company: str, description: str, liked_titles: list 
         if kw in text:
             score += weight  # weights are negative
 
-    # Year experience check
+    # Year experience check against the candidate's own experience
+    if years_exp is None:
+        years_exp = PROFILE["years_exp"]
+        if resume_text:
+            from resume_parser import parse_resume_local
+            years_exp = parse_resume_local(resume_text).get("years_experience") or years_exp
     for m in YEARS_PATTERN.finditer(text):
         req_yrs = int(m.group(1))
-        if req_yrs > PROFILE["years_exp"] + 2:
+        if req_yrs > years_exp + 2:
             score -= 1.5
-        elif req_yrs <= PROFILE["years_exp"] + 1:
+        elif req_yrs <= years_exp + 1:
             score += 0.5
 
     # Title word overlap adjustments based on liked/disliked jobs and user weights
@@ -150,22 +116,20 @@ def _local_score(title: str, company: str, description: str, liked_titles: list 
     score = max(1.0, min(10.0, score))
 
     reqs = []
-    for kw in ["sql", "data", "roadmap", "stakeholder", "user research", "agile", "a/b test"]:
+    for kw in ["sql", "python", "data", "roadmap", "stakeholder", "user research", "agile", "a/b test", "communication", "leadership"]:
         if kw in text:
             reqs.append(kw.title())
 
     fit_parts = []
     if score >= 8:
-        fit_parts.append(f"Strong fit — role aligns well with your {PROFILE['domain']} background.")
+        fit_parts.append("Strong fit — role aligns well with your background.")
     elif score >= 6:
         fit_parts.append("Solid match — most requirements align with your experience.")
     else:
         fit_parts.append("Partial match — some requirements may be a stretch.")
 
-    if "bengaluru" in text or "bangalore" in text or "remote" in text:
-        fit_parts.append("Location is ideal.")
-    if any(k in text for k in ["ai", "voice", "conversational", "llm", "speech", "tts", "stt"]):
-        fit_parts.append("Domain aligns with your conversational AI and voice agent experience.")
+    if "remote" in text:
+        fit_parts.append("Remote-friendly.")
 
     return {
         "score": round(score, 1),
@@ -178,11 +142,11 @@ def _local_score(title: str, company: str, description: str, liked_titles: list 
 def _ai_score(title: str, company: str, description: str, resume_text: str = None) -> dict:
     """Claude-powered scoring — used when API key is set."""
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt = f"""Score this PM job for fit with this candidate. Reply ONLY with JSON, no markdown.
+        prompt = f"""Score this job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
 CANDIDATE RESUME:
 {resume_text}
@@ -232,7 +196,7 @@ def _gemini_score(title: str, company: str, description: str, resume_text: str =
                   liked_titles: list = None, disliked_titles: list = None,
                   w_up: float = 1.0, w_app: float = 1.0, w_down: float = -1.0, w_rej: float = -1.5) -> dict:
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         prompt = f"""Score this job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
@@ -264,7 +228,7 @@ Return exactly:
 
 def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None, user_id: int = 1) -> dict:
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
 
     liked_titles = []
     disliked_titles = []
@@ -363,48 +327,38 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
 # ── Cover letter ───────────────────────────────────────────────────────────
 
 def _local_cover_letter(title: str, company: str, description: str,
-                         contact_name: str, contact_title: str) -> dict:
+                         contact_name: str, contact_title: str, candidate_name: str = "") -> dict:
     """Template cover letter — personalised from your profile, no API needed."""
     greeting = f"Hi {contact_name.split()[0]}," if contact_name and contact_name != "Hiring Team" else "Hi,"
 
-    # Pull a relevant strength from the description
-    domain_line = ""
-    desc_lower = description.lower()
-    if any(k in desc_lower for k in ["development", "web", "software", "engineering", "backend"]):
-        domain_line = f"My experience building robust applications and backend systems aligns perfectly with this role."
-    elif "data" in desc_lower or "analytics" in desc_lower:
-        domain_line = f"Having designed and optimized data models and automated sync workflows, I am well-suited for your requirements."
-    else:
-        domain_line = f"With my background as a Software Engineer shipping scalable automation products, I can contribute immediately."
-
-    achievement = PROFILE["achievements"][0]
+    candidate_name = candidate_name or PROFILE["name"]
+    signoff = candidate_name or ""
 
     body = f"""{greeting}
 
-{domain_line} {achievement}.
-
-The {title} role at {company} is the kind of problem space I want to work in — high user impact, fast iteration, and a team that treats product as a first-class discipline. I noticed {description[:120].rstrip().rstrip('.') + '...' if description else 'the scope of this role'} and I think my background maps well.
+I'm excited to apply for the {title} role at {company}. I noticed {description[:120].rstrip().rstrip('.') + '...' if description else 'the scope of this role'} and I think my background maps well.
 
 A few things I'd bring on day one:
-- Structured discovery process: I start with user problems, not solutions
-- Strong cross-functional execution: I've shipped with engineering and design teams of 5–30 people
-- Data-first mindset: I'm comfortable in SQL and Mixpanel, and I set metric targets before writing specs
+- A habit of starting from the problem and the people affected by it
+- Steady cross-functional execution with the teams around me
+- A data-informed approach: I set clear goals and measure against them
 
-I'd love 20 minutes to learn more about the team and share how I've tackled similar challenges. Happy to share specifics.
+I'd love 20 minutes to learn more about the team and share how I've tackled similar challenges.
 
-{PROFILE['name']}"""
+{signoff}"""
 
+    subject = f"Application: {title}" + (f" — {candidate_name}" if candidate_name else "")
     return {
-        "subject": f"Application: {title} — {PROFILE['name']}",
+        "subject": subject,
         "body": body.strip(),
     }
 
 
 def _ai_cover_letter(title: str, company: str, description: str,
-                      contact_name: str, contact_title: str, resume_text: str = None) -> dict:
+                      contact_name: str, contact_title: str, resume_text: str = None, candidate_name: str = "") -> dict:
     """Claude-generated cover letter."""
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -431,13 +385,14 @@ Return exactly:
         return json.loads(raw)
     except Exception as e:
         print(f"  [AI cover letter fallback] {e}")
-        return _local_cover_letter(title, company, description, contact_name, contact_title)
+        return _local_cover_letter(title, company, description, contact_name, contact_title, candidate_name)
 
 
 def _gemini_cover_letter(title: str, company: str, description: str,
-                         contact_name: str, contact_title: str, resume_text: str = None, api_key: str = None) -> dict:
+                         contact_name: str, contact_title: str, resume_text: str = None, api_key: str = None,
+                         candidate_name: str = "") -> dict:
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         prompt = f"""Write a cover letter for this job application. Under 300 words. 
 Start with impact — not "I am writing to express my interest". Be specific, confident, human.
@@ -457,22 +412,22 @@ Return exactly:
         return json.loads(raw)
     except Exception as e:
         print(f"  [Gemini cover letter fallback] {e}")
-        return _local_cover_letter(title, company, description, contact_name, contact_title)
+        return _local_cover_letter(title, company, description, contact_name, contact_title, candidate_name)
 
 
 def generate_cover_letter(title: str, company: str, description: str,
                            contact_name: str = "Hiring Team",
                            contact_title: str = "Recruiter",
-                           resume_text: str = None, api_key: str = None) -> dict:
-    if not resume_text:
-        resume_text = RESUME_TEXT
+                           resume_text: str = None, api_key: str = None,
+                           candidate_name: str = "") -> dict:
     if ANTHROPIC_API_KEY:
-        return _ai_cover_letter(title, company, description, contact_name, contact_title, resume_text)
+        return _ai_cover_letter(title, company, description, contact_name, contact_title, resume_text, candidate_name)
     
-    key_to_use = api_key or GEMINI_API_KEY
+    key_to_use = api_key or get_fallback_gemini_key()
     if key_to_use:
-        return _gemini_cover_letter(title, company, description, contact_name, contact_title, resume_text, api_key=key_to_use)
-    return _local_cover_letter(title, company, description, contact_name, contact_title)
+        return _gemini_cover_letter(title, company, description, contact_name, contact_title, resume_text,
+                                    api_key=key_to_use, candidate_name=candidate_name)
+    return _local_cover_letter(title, company, description, contact_name, contact_title, candidate_name)
 
 
 # ── LinkedIn note ──────────────────────────────────────────────────────────
@@ -511,59 +466,11 @@ def generate_linkedin_note(contact_name: str, contact_title: str,
     )
 
 
-FULL_RESUME_MARKDOWN = """# Anand Bhattacharya
-Bengaluru, India | +91-6364-123-572 | anandb9198@gmail.com | https://www.linkedin.com/in/anand-bhattacharya/
-
-## PROFESSIONAL EXPERIENCE
-**AI Associate Product Manager** <span style="float: right;">July 2025 – Present</span>
-_Revrag.ai | Bengaluru, India_
-
-- Designed and optimized multilingual (English, Hindi, Kannada) conversation flows for BFSI clients, reducing call errors by 20% and driving measurable improvement in end-user engagement across live deployments.
-- Trained AI voice agents on 500+ real call recordings, cutting iteration cycles by 30% and accelerating client delivery timelines by 25%, equivalent to 2 weeks saved per project.
-- Partnered with clients to co-define AI personas and deployment strategies, increasing adoption rates by 40% and improving user engagement across BFSI voice automation use cases.
-
-**Data Science Intern** <span style="float: right;">March 2021 – April 2021</span>
-_Kigyan Techno Solutions | Bengaluru, India_
-
-- Built a Python regression module for retail sales forecasting, achieving 90% prediction accuracy and improving strategic planning reliability for the client.
-- Applied Test-Driven Development (TDD) and paired programming practices, increasing forecasting model reliability by 15% against dynamic market conditions.
-
-## ACADEMIC PROJECT EXPERIENCE
-**ZoomWellness – AI Wellness Analytics Platform** <span style="float: right;">Jan 2025 – May 2025</span>
-_Managing IT in the Analytics Age_
-
-- Designed an AI engine integrating Zoom, calendar, and wearable data to detect employee burnout risk, targeting a 15% reduction in late-hour work indicators within year one.
-- Defined an ML-based wellness nudge system leveraging behavioral and biometric signals, targeting 70% opt-in rate and weekly active usage within 6 months of launch.
-- Built Explainable AI (XAI) framework with documented decision logic and consent controls, projected to boost retention by 5% and add 50+ enterprise clients within 18 months.
-
-**Queue-less Lines** <span style="float: right;">Jan 2023 – May 2023</span>
-_Entrepreneurial Experience_
-
-- Led research into AT&T's 5G and video analytics technology to build a product innovation strategy targeting a 50% reduction in theme park wait times across high-traffic zones.
-- Developed comprehensive product requirements and a go-to-market plan for Disney Theme Parks, projecting a 15% increase in ticket-linked profit from operational improvements.
-- Established revenue models spanning budget tracking and merchandise, contributing to a projected $345M revenue increase across U.S. and emerging markets.
-
-## SKILLS
-- **AI Tools**: Retell, Deepgram, OpenAI TTS/STT, ElevenLabs, Replit, Cursor
-- **PM & Agile**: Product Road mapping, Stakeholder Management, User Research, Agile, Jira, Go-to-Market Strategy
-- **Data & Analytics**: MySQL, Tableau, Python, Java
-
-## CERTIFICATIONS
-- Certified Scrum Master (CSM) | AI for Product Management | IBM Generative AI: Prompt Engineering
-- Machine Learning Foundations for Product Managers | Google Project Management Professional Certificate
-
-## EDUCATION
-**Dual Degree: MBA & MS in Information Technology Management** <span style="float: right;">May 2025</span>
-_The University of Texas at Dallas | Richardson, Texas | GPA: 3.49/4.00_
-
-**BE, Computer Science** <span style="float: right;">May 2021</span>
-_Dayananda Sagar College of Engineering | Bengaluru, India | 7.45/10.00_
-"""
-
-def generate_tailored_resume(job_description: str, job_title: str, company: str, resume_text: str = None) -> str:
+def generate_tailored_resume(job_description: str, job_title: str, company: str, resume_text: str = None,
+                             api_key: str = None) -> str:
     """Generate a tailored resume based on the candidate profile and job description."""
     if not resume_text:
-        resume_text = FULL_RESUME_MARKDOWN
+        return "# No resume on file\n\nUpload your resume in settings to generate a tailored version for this job."
     prompt = f"""
 You are an expert resume writer. Given the candidate's base resume and the target job description (JD) at {company} for the role of {job_title}, generate a highly tailored professional resume in Markdown format.
 
@@ -584,9 +491,9 @@ Guidelines for tailoring:
 6. Do not include any introductory remarks or meta-commentary; output ONLY the Markdown resume.
 """
     try:
-        fallback_key = get_fallback_gemini_key()
-        if fallback_key:
-            return _call_gemini(prompt)
+        key_to_use = api_key or get_fallback_gemini_key()
+        if key_to_use:
+            return _call_gemini(prompt, api_key=key_to_use)
     except Exception as e:
         print(f"[AI Resume] Gemini failed: {e}")
         
@@ -598,9 +505,11 @@ Guidelines for tailoring:
 def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: int = 1) -> list[dict]:
     """Score and generate cover letters for all 'new' jobs in the DB."""
     conn = get_conn(db_path)
-    row = conn.execute("SELECT resume_text, gemini_api_key FROM users WHERE id = ?", (user_id,)).fetchone()
+    from db import get_user_secrets
+    row = conn.execute("SELECT resume_text, name FROM users WHERE id = ?", (user_id,)).fetchone()
     resume_text = row[0] if row else None
-    api_key = row[1] if row else None
+    candidate_name = (row[1] if row else "") or ""
+    api_key = get_user_secrets(conn, user_id)["gemini_api_key"] or None
 
     jobs = conn.execute(
         "SELECT job_id, title, company, location, url, description FROM jobs WHERE status = 'new' AND user_id = ?",
@@ -642,7 +551,8 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
         contact_title = contact[1] if contact else "Recruiter"
 
         letter = generate_cover_letter(title, company, description or "",
-                                       contact_name, contact_title, resume_text=resume_text, api_key=api_key)
+                                       contact_name, contact_title, resume_text=resume_text, api_key=api_key,
+                                       candidate_name=candidate_name)
         linkedin_note = generate_linkedin_note(contact_name, contact_title, company, title, api_key=api_key)
 
         conn.execute(
@@ -676,14 +586,14 @@ def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: in
 def generate_interview_prep(title: str, company: str, description: str,
                             resume_text: str = None, api_key: str = None) -> dict:
     if not resume_text:
-        resume_text = RESUME_TEXT
+        resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     if ANTHROPIC_API_KEY:
         try:
             return _ai_interview_prep(title, company, description, resume_text)
         except Exception:
             pass
     
-    key_to_use = api_key or GEMINI_API_KEY or get_fallback_gemini_key()
+    key_to_use = api_key or get_fallback_gemini_key()
     if key_to_use:
         try:
             return _gemini_interview_prep(title, company, description, resume_text, api_key=key_to_use)

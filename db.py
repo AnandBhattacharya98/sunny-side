@@ -185,20 +185,8 @@ def migrate_db(conn) -> None:
     """)
     conn.commit()
     
-    admin_exists = conn.execute("SELECT 1 FROM users WHERE id = 1").fetchone()
-    if not admin_exists:
-        from datetime import datetime
-        import hashlib
-        import binascii
-        salt = b"default_salt_123"
-        key = hashlib.pbkdf2_hmac("sha256", b"admin", salt, 100000)
-        p_hash = binascii.hexlify(salt + b":" + key).decode("ascii")
-        conn.execute(
-            "INSERT OR IGNORE INTO users (id, username, password_hash, created_at) VALUES (1, ?, ?, ?)",
-            ("admin", p_hash, datetime.now().isoformat())
-        )
-        conn.commit()
-        
+    _ensure_admin(conn)
+
     tables = ["jobs", "contacts", "cover_letters", "application_notes", "application_timeline", "received_emails", "tailored_resumes"]
     for t in tables:
         columns = [row[1] for row in conn.execute(f"PRAGMA table_info({t})").fetchall()]
@@ -208,7 +196,7 @@ def migrate_db(conn) -> None:
             
     # Migrate users table columns if needed
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
-    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile", "name", "designation", "resume_filename", "resume_profile_json", "last_scraped_at"]:
+    for col in ["imap_email", "imap_password", "gemini_api_key", "linkedin_profile", "name", "designation", "resume_filename", "resume_profile_json", "last_scraped_at", "email", "auth_provider"]:
         if col not in user_cols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
             conn.commit()
@@ -278,6 +266,8 @@ def migrate_db(conn) -> None:
     """)
     conn.commit()
 
+    _encrypt_legacy_secrets(conn)
+
     if IS_POSTGRES:
         seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep"]
         for t in seq_tables:
@@ -287,6 +277,73 @@ def migrate_db(conn) -> None:
             except Exception as e:
                 pass
 
+
+
+def _ensure_admin(conn) -> None:
+    """Seeds the admin account (id 1) and keeps its password off the old 'admin' default.
+    ADMIN_PASSWORD, when set, is applied on every startup."""
+    from auth import hash_password, verify_password
+    from datetime import datetime
+    import secrets
+
+    admin_pw = os.getenv("ADMIN_PASSWORD", "").strip()
+    row = conn.execute("SELECT password_hash FROM users WHERE id = 1").fetchone()
+    if not row:
+        generated = not admin_pw
+        pw = admin_pw or secrets.token_urlsafe(12)
+        conn.execute(
+            "INSERT OR IGNORE INTO users (id, username, password_hash, created_at) VALUES (1, ?, ?, ?)",
+            ("admin", hash_password(pw), datetime.now().isoformat())
+        )
+        conn.commit()
+        if generated:
+            print(f"Created admin account. Username: admin  Password: {pw}  (set ADMIN_PASSWORD to choose your own)")
+        return
+
+    current_hash = row[0] or ""
+    if admin_pw:
+        if not verify_password(admin_pw, current_hash):
+            conn.execute("UPDATE users SET password_hash = ? WHERE id = 1", (hash_password(admin_pw),))
+            conn.commit()
+    elif verify_password("admin", current_hash):
+        pw = secrets.token_urlsafe(12)
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = 1", (hash_password(pw),))
+        conn.commit()
+        print(f"Admin still had the default password 'admin'; it has been replaced. New password: {pw}  "
+              f"(set ADMIN_PASSWORD to choose your own)")
+
+
+def _encrypt_legacy_secrets(conn) -> None:
+    """One-time upgrade: encrypt credentials that were stored in plain text."""
+    from crypto_util import encrypt_secret, ENC_PREFIX
+    rows = conn.execute("SELECT id, imap_password, gemini_api_key FROM users").fetchall()
+    for r in rows:
+        uid, imap_pw, gem_key = r[0], r[1], r[2]
+        updates = {}
+        if imap_pw and not imap_pw.startswith(ENC_PREFIX):
+            updates["imap_password"] = encrypt_secret(imap_pw)
+        if gem_key and not gem_key.startswith(ENC_PREFIX):
+            updates["gemini_api_key"] = encrypt_secret(gem_key)
+        if updates:
+            sets = ", ".join(f"{k} = ?" for k in updates)
+            conn.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), uid))
+            conn.commit()
+
+
+def get_user_secrets(conn, user_id: int) -> dict:
+    """Decrypted imap_email / imap_password / gemini_api_key for one user."""
+    from crypto_util import decrypt_secret
+    row = conn.execute("SELECT imap_email, imap_password, gemini_api_key FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        return {"imap_email": "", "imap_password": "", "gemini_api_key": ""}
+    return {
+        "imap_email": row[0] or "",
+        "imap_password": decrypt_secret(row[1] or ""),
+        "gemini_api_key": decrypt_secret(row[2] or ""),
+    }
+
+
+_migrated = set()
 
 
 def init_db(db_path: str = DB_PATH):
@@ -358,7 +415,9 @@ def init_db(db_path: str = DB_PATH):
         );
     """)
     conn.commit()
-    migrate_db(conn)
+    if db_path not in _migrated:
+        migrate_db(conn)
+        _migrated.add(db_path)
     return conn
 
 

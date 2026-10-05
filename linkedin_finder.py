@@ -121,7 +121,7 @@ def _store_contacts(conn, job_id: str, contacts: list[dict]) -> None:
     uid = row[0] if row else 1
     
     # Clear old contacts for this job first
-    conn.execute("DELETE FROM contacts WHERE job_id=?", (job_id,))
+    conn.execute("DELETE FROM contacts WHERE job_id=? AND user_id=?", (job_id, uid))
     for c in contacts:
         conn.execute(
             """INSERT INTO contacts (job_id, name, title, linkedin_url, email, found_at, user_id)
@@ -132,11 +132,16 @@ def _store_contacts(conn, job_id: str, contacts: list[dict]) -> None:
     conn.commit()
 
 
-def enrich_jobs_with_contacts(db_path: str = DB_PATH) -> None:
+def enrich_jobs_with_contacts(db_path: str = DB_PATH, user_id: int = None) -> None:
     conn = get_conn(db_path)
-    jobs = conn.execute(
-        "SELECT job_id, company FROM jobs WHERE status='new' LIMIT 30"
-    ).fetchall()
+    if user_id is not None:
+        jobs = conn.execute(
+            "SELECT job_id, company FROM jobs WHERE status='new' AND user_id = ? LIMIT 30", (user_id,)
+        ).fetchall()
+    else:
+        jobs = conn.execute(
+            "SELECT job_id, company FROM jobs WHERE status='new' LIMIT 30"
+        ).fetchall()
 
     mode = "Proxycurl (live)" if PROXYCURL_API_KEY else "local placeholders + LinkedIn search URLs"
     print(f"\n[Finding contacts — mode: {mode}]")
