@@ -538,9 +538,9 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <div style="display:flex; flex-direction:column; gap:8px;">
         <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase; text-align: left;">Select a test profile:</label>
         
-        <button type="submit" onclick="document.getElementById('mock-email').value='anandbhattacharya98@gmail.com'; document.getElementById('mock-name').value='Anand Bhattacharya';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
-          <strong style="color:var(--txt);">Anand Bhattacharya</strong>
-          <span style="font-size:11px; color:var(--mut);">anandbhattacharya98@gmail.com</span>
+        <button type="submit" onclick="document.getElementById('mock-email').value='test.user@example.com'; document.getElementById('mock-name').value='Test User';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
+          <strong style="color:var(--txt);">Test User</strong>
+          <span style="font-size:11px; color:var(--mut);">test.user@example.com</span>
         </button>
         
         <button type="submit" onclick="document.getElementById('mock-email').value='guest@gmail.com'; document.getElementById('mock-name').value='Guest User';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
@@ -553,7 +553,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
       <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
         <label class="auth-label">Custom Full Name</label>
-        <input type="text" id="mock-name" name="name" class="auth-input" placeholder="e.g. Anand Bhattacharya">
+        <input type="text" id="mock-name" name="name" class="auth-input" placeholder="e.g. Test User">
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
@@ -628,7 +628,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Full Name</label>
-                <input type="text" name="name" class="auth-input" style="padding:8px 12px;" placeholder="Anand Bhattacharya">
+                <input type="text" name="name" class="auth-input" style="padding:8px 12px;" placeholder="Your full name">
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
@@ -638,7 +638,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
             <!-- Show on landing page checkbox -->
             <div style="display:flex; align-items:center; gap:8px;">
-              <input type="checkbox" id="signup-share-profile" name="share_profile" checked style="width:16px;height:16px;cursor:pointer;">
+              <input type="checkbox" id="signup-share-profile" name="share_profile" style="width:16px;height:16px;cursor:pointer;">
               <label for="signup-share-profile" style="font-size:12px; color:var(--txt); cursor:pointer;">Show my profile on landing page seekers wall</label>
             </div>
             
@@ -1004,10 +1004,10 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         {% set score = job.ai_score or 0 %}
         {% set source_domain = "linkedin.com" %}
         {% set source_type = "direct" %}
-        {% if "naukri.com" in job.url or job.job_id.startswith("nk_") %}
+        {% if "naukri.com" in (job.url or "") or job.job_id.startswith("nk_") %}
           {% set source_domain = "naukri.com" %}
           {% set source_type = "naukri" %}
-        {% elif "indeed.com" in job.url %}
+        {% elif "indeed.com" in (job.url or "") %}
           {% set source_domain = "indeed.com" %}
           {% set source_type = "indeed" %}
         {% elif job.job_id.startswith("auto_") %}
@@ -1016,7 +1016,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
         {% elif job.job_id.startswith("wa_") %}
           {% set source_domain = "whatsapp.com" %}
           {% set source_type = "whatsapp" %}
-        {% elif job.job_id.startswith("li_") or "linkedin.com" in job.url %}
+        {% elif job.job_id.startswith("li_") or "linkedin.com" in (job.url or "") %}
           {% set source_domain = "linkedin.com" %}
           {% set source_type = "linkedin" %}
         {% elif job.source %}
@@ -1515,7 +1515,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Full Name</label>
-          <input type="text" id="settings-name" value="{{ (settings or {}).get('name', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Anand Bhattacharya">
+          <input type="text" id="settings-name" value="{{ (settings or {}).get('name', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Your full name">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
@@ -2208,6 +2208,11 @@ function stopSpeaking() {
   }
 }
 
+// Escape untrusted text (scraped job data, email bodies, AI output) before it goes into innerHTML
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+}
+
 function addMessageBubble(text, sender, isSpoken = false, replyCards = null, requiresConfirmation = false) {
   chatHistory.push({ role: sender === 'user' ? 'user' : 'model', text: text });
   if (chatHistory.length > 20) {
@@ -2227,7 +2232,7 @@ function addMessageBubble(text, sender, isSpoken = false, replyCards = null, req
     msgDiv.style = "align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; animation: logFadeIn 0.3s ease-out;";
     msgDiv.innerHTML = `
       <div style="background: var(--pur); color: white; padding: 10px 14px; border-radius: 16px 16px 0 16px; font-size: 13px; line-height: 1.4; word-break: break-word;">
-        ${text}
+        ${esc(text)}
         ${isSpoken ? '<span style="font-size:10px; margin-left:6px; opacity:0.7;">🎤</span>' : ''}
       </div>
       <span style="font-size: 9px; color: var(--hin);">${timestamp}</span>
@@ -2241,10 +2246,10 @@ function addMessageBubble(text, sender, isSpoken = false, replyCards = null, req
         if (card.type === 'stats') {
           cardsHtml += `
             <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: var(--bdr); color: var(--txt);">Total: ${card.total}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #e0f2fe; color: #0369a1;">Shortlisted: ${card.shortlisted}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">Applied: ${card.applied}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #fef9c3; color: #a16207;">Offers: ${card.offers}</span>
+              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: var(--bdr); color: var(--txt);">Total: ${esc(card.total)}</span>
+              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #e0f2fe; color: #0369a1;">Shortlisted: ${esc(card.shortlisted)}</span>
+              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">Applied: ${esc(card.applied)}</span>
+              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #fef9c3; color: #a16207;">Offers: ${esc(card.offers)}</span>
             </div>
           `;
         } else if (card.type === 'job') {
@@ -2256,22 +2261,22 @@ function addMessageBubble(text, sender, isSpoken = false, replyCards = null, req
           cardsHtml += `
             <div class="jcard" style="border: 1px solid var(--bdr); border-radius: 12px; padding: 12px; margin-top: 8px; background: var(--sur); display: flex; flex-direction: column; gap: 6px; width: 100%;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                <div style="font-weight: 700; font-size: 13px; color: var(--txt);">${card.title}</div>
+                <div style="font-weight: 700; font-size: 13px; color: var(--txt);">${esc(card.title)}</div>
                 <span class="score-pill ${scoreClass}" style="flex-shrink:0;">${scoreVal}</span>
               </div>
-              <div style="font-size: 11px; color: var(--mut);">${card.company} • ${card.location}</div>
+              <div style="font-size: 11px; color: var(--mut);">${esc(card.company)} • ${esc(card.location)}</div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-                <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--bdr); color: var(--txt);">${card.status}</span>
-                <a href="#" onclick="openJobModal('${card.job_id}'); return false;" style="font-size: 11px; font-weight: 600; color: var(--pur); text-decoration: none;">Open Details</a>
+                <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--bdr); color: var(--txt);">${esc(card.status)}</span>
+                <a href="#" onclick="openJobModal(${esc(JSON.stringify(String(card.job_id)))}); return false;" style="font-size: 11px; font-weight: 600; color: var(--pur); text-decoration: none;">Open Details</a>
               </div>
             </div>
           `;
         } else if (card.type === 'email') {
           cardsHtml += `
             <div style="border: 1px solid var(--bdr); border-radius: 12px; padding: 12px; margin-top: 8px; background: var(--sur); cursor: pointer; text-align: left; width: 100%;" onclick="const b=this.querySelector('.email-body'); b.style.display=b.style.display==='none'?'block':'none';">
-              <div style="font-weight: 700; font-size: 12px; color: var(--txt);">${card.subject}</div>
-              <div style="font-size: 11px; color: var(--mut); margin-bottom: 4px;">From: ${card.sender}</div>
-              <div class="email-body" style="font-size: 11px; line-height: 1.4; color: var(--txt); display: none; border-top: 1px solid var(--bdr); padding-top: 6px; margin-top: 6px; white-space: pre-wrap;">${card.body}</div>
+              <div style="font-weight: 700; font-size: 12px; color: var(--txt);">${esc(card.subject)}</div>
+              <div style="font-size: 11px; color: var(--mut); margin-bottom: 4px;">From: ${esc(card.sender)}</div>
+              <div class="email-body" style="font-size: 11px; line-height: 1.4; color: var(--txt); display: none; border-top: 1px solid var(--bdr); padding-top: 6px; margin-top: 6px; white-space: pre-wrap;">${esc(card.body)}</div>
               <div style="font-size: 9px; color: var(--pur); font-weight: 700; margin-top: 4px;">Tap to expand email</div>
             </div>
           `;
@@ -2293,7 +2298,7 @@ function addMessageBubble(text, sender, isSpoken = false, replyCards = null, req
       <div class="logo-yolk" style="width: 28px; height: 28px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--purl); color: var(--pur); flex-shrink: 0; margin-top: 4px;">SS</div>
       <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; max-width: 100%;">
         <div style="background: var(--sur); border: 1px solid var(--bdr); color: var(--txt); padding: 10px 14px; border-radius: 0 16px 16px 16px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); text-align: left;">
-          <div>${text}</div>
+          <div>${esc(text)}</div>
           ${cardsHtml}
           ${confirmHtml}
         </div>
@@ -2988,9 +2993,9 @@ async function deleteUser(userId, username) {
         <p style="font-size:11px; color:var(--mut); margin:2px 0 0 0;">to continue to Sunny Side</p>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">
-        <button onclick="selectSocialAccount('google', 'Anand Bhattacharya', 'anandbhattacharya98@gmail.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
-          <strong style="color:var(--txt);">Anand Bhattacharya</strong>
-          <span style="font-size:11px; color:var(--mut);">anandbhattacharya98@gmail.com</span>
+        <button onclick="selectSocialAccount('google', 'Test User', 'test.user@example.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
+          <strong style="color:var(--txt);">Test User</strong>
+          <span style="font-size:11px; color:var(--mut);">test.user@example.com</span>
         </button>
         <button onclick="selectSocialAccount('google', 'Guest User', 'guest@gmail.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
           <strong style="color:var(--txt);">Guest User</strong>
@@ -3008,9 +3013,9 @@ async function deleteUser(userId, username) {
         <p style="font-size:11px; color:var(--mut); margin:2px 0 0 0;">to continue to Sunny Side</p>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">
-        <button onclick="selectSocialAccount('linkedin', 'Anand Bhattacharya', 'anandbhattacharya@linkedin.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
-          <strong style="color:var(--txt);">Anand Bhattacharya</strong>
-          <span style="font-size:11px; color:var(--mut);">anandbhattacharya@linkedin.com</span>
+        <button onclick="selectSocialAccount('linkedin', 'Test User', 'test.user@example.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
+          <strong style="color:var(--txt);">Test User</strong>
+          <span style="font-size:11px; color:var(--mut);">test.user@example.com</span>
         </button>
         <button onclick="selectSocialAccount('linkedin', 'Guest User', 'guest@linkedin.com')" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr);">
           <strong style="color:var(--txt);">Guest User</strong>
@@ -3174,14 +3179,14 @@ async function startOnboardingParse(event) {
         card.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <div>
-              <h4 style="font-size:16px; font-weight:700; color:var(--txt); margin:0;">${job.title}</h4>
-              <p style="font-size:13px; color:var(--mut); margin:2px 0 0 0;">${job.company} &bull; ${job.location}</p>
+              <h4 style="font-size:16px; font-weight:700; color:var(--txt); margin:0;">${esc(job.title)}</h4>
+              <p style="font-size:13px; color:var(--mut); margin:2px 0 0 0;">${esc(job.company)} &bull; ${esc(job.location)}</p>
             </div>
             <span style="font-size:12px; font-weight:700; background:var(--purl); color:var(--pur); padding:4px 10px; border-radius:12px; white-space:nowrap;">
               ${job.ai_score ? job.ai_score.toFixed(1) : '8.5'} / 10
             </span>
           </div>
-          <p style="font-size:12.5px; color:var(--mut); line-height:1.5; margin:8px 0 0 0;">${job.ai_summary || ''}</p>
+          <p style="font-size:12.5px; color:var(--mut); line-height:1.5; margin:8px 0 0 0;">${esc(job.ai_summary || '')}</p>
         `;
         grid.appendChild(card);
       });
@@ -3525,13 +3530,13 @@ function renderQuizData(jobId, data) {
           <div class="flashcard-front">
             <div style="padding:4px;">
               <div style="font-size:10px; font-weight:700; color:var(--pur); margin-bottom:6px; text-transform:uppercase;">Question ${idx+1}</div>
-              <div style="line-height:1.4;">${qText}</div>
+              <div style="line-height:1.4;">${esc(qText)}</div>
             </div>
           </div>
           <div class="flashcard-back">
             <div style="padding:4px; text-align:left; overflow-y:auto; height:100%;">
               <div style="font-size:10px; font-weight:700; opacity:0.8; margin-bottom:6px; text-transform:uppercase;">Answer Outline</div>
-              <div style="font-size:10.5px; line-height:1.4; white-space:pre-line;">${aText}</div>
+              <div style="font-size:10.5px; line-height:1.4; white-space:pre-line;">${esc(aText)}</div>
             </div>
           </div>
         </div>
@@ -3555,13 +3560,13 @@ function renderQuizData(jobId, data) {
         <div id="${headerId}" onclick="toggleDeepQAccordion('${jobId}', ${idx})" style="padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
           <div style="font-size:12px; font-weight:600; color:var(--txt); display:flex; gap:8px;">
             <span style="color:var(--pur); font-weight:700;">Q${idx+1}.</span>
-            <span>${item.q}</span>
+            <span>${esc(item.q)}</span>
           </div>
           <span class="chevron-${jobId}-${idx}" style="font-size:12px; color:var(--pur); transition: transform 0.2s;">▼</span>
         </div>
         <div id="${bodyId}" style="display:none; padding:12px; border-top:1px solid var(--bdr); background:var(--bg); font-size:11.5px; color:var(--mut); line-height:1.5;">
           <strong style="color:var(--txt); display:block; margin-bottom:4px;">Model Answer Outline & Hints:</strong>
-          <div style="white-space:pre-line;">${item.hints || item.answer || 'No outline provided.'}</div>
+          <div style="white-space:pre-line;">${esc(item.hints || item.answer || 'No outline provided.')}</div>
         </div>
       `;
       deepList.appendChild(qBox);
@@ -3623,8 +3628,8 @@ async function loadDailyRecommendations() {
       const card = document.createElement('div');
       card.style.cssText = "flex: 0 0 240px; background:var(--sur); border:1px solid #FFE082; border-radius:12px; padding:12px; cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;";
       card.innerHTML = `
-        <div style="font-size:12px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${job.title}</div>
-        <div style="font-size:11px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${job.company}</div>
+        <div style="font-size:12px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(job.title)}</div>
+        <div style="font-size:11px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(job.company)}</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
           <span style="font-size:10px; font-weight:700; background:#EAF3DE; color:#3B6D11; padding:2px 6px; border-radius:8px;">${job.ai_score.toFixed(1)}/10</span>
           <span style="font-size:10px; color:var(--pur); font-weight:600;">View in Board &rarr;</span>

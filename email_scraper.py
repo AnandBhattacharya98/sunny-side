@@ -10,7 +10,7 @@ import email
 import sqlite3
 from datetime import datetime, date, timedelta
 from email.header import decode_header
-from db import get_conn, add_timeline, DB_PATH
+from db import get_conn, add_timeline, DB_PATH, get_user_secrets
 
 from dotenv import load_dotenv
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -166,19 +166,28 @@ def extract_job_info_from_email(subject: str, body: str, sender: str) -> tuple[s
 
 def sync_job_statuses_from_email(db_path: str = DB_PATH, user_id: int | None = None) -> int:
     """Connect to IMAP and synchronize statuses in the database."""
+    # An unscoped run is the operator's own (CLI) run: only touch the admin's jobs,
+    # never match the operator's inbox against other users' boards.
+    if user_id is None:
+        user_id = 1
     imap_server = IMAP_SERVER
-    imap_email = IMAP_EMAIL
-    imap_password = IMAP_PASSWORD
+    # The IMAP_* / SENDER_* env credentials belong to the server operator, so only the
+    # admin account (or an unscoped CLI run) may fall back to them. Every other user
+    # syncs only the inbox they connected themselves.
+    if user_id is None or user_id == 1:
+        imap_email = IMAP_EMAIL
+        imap_password = IMAP_PASSWORD
+    else:
+        imap_email = ""
+        imap_password = ""
 
     if user_id is not None:
         conn = get_conn(db_path)
-        row = conn.execute("SELECT imap_email, imap_password FROM users WHERE id = ?", (user_id,)).fetchone()
+        creds = get_user_secrets(conn, user_id)
         conn.close()
-        if row:
-            if row["imap_email"]:
-                imap_email = row["imap_email"]
-            if row["imap_password"]:
-                imap_password = row["imap_password"]
+        if creds["imap_email"] and creds["imap_password"]:
+            imap_email = creds["imap_email"]
+            imap_password = creds["imap_password"]
 
     if not imap_email or not imap_password:
         prefix = f"[Email Sync (User {user_id})]" if user_id else "[Email Sync]"
@@ -278,8 +287,8 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH, user_id: int | None = N
                         print(f"  [Match!] {company} ({title}): status '{current_status}' → '{new_status}'")
                         
                         conn.execute(
-                            "UPDATE jobs SET status = ? WHERE job_id = ?",
-                            (new_status, job_id)
+                            "UPDATE jobs SET status = ? WHERE job_id = ? AND user_id = ?",
+                            (new_status, job_id, job_user_id)
                         )
                         conn.execute(
                             """INSERT INTO received_emails (job_id, sender, subject, body, received_at, user_id)
@@ -317,10 +326,10 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH, user_id: int | None = N
                     if not existing_job:
                         import uuid
                         import random
-                        job_id = f"auto_{extracted_company.lower().replace(' ', '_')}_{str(uuid.uuid4())[:8]}"
-                        auto_score = round(random.uniform(7.5, 9.5), 1)
+                        job_id = f"auto_{extracted_company.lower().replace(' ', '_')}_{str(uuid.uuid4())[:8]}_u{user_id}"
+                        auto_score = None  # not scored: there's no job description to score against
                         
-                        print(f"  [Auto-Discover!] Creating new applied job: {extracted_company} - {extracted_title} (Score: {auto_score})")
+                        print(f"  [Auto-Discover!] Creating new applied job: {extracted_company} - {extracted_title}")
                         conn.execute(
                             """INSERT INTO jobs (job_id, company, title, status, url, location, description, scraped_at, ai_score, user_id)
                                VALUES (?, ?, ?, 'applied', '', 'Remote', 'Automatically discovered via email application confirmation.', ?, ?, ?)""",

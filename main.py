@@ -45,15 +45,15 @@ def run_pipeline(scrape=True):
     init_db(DB_PATH)
 
     if scrape:
-        run_all_scrapers(DB_PATH)
-        enrich_jobs_with_contacts(DB_PATH)
+        run_all_scrapers(DB_PATH, user_id=1)
+        enrich_jobs_with_contacts(DB_PATH, user_id=1)
 
     # Sync application statuses from user's email
     from email_scraper import sync_job_statuses_from_email
-    sync_job_statuses_from_email(DB_PATH)
+    sync_job_statuses_from_email(DB_PATH, user_id=1)
 
-    digest = process_new_jobs(DB_PATH, min_score=MIN_SCORE)
-    notify(digest)
+    digest = process_new_jobs(DB_PATH, min_score=MIN_SCORE, user_id=1)
+    notify(digest, user_id=1)
     print(f"\nDone. Open dashboard: python main.py --dashboard\n")
 
 def run_pipeline_for_user(user_id: int, scrape: bool = True):
@@ -61,7 +61,6 @@ def run_pipeline_for_user(user_id: int, scrape: bool = True):
     pipeline scoped to a single user_id. Mirrors the logic used by the
     dashboard's /api/refresh route so behavior stays consistent between
     manual "Refresh Now" clicks and the scheduled daily run."""
-    from db import get_conn
     from scraper import run_all_scrapers
     from linkedin_finder import enrich_jobs_with_contacts
     from ai_engine import process_new_jobs
@@ -73,27 +72,11 @@ def run_pipeline_for_user(user_id: int, scrape: bool = True):
     if scrape:
         run_all_scrapers(DB_PATH, user_id=user_id)
 
-    # scraper/contact-finder helpers aren't fully user-scoped internally,
-    # so re-tag any orphaned rows to this user (same pattern dashboard.py
-    # uses in /api/refresh)
-    conn = get_conn(DB_PATH)
-    conn.execute("UPDATE jobs SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (user_id,))
-    conn.commit()
-
-    enrich_jobs_with_contacts(DB_PATH)
-    conn.execute("UPDATE contacts SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (user_id,))
-    conn.commit()
-    conn.close()
-
+    enrich_jobs_with_contacts(DB_PATH, user_id=user_id)
     sync_job_statuses_from_email(DB_PATH, user_id=user_id)
 
-    conn = get_conn(DB_PATH)
-    conn.execute("UPDATE received_emails SET user_id = ? WHERE user_id IS NULL OR user_id = 0", (user_id,))
-    conn.commit()
-    conn.close()
-
     digest = process_new_jobs(DB_PATH, min_score=MIN_SCORE, user_id=user_id)
-    notify(digest)
+    notify(digest, user_id=user_id)
     return digest
 
 
@@ -136,28 +119,8 @@ def run_pipeline_for_all_users(scrape: bool = True):
 
 
 def run_demo():
-    """Load demo jobs and open dashboard — works with zero internet or keys."""
-    from db import init_db
-    from scraper import seed_demo_jobs, init_db as scraper_init
-    from linkedin_finder import enrich_jobs_with_contacts
-    from ai_engine import process_new_jobs
-    import sqlite3
-
-    print("\nLoading demo data…")
-    conn = init_db(DB_PATH)
-    conn.close()
-
-    conn2 = sqlite3.connect(DB_PATH)
-    from scraper import DEMO_JOBS
-    from scraper import _insert_job
-    for job in DEMO_JOBS:
-        _insert_job(conn2, job)
-    conn2.close()
-
-    enrich_jobs_with_contacts(DB_PATH)
-    process_new_jobs(DB_PATH, min_score=0)  # score everything for demo
-
-    print("Demo data loaded. Opening dashboard…\n")
+    """Opens the dashboard on the existing database (built-in demo jobs were removed)."""
+    print("\nDemo jobs are no longer bundled. Sign up in the dashboard and click Refresh to pull live jobs.\n")
     open_dashboard()
 
 
