@@ -3,6 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script>
+// Send the CSRF token with every same-origin request that changes data.
+(function(){
+  var token = document.querySelector('meta[name="csrf-token"]').content;
+  var origFetch = window.fetch;
+  window.fetch = function(input, init){
+    init = init || {};
+    var method = (init.method || (input && input.method) || 'GET').toUpperCase();
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var sameOrigin = url.indexOf('://') === -1 || url.indexOf(location.origin + '/') === 0;
+    if (sameOrigin && ['GET','HEAD','OPTIONS'].indexOf(method) === -1) {
+      var headers = new Headers(init.headers || (input && input.headers) || {});
+      headers.set('X-CSRF-Token', token);
+      init.headers = headers;
+    }
+    return origFetch.call(this, input, init);
+  };
+})();
+</script>
 <title>Sunny Side — A Job Hunter's Board</title>
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1127,6 +1147,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     </div>
 
     <form method="POST" action="/auth/mock/callback" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="provider" value="{{ provider }}">
 
       <div class="auth-field">
@@ -1174,6 +1195,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     {% endif %}
 
     <form method="POST" action="/{{ view_mode }}" {% if view_mode == 'signup' %}enctype="multipart/form-data"{% endif %} class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="auth-field">
         <label class="auth-label" for="auth-username">Username</label>
         <input type="text" id="auth-username" name="username" required class="auth-input" autocomplete="username" placeholder="yourname">
@@ -1680,6 +1702,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
       {% endif %}
       
       <form method="POST" action="/users" style="display:flex; flex-direction:column; gap:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display:flex; flex-direction:column; gap:4px;">
           <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Username</label>
           <input type="text" name="username" required style="padding:8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;" placeholder="family_member">

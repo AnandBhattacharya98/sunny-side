@@ -1,6 +1,7 @@
 import os, re, json, sqlite3, hmac, secrets, threading, time, base64
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
+from werkzeug.middleware.proxy_fix import ProxyFix
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
@@ -11,13 +12,75 @@ from crypto_util import get_app_secret, encrypt_secret
 
 app = Flask(__name__, template_folder='.')
 app.secret_key = get_app_secret()
+# Behind Render's proxy, remote_addr is the proxy. Trust one hop of X-Forwarded-For so
+# login throttling sees the visitor's IP. Set TRUST_PROXY=0 when serving directly.
+if os.getenv("TRUST_PROXY", "1") != "0":
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     # Secure cookies by default; set SESSION_COOKIE_SECURE=0 for plain-http local dev
     SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "1") != "0",
     MAX_CONTENT_LENGTH=int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024,
+    CSRF_ENABLED=True,
 )
+
+# ── Brute-force protection ────────────────────────────────────────────────
+# Failed sign-ins are counted per username and per IP; signups per IP.
+LOGIN_FAILS_PER_USER = int(os.getenv("LOGIN_FAILS_PER_USER", "5"))
+LOGIN_FAILS_PER_IP = int(os.getenv("LOGIN_FAILS_PER_IP", "20"))
+LOGIN_WINDOW_SECONDS = 15 * 60
+SIGNUPS_PER_IP_PER_HOUR = int(os.getenv("SIGNUPS_PER_IP_PER_HOUR", "5"))
+TOO_MANY_ATTEMPTS = "Too many attempts. Please wait 15 minutes and try again."
+login_throttle = ve.RateLimiter()
+
+
+def _client_ip() -> str:
+    return request.remote_addr or "unknown"
+
+
+def _login_locked(username: str) -> bool:
+    return (login_throttle.count(("user", username), "login_fail", LOGIN_WINDOW_SECONDS) >= LOGIN_FAILS_PER_USER
+            or login_throttle.count(("ip", _client_ip()), "login_fail", LOGIN_WINDOW_SECONDS) >= LOGIN_FAILS_PER_IP)
+
+
+def _record_login_failure(username: str) -> None:
+    login_throttle.allow(("user", username), "login_fail", 10**6, LOGIN_WINDOW_SECONDS)
+    login_throttle.allow(("ip", _client_ip()), "login_fail", 10**6, LOGIN_WINDOW_SECONDS)
+
+
+# ── CSRF protection ───────────────────────────────────────────────────────
+# Every state-changing request must echo the per-session token, either as a
+# csrf_token form field or an X-CSRF-Token header (the page's fetch wrapper adds it).
+CSRF_EXEMPT_ENDPOINTS = {"cron_daily_recommendations"}
+
+
+def csrf_token() -> str:
+    tok = session.get("csrf_token")
+    if not tok:
+        tok = secrets.token_urlsafe(32)
+        session["csrf_token"] = tok
+    return tok
+
+
+@app.context_processor
+def _inject_csrf():
+    return {"csrf_token": csrf_token}
+
+
+@app.before_request
+def check_csrf():
+    if not app.config.get("CSRF_ENABLED") or request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
+        return
+    expected = session.get("csrf_token", "")
+    sent = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
+    if expected and sent and hmac.compare_digest(expected, sent):
+        return
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Your session expired. Reload the page and try again."}), 403
+    return "Your session expired. Go back, reload the page and try again.", 403
 
 # The "Dev Mode" fake Google/LinkedIn sign-in lets anyone log in as any email.
 # It only works when explicitly enabled for local testing.
@@ -114,9 +177,14 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        throttle_key = username.lower()
+        if _login_locked(throttle_key):
+            return render_template("dashboard.html", view_mode="login", error=TOO_MANY_ATTEMPTS), 429
         conn = get_conn(DB_PATH)
         user = login_user(conn, username, password)
         conn.close()
+        if not user:
+            _record_login_failure(throttle_key)
         if user:
             session.clear()
             session.permanent = True
@@ -129,6 +197,8 @@ def login():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
+        if not login_throttle.allow(("ip", _client_ip()), "signup", SIGNUPS_PER_IP_PER_HOUR, 3600):
+            return render_template("dashboard.html", view_mode="signup", error=TOO_MANY_ATTEMPTS), 429
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         name = request.form.get("name", "").strip() or username.capitalize()
