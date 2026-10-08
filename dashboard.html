@@ -714,7 +714,53 @@ input, select, textarea, button { font-family: inherit; }
 .drop-hint { font-family: var(--font-mono); border: 1.5px dashed var(--bdr-strong); color: var(--hin); border-radius: 12px; }
 
 .board-header { flex-wrap: wrap; row-gap: 10px; }
-.board-header > div[style*="max-width: 320px"] { min-width: 220px; }
+
+/* Board search: one pill for "what" and "where" */
+.board-search { position: relative; display: flex; align-items: center; flex: 1 1 300px; min-width: 260px; max-width: 540px; height: 40px;
+  background: var(--sur); border: 1px solid var(--bdr-strong); border-radius: 999px; padding: 0 6px 0 14px;
+  transition: border-color .18s ease, box-shadow .25s ease, background-color .18s ease; }
+.board-search:hover { border-color: rgba(13, 12, 10, 0.4); }
+.board-search:focus-within { border-color: var(--ink); box-shadow: 0 0 0 4px var(--purl), 0 10px 24px -16px rgba(13, 12, 10, 0.35); }
+[data-theme="dark"] .board-search:focus-within { border-color: var(--paper); }
+.bs-field { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; height: 100%; }
+.bs-query { flex: 1 1 0; }
+.bs-loc { flex: 0 1 140px; padding-left: 12px; }
+.bs-icon { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: var(--mut); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke .18s ease, transform .3s cubic-bezier(.2,.7,.2,1); }
+.bs-field:focus-within .bs-icon { stroke: var(--purt); transform: scale(1.08); }
+.bs-query:focus-within .bs-icon { transform: scale(1.08) rotate(-8deg); }
+.main .board-search input[type="search"] { flex: 1; min-width: 0; width: 100% !important; height: 100%; padding: 0 !important;
+  border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
+  font-family: var(--font-sans) !important; font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; color: var(--txt) !important;
+  outline: none; -webkit-appearance: none; appearance: none; }
+.main .board-search input[type="search"]:focus { box-shadow: none !important; }
+.main .board-search input::placeholder { color: var(--hin); font-weight: 400; }
+.board-search input::-webkit-search-cancel-button, .board-search input::-webkit-search-decoration { -webkit-appearance: none; }
+.bs-loc input { font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: 0 !important; }
+.bs-div { width: 1px; height: 18px; background: var(--bdr-strong); flex-shrink: 0; }
+.bs-kbd { font-family: var(--font-mono); font-size: 10.5px; line-height: 1; color: var(--mut); background: var(--sur2);
+  border: 1px solid var(--bdr-strong); border-bottom-width: 2px; border-radius: 6px; padding: 3px 6px; margin-right: 4px;
+  transition: opacity .15s ease, transform .15s ease; }
+.bs-query:focus-within .bs-kbd, .bs-query.has-value .bs-kbd { opacity: 0; transform: translateY(2px); pointer-events: none; position: absolute; right: 0; }
+.bs-clear { display: grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; padding: 0; border: 0; border-radius: 999px;
+  background: var(--sur2); color: var(--mut); font-size: 14px; line-height: 1; cursor: pointer;
+  opacity: 0; transform: scale(.6); pointer-events: none; transition: opacity .15s ease, transform .2s cubic-bezier(.2,.7,.2,1), background-color .15s, color .15s; }
+.bs-field.has-value .bs-clear { opacity: 1; transform: scale(1); pointer-events: auto; }
+.bs-clear:hover { background: var(--ink); color: var(--paper); }
+.bs-count { flex-shrink: 0; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap;
+  background: var(--yolk); color: var(--on-yolk, #0D0C0A); border-radius: 999px; padding: 0 9px; height: 24px; line-height: 24px;
+  margin-left: 6px; max-width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden;
+  transition: max-width .25s ease, opacity .2s ease, padding .25s ease; }
+.bs-count.show { max-width: 120px; padding: 0 9px; opacity: 1; }
+.bs-count.none { background: var(--ink); color: var(--paper); }
+@media (prefers-reduced-motion: reduce) {
+  .board-search, .bs-icon, .bs-kbd, .bs-clear, .bs-count { transition: none; }
+}
+@media (max-width: 768px) {
+  .board-header > .board-search { flex: 0 0 auto !important; height: 44px; flex-direction: row !important; align-items: center !important; gap: 0 !important; max-width: none; min-width: 0; }
+  .bs-loc { flex-basis: 110px; }
+  .bs-kbd { display: none; }
+}
 
 /* Job cards */
 .jcard { background: var(--sur); border: 1px solid var(--bdr); border-radius: 12px; box-shadow: var(--shadow);
@@ -1239,12 +1285,23 @@ input, select, textarea, button { font-family: inherit; }
   <div class="board-header" style="gap: 16px;">
     <h2 class="board-title" style="flex-shrink: 0; margin-bottom: 0;">Application Pipeline</h2>
     
-    <div style="max-width: 320px; flex: 1;">
-      <input type="text" placeholder="Search company or job title..." id="global-search" style="width: 100%; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
+    <div class="board-search" role="search">
+      <div class="bs-field bs-query">
+        <svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line></svg>
+        <input type="search" id="global-search" placeholder="Company or role" aria-label="Search company or role" autocomplete="off" spellcheck="false" oninput="filterBoard()" onkeydown="boardSearchKey(event)">
+        <button type="button" class="bs-clear" onclick="clearBoardSearch('global-search')" aria-label="Clear search" tabindex="-1">&times;</button>
+        <kbd class="bs-kbd" title="Press / to search">/</kbd>
+      </div>
+      <span class="bs-div" aria-hidden="true"></span>
+      <div class="bs-field bs-loc">
+        <svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"></path><circle cx="12" cy="10" r="2.3"></circle></svg>
+        <input type="search" id="location-search" placeholder="Anywhere" aria-label="Filter by location" autocomplete="off" spellcheck="false" oninput="filterBoard()" onkeydown="boardSearchKey(event)">
+        <button type="button" class="bs-clear" onclick="clearBoardSearch('location-search')" aria-label="Clear location" tabindex="-1">&times;</button>
+      </div>
+      <span class="bs-count" id="board-search-count" aria-live="polite"></span>
     </div>
     
     <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
-      <input type="text" placeholder="Location..." id="location-search" style="width: 110px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur);" oninput="filterBoard()">
       <select id="score-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="0">Min Score: Any</option>
         <option value="9">Min Score: 9+</option>
@@ -1258,8 +1315,8 @@ input, select, textarea, button { font-family: inherit; }
         <option value="naukri">Naukri</option>
         <option value="indeed">Indeed</option>
         <option value="whatsapp">WhatsApp</option>
-        <option value="gmail">Gmail (Auto-discovered)</option>
-        <option value="direct">Direct Startups</option>
+        <option value="gmail">Gmail</option>
+        <option value="direct">Startups</option>
       </select>
       <select id="board-sort" onchange="sortAllColumns(this.value)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="score">Sort: Score</option>
@@ -3403,6 +3460,44 @@ async function triggerRefresh() {
   }
 }
 
+function boardSearchKey(event) {
+  if (event.key === 'Escape') {
+    if (event.target.value) clearBoardSearch(event.target.id);
+    else event.target.blur();
+  }
+}
+
+function clearBoardSearch(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.value = '';
+  filterBoard();
+  input.focus();
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+  const tag = (event.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target.isContentEditable) return;
+  const search = document.getElementById('global-search');
+  if (!search || search.offsetParent === null) return;
+  event.preventDefault();
+  search.focus();
+  search.select();
+});
+
+function updateBoardSearchUI(visible, total, active) {
+  ['global-search', 'location-search'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.closest('.bs-field').classList.toggle('has-value', !!input.value);
+  });
+  const count = document.getElementById('board-search-count');
+  if (!count) return;
+  count.classList.toggle('show', active);
+  count.classList.toggle('none', active && visible === 0);
+  if (active) count.textContent = visible === 0 ? 'No matches' : `${visible} of ${total}`;
+}
+
 function filterBoard() {
   const query = document.getElementById('global-search') ? document.getElementById('global-search').value.toLowerCase().trim() : '';
   const sourceValue = document.getElementById('source-filter') ? document.getElementById('source-filter').value : 'all';
@@ -3410,6 +3505,7 @@ function filterBoard() {
   const locQuery = document.getElementById('location-search') ? document.getElementById('location-search').value.toLowerCase().trim() : '';
   
   const cards = document.querySelectorAll('.jcard');
+  let visible = 0;
   cards.forEach(card => {
     const title = card.querySelector('.jt').textContent.toLowerCase();
     const company = card.querySelector('.jc').textContent.toLowerCase();
@@ -3424,12 +3520,14 @@ function filterBoard() {
     
     if (matchesSearch && matchesSource && matchesScore && matchesLocation) {
       card.style.display = '';
+      visible++;
     } else {
       card.style.display = 'none';
     }
   });
   
   updateColumnCounts();
+  updateBoardSearchUI(visible, cards.length, !!(query || locQuery || sourceValue !== 'all' || minScore > 0));
 }
 
 function sortAllColumns(sortBy) {
