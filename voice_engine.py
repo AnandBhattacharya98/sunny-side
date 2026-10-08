@@ -64,7 +64,7 @@ INTENTS = {
     "help", "greeting", "thanks", "daily_digest", "pipeline_stats", "column_count", "job_lookup", "job_fit",
     "job_status", "email_lookup", "email_count", "last_sync", "top_matches", "cover_letter_status",
     "move_job", "thumbs_up", "thumbs_down", "trigger_refresh", "regenerate_cover_letter", "send_email",
-    "archive_job", "quiz_mode",
+    "archive_job", "quiz_mode", "follow_ups", "weekly_summary",
 }
 
 # Intents that can't be answered without knowing which job the user means
@@ -475,6 +475,8 @@ INTENTS:
 - send_email: send the application email. slot job_id
 - archive_job: remove / archive a job. slot job_id
 - quiz_mode: practice interview questions for a job. slot job_id
+- follow_ups: which applications have gone quiet / who should I follow up with / draft a follow-up
+- weekly_summary: how did my week go / weekly recap / what did I do this week
 
 Columns (for "column" and "status"): {", ".join(COLUMNS)}. "Self import" means whatsapp; "inbox" means new.
 
@@ -541,6 +543,12 @@ def _local_classify(t: str, jobs_snapshot: list[dict], chat_history: list[dict] 
     elif _has(t, "quiz", "practice", "interview prep", "prep me", "mock interview", "test me", "coach me",
               "क्विज़", "क्विज", "अभ्यास", "प्रैक्टिस", "तैयारी", "मॉक इंटरव्यू"):
         intent = "quiz_mode"
+    elif _has(t, "follow up", "follow-up", "followup", "gone quiet", "went quiet", "chase", "nudge", "haven't heard",
+              "havent heard", "फॉलो अप", "फॉलो-अप", "फॉलोअप"):
+        intent = "follow_ups"
+    elif _has(t, "this week", "my week", "weekly", "last week", "past week", "recap",
+              "इस हफ्ते", "इस हफ़्ते", "हफ्ता", "हफ़्ता", "हफ्ते", "हफ़्ते"):
+        intent = "weekly_summary"
     elif _has(t, "cover letter", "letter", "कवर लेटर", "लेटर"):
         if _has(t, "regenerate", "regen", "rewrite", "write", "create", "redo", "new one", "make",
                 "दोबारा", "फिर से", "लिखो", "लिख दो", "बनाओ", "बना दो", "नया"):
@@ -720,10 +728,12 @@ def reply_lang(requested, transcript: str = "") -> str:
 
 HELP_TEXT = {
     "en": ("I can tell you what's new, give you your pipeline stats and top matches, explain why a job scored "
-           "what it did, check emails from a company, and move, like or archive jobs for you. "
+           "what it did, check emails from a company, tell you which applications need a follow-up, recap your week, "
+           "and move, like or archive jobs for you. "
            "Just tap the mic and talk to me like you would to a friend."),
     "hi": ("मैं आपको बता सकती हूँ कि आज क्या नया है, आपकी पाइपलाइन और टॉप मैच दिखा सकती हूँ, किसी जॉब का स्कोर "
-           "समझा सकती हूँ, किसी कंपनी के ईमेल देख सकती हूँ, और जॉब्स को मूव, लाइक या आर्काइव कर सकती हूँ। "
+           "समझा सकती हूँ, किसी कंपनी के ईमेल देख सकती हूँ, बता सकती हूँ कि किसे फॉलो-अप करना है, आपके हफ्ते का हाल "
+           "सुना सकती हूँ, और जॉब्स को मूव, लाइक या आर्काइव कर सकती हूँ। "
            "बस माइक दबाइए और दोस्त की तरह बात कीजिए।"),
 }
 
@@ -758,6 +768,8 @@ _CHIPS = {
     "send": ("Send the application", "एप्लीकेशन भेजो"),
     "rewrite": ("Rewrite the cover letter", "कवर लेटर दोबारा लिखो"),
     "write_letter": ("Write a cover letter for it", "इसके लिए कवर लेटर लिखो"),
+    "followups": ("Who should I follow up with?", "मुझे किसे फॉलो-अप करना चाहिए?"),
+    "week": ("How did my week go?", "मेरा हफ्ता कैसा रहा?"),
 }
 
 
@@ -766,9 +778,12 @@ def chip(key: str, lang: str = "en") -> str:
     return hi if lang == "hi" else en
 
 
-def default_suggestions(jobs_snapshot: list[dict], digest_count: int = 0, lang: str = "en") -> list[str]:
+def default_suggestions(jobs_snapshot: list[dict], digest_count: int = 0, lang: str = "en",
+                        followup_count: int = 0) -> list[str]:
     """Starter chips built from the user's own board, so the examples feel relevant."""
     chips = []
+    if followup_count:
+        chips.append(chip("followups", lang))
     if digest_count:
         chips.append(chip("whats_new", lang))
     top = sorted((j for j in jobs_snapshot if j.get("score") is not None),

@@ -6,6 +6,7 @@ from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
 import quiz_coach
+import followups
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
@@ -1280,8 +1281,102 @@ def run_daily_recommendations():
             to = recipient_for_user(uid)
             if picks and to:
                 send_email_digest([{**pick, "score": pick.get("ai_score") or 0, "fit_summary": pick.get("ai_summary") or ""} for pick in picks], recipient=to)
+
+            # 5. Weekly recap on Mondays, never twice in one week
+            if to:
+                send_weekly_summary_if_due(uid, to)
         except Exception as e:
             print(f"Daily recommendations failed for user {uid}: {e}")
+
+
+WEEKLY_SUMMARY_WEEKDAY = int(os.getenv("WEEKLY_SUMMARY_WEEKDAY", "0"))  # Monday
+
+
+def send_weekly_summary_if_due(uid, to, now=None):
+    now = now or datetime.now()
+    if now.weekday() != WEEKLY_SUMMARY_WEEKDAY:
+        return False
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT weekly_summary_sent_at, name FROM users WHERE id = ?", (uid,)).fetchone()
+        last = followups._parse(row[0]) if row else None
+        if last and now - last < timedelta(days=6):
+            return False
+        summary = followups.weekly_summary(conn, uid, now=now)
+        board_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+        html = followups.weekly_email_html(summary, name=(row[1] if row else "") or "",
+                                           board_url=f"{board_url}/" if board_url else "")
+        if not send_email(to, "Your week in job hunting", html):
+            return False
+        conn.execute("UPDATE users SET weekly_summary_sent_at = ? WHERE id = ?", (now.isoformat(), uid))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+@app.route("/api/followups", methods=["GET"])
+def api_followups():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        return jsonify({"ok": True, "days": followups.FOLLOWUP_DAYS, "jobs": followups.stale_applications(conn, uid)})
+    finally:
+        conn.close()
+
+
+def _followup_job(conn, uid, job_id):
+    for job in followups.stale_applications(conn, uid, days=0):
+        if job["job_id"] == job_id:
+            return job
+    return None
+
+
+@app.route("/api/job/<job_id>/followup/draft", methods=["POST"])
+def api_followup_draft(job_id):
+    uid = get_user_id()
+    if not ve.rate_limiter.allow(uid, "followup_draft", 10):
+        return jsonify({"ok": False, "error": "Too many drafts at once. Try again in a minute."}), 429
+    conn = get_conn(DB_PATH)
+    try:
+        job = _followup_job(conn, uid, job_id)
+        if not job:
+            return jsonify({"ok": False, "error": "Job not found"}), 404
+        settings = get_user_settings(conn, uid)
+    finally:
+        conn.close()
+    draft = followups.draft_followup(job, candidate_name=settings.get("name") or "",
+                                     resume_text=settings.get("resume_text") or "",
+                                     api_key=settings.get("gemini_api_key") or None)
+    return jsonify({"ok": True, "job": job, **draft})
+
+
+@app.route("/api/job/<job_id>/followup/done", methods=["POST"])
+def api_followup_done(job_id):
+    """Followed up (or chose to wait): hide the reminder for another FOLLOWUP_DAYS."""
+    uid = get_user_id()
+    sent = bool((request.get_json(silent=True) or {}).get("sent"))
+    conn = get_conn(DB_PATH)
+    try:
+        if not conn.execute("SELECT 1 FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone():
+            return jsonify({"ok": False, "error": "Job not found"}), 404
+        followups.snooze(conn, uid, job_id)
+        if sent:
+            add_timeline(conn, job_id, "Followed up")
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/summary/weekly", methods=["GET"])
+def api_weekly_summary():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        s = followups.weekly_summary(conn, uid)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "text": followups.summary_sentence(s), **s})
 
 
 @app.route("/api/cron/daily-recommendations", methods=["POST"])
@@ -1906,6 +2001,38 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
                 else _t("Your board hasn't been refreshed yet. Want me to do it now?", "आपका बोर्ड अभी तक रिफ्रेश नहीं हुआ है। अभी कर दूँ?"))
         return _voice_reply(intent, text, suggestions=follow)
 
+    if intent == "follow_ups":
+        stale = followups.stale_applications(conn, uid)
+        if not stale:
+            return _voice_reply(intent, _t(f"Nothing has gone quiet. Every application has had activity in the last {followups.FOLLOWUP_DAYS} days.",
+                                           f"कुछ भी अटका नहीं है। पिछले {followups.FOLLOWUP_DAYS} दिनों में हर एप्लीकेशन पर कुछ न कुछ हुआ है।"),
+                                suggestions=[ve.chip("pipeline", lang), ve.chip("week", lang)])
+        jobs = [j for j in (_voice_job(conn, uid, x["job_id"]) for x in stale[:3]) if j]
+        quiet = {x["job_id"]: x["days_quiet"] for x in stale}
+        if lang == "hi":
+            spoken = ", ".join(f"{j['company']} ({quiet[j['job_id']]} दिन)" for j in jobs)
+            text = f"{len(stale)} एप्लीकेशन पर कोई जवाब नहीं आया: {spoken}। बोर्ड पर 'फॉलो-अप' पट्टी से ईमेल का ड्राफ्ट बना सकते हैं।"
+        else:
+            spoken = ", ".join(f"{j['company']} ({quiet[j['job_id']]} days)" for j in jobs)
+            text = (f"{len(stale)} application{'s have' if len(stale) != 1 else ' has'} gone quiet: {spoken}. "
+                    "Tap Draft email in the follow-up strip on your board and I'll write the nudge for you.")
+        return _voice_reply(intent, text, cards=[_voice_card(j) for j in jobs],
+                            suggestions=[ve.chip("week", lang), ve.chip("pipeline", lang)])
+
+    if intent == "weekly_summary":
+        summary = followups.weekly_summary(conn, uid)
+        if lang == "hi":
+            text = (f"इस हफ्ते: {summary['new_jobs']} नई जॉब्स, {summary['applied']} में अप्लाई, "
+                    f"{summary['interviews']} इंटरव्यू अपडेट और {summary['replies']} जवाब।")
+            if summary["follow_ups"]:
+                text += f" {len(summary['follow_ups'])} एप्लीकेशन फॉलो-अप का इंतज़ार कर रही हैं।"
+        else:
+            text = followups.summary_sentence(summary)
+        card = {"type": "week", "new_jobs": summary["new_jobs"], "applied": summary["applied"],
+                "interviews": summary["interviews"], "replies": summary["replies"]}
+        chips = [ve.chip("followups", lang)] if summary["follow_ups"] else []
+        return _voice_reply(intent, text, cards=[card], suggestions=chips + [ve.chip("top", lang)])
+
     if intent == "top_matches":
         rows = conn.execute(
             "SELECT job_id, title, company, ai_score, status, location, ai_summary FROM jobs WHERE user_id = ? AND status != 'archived' "
@@ -2123,13 +2250,15 @@ def voice_welcome():
         settings = get_user_settings(conn, uid)
         snapshot = _voice_jobs_snapshot(conn, uid)
         digest_count = len(_digest_rows(conn, uid))
+        followup_count = len(followups.stale_applications(conn, uid))
         has_key = bool(settings.get("gemini_api_key") or get_fallback_gemini_key())
     finally:
         conn.close()
     return jsonify({
         "ok": True,
         "greeting": ve.greeting_text(settings.get("name"), lang=lang),
-        "suggestions": ve.default_suggestions(snapshot, digest_count, lang=lang),
+        "suggestions": ve.default_suggestions(snapshot, digest_count, lang=lang, followup_count=followup_count),
+        "followup_count": followup_count,
         "lang": lang,
         "digest_count": digest_count,
         "has_jobs": bool(snapshot),

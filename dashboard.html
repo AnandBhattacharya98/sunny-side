@@ -39,14 +39,15 @@
     document.documentElement.setAttribute('data-theme', t);
   })();
 </script>
-{% if view_mode in ('login', 'signup', 'mock_auth', 'onboarding') %}
+{% if view_mode in ('login', 'signup', 'mock_auth', 'onboarding', 'forgot', 'reset') %}
 <script>document.documentElement.setAttribute('data-theme', 'light');</script>
 {% endif %}
-{% if view_mode in ('login', 'signup', 'onboarding') %}
+{% if view_mode in ('login', 'signup', 'onboarding', 'forgot', 'reset') %}
 <style>
 body {
   overflow: auto !important;
 }
+
 </style>
 {% endif %}
 <style>
@@ -737,6 +738,28 @@ body[data-sunny="happy"] .sunny .s-body { animation: sunnyHop 0.5s ease-out 2; }
 @media (prefers-reduced-motion: reduce) {
   .va-big-mic, #va-fab, #va-fab.wave .va-sunny-slot, .va-mascot-btn, .sunny *, #va-fab.pulse::after, .va-mic.pulse::after, .va-mic.listening::after, .va-wave.auto i, .va-typing span { animation: none !important; }
 }
+
+/* Follow-up reminders */
+.fu-strip { margin: 0 20px 20px; padding: 16px; background: var(--sur); border: 1px solid var(--bdr); border-left: 4px solid var(--pur); border-radius: 16px; }
+.fu-strip[hidden], .fu-modal[hidden] { display: none; }
+.fu-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.fu-head h4 { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: var(--txt); margin: 0; }
+.fu-sub { font-size: 12px; color: var(--mut); margin: 0; }
+.fu-body { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.fu-card { flex: 0 0 250px; border: 1px solid var(--bdr); border-radius: 12px; padding: 12px; background: var(--bg); }
+.fu-card-title { font-size: 13px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fu-card-sub { font-size: 11.5px; color: var(--mut); margin-top: 3px; }
+.fu-card-actions, .fu-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.fu-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--bdr); background: var(--sur); color: var(--txt); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.fu-btn-p { background: var(--pur); border-color: var(--pur); color: #1a1408; }
+.fu-btn-ghost { background: transparent; }
+.fu-btn:disabled { opacity: .6; cursor: wait; }
+.fu-modal { position: fixed; inset: 0; background: rgba(20, 16, 10, .45); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.fu-panel { background: var(--bg); color: var(--txt); width: 100%; max-width: 560px; border-radius: 16px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,.25); max-height: 90vh; overflow: auto; }
+.fu-panel h3 { margin: 0 0 4px; font-size: 17px; }
+.fu-label { display: block; font-size: 11px; font-weight: 600; color: var(--mut); text-transform: uppercase; margin: 14px 0 4px; }
+.fu-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--bdr); background: var(--sur); color: var(--txt); }
+textarea.fu-input { resize: vertical; line-height: 1.5; }
 </style>
 <style>
 /* ── Design layer: matches the landing page ─────────────────────────────────
@@ -1568,6 +1591,32 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     </div>
     <div id="daily-picks-body" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:4px;">
       <!-- JavaScript populated cards -->
+    </div>
+  </div>
+
+  <!-- Follow-up reminders -->
+  <section id="followup-strip" class="fu-strip" hidden aria-labelledby="fu-title">
+    <div class="fu-head">
+      <h4 id="fu-title">Worth a follow-up</h4>
+      <span class="fu-sub" id="fu-sub"></span>
+    </div>
+    <div class="fu-body" id="fu-body"></div>
+  </section>
+
+  <div id="fu-modal" class="fu-modal" hidden role="dialog" aria-modal="true" aria-labelledby="fu-modal-title">
+    <div class="fu-panel">
+      <h3 id="fu-modal-title">Follow-up email</h3>
+      <p class="fu-sub" id="fu-modal-sub"></p>
+      <label class="fu-label" for="fu-subject">Subject</label>
+      <input id="fu-subject" class="fu-input" type="text">
+      <label class="fu-label" for="fu-text">Message</label>
+      <textarea id="fu-text" class="fu-input" rows="9"></textarea>
+      <div class="fu-actions">
+        <button type="button" class="fu-btn" onclick="copyFollowup()">Copy</button>
+        <a class="fu-btn" id="fu-mailto" href="#" target="_blank" rel="noopener">Open in email</a>
+        <button type="button" class="fu-btn fu-btn-p" onclick="finishFollowup(true)">I sent it</button>
+        <button type="button" class="fu-btn fu-btn-ghost" onclick="closeFollowup()">Close</button>
+      </div>
     </div>
   </div>
 
@@ -3469,6 +3518,10 @@ function renderMessage(msg) {
 }
 
 function renderCard(card) {
+  if (card.type === 'week') {
+    const stat = (n, label) => `<div class="va-stat"><b>${esc(n ?? 0)}</b><span>${label}</span></div>`;
+    return `<div class="va-stats">${stat(card.new_jobs, vaT('New jobs', 'नई जॉब्स'))}${stat(card.applied, vaT('Applied', 'अप्लाई किया'))}${stat(card.interviews, vaT('Interviews', 'इंटरव्यू'))}${stat(card.replies, vaT('Replies', 'जवाब'))}</div>`;
+  }
   if (card.type === 'stats') {
     const stat = (n, label) => `<div class="va-stat"><b>${esc(n ?? 0)}</b><span>${label}</span></div>`;
     return `<div class="va-stats">${stat(card.total, vaT('On board', 'बोर्ड पर'))}${stat(card.avg_score, vaT('Avg score', 'औसत स्कोर'))}${stat(card.shortlisted, vaT('Shortlisted', 'शॉर्टलिस्ट'))}${stat(card.applied, vaT('Applied', 'अप्लाई किया'))}${stat(card.interviewing, vaT('Interviewing', 'इंटरव्यू'))}${stat(card.offers, vaT('Offers', 'ऑफ़र'))}</div>`;
@@ -5455,6 +5508,95 @@ async function loadDailyRecommendations() {
   }
 }
 
+let fuJobs = [];
+let fuCurrent = null;
+
+async function loadFollowups() {
+  let data;
+  try { data = await (await fetch('/api/followups')).json(); } catch (e) { return; }
+  const strip = document.getElementById('followup-strip');
+  if (!strip) return;
+  fuJobs = (data && data.ok && data.jobs) || [];
+  if (!fuJobs.length) { strip.hidden = true; return; }
+  document.getElementById('fu-sub').textContent =
+    `${fuJobs.length} application${fuJobs.length > 1 ? 's have' : ' has'} had no reply for ${data.days}+ days`;
+  document.getElementById('fu-body').innerHTML = fuJobs.map((j, i) => `
+    <div class="fu-card">
+      <div class="fu-card-title">${esc(j.title)}</div>
+      <div class="fu-card-sub">${esc(j.company)} · ${j.status === 'interviewing' ? 'Interviewing' : 'Applied'} · quiet for ${j.days_quiet} days</div>
+      <div class="fu-card-actions">
+        <button type="button" class="fu-btn fu-btn-p" onclick="openFollowup(${i}, this)">Draft email</button>
+        <button type="button" class="fu-btn fu-btn-ghost" onclick="snoozeFollowup(${i})" title="Hide for a week">Snooze</button>
+      </div>
+    </div>`).join('');
+  strip.hidden = false;
+}
+
+async function openFollowup(i, btn) {
+  const job = fuJobs[i];
+  if (!job) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Writing…';
+  try {
+    const r = await fetch(`/api/job/${encodeURIComponent(job.job_id)}/followup/draft`, { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) { toast(d.error || 'Could not draft the email'); return; }
+    fuCurrent = job;
+    document.getElementById('fu-modal-sub').textContent = `${job.title} at ${job.company}${job.contact_name ? ' · to ' + job.contact_name : ''}`;
+    document.getElementById('fu-subject').value = d.subject;
+    document.getElementById('fu-text').value = d.body;
+    updateFollowupMailto();
+    document.getElementById('fu-modal').hidden = false;
+    document.getElementById('fu-text').focus();
+  } catch (e) {
+    toast('Could not draft the email');
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+function updateFollowupMailto() {
+  const to = (fuCurrent && fuCurrent.contact_email) || '';
+  const subject = document.getElementById('fu-subject').value;
+  const body = document.getElementById('fu-text').value;
+  document.getElementById('fu-mailto').href =
+    `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function copyFollowup() {
+  const text = `Subject: ${document.getElementById('fu-subject').value}\n\n${document.getElementById('fu-text').value}`;
+  try { await navigator.clipboard.writeText(text); toast('Copied'); } catch (e) { toast('Select the text and copy it'); }
+}
+
+function closeFollowup() {
+  document.getElementById('fu-modal').hidden = true;
+  fuCurrent = null;
+}
+
+async function finishFollowup(sent) {
+  if (!fuCurrent) return;
+  const job = fuCurrent;
+  closeFollowup();
+  await fetch(`/api/job/${encodeURIComponent(job.job_id)}/followup/done`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sent })
+  });
+  toast(sent ? 'Nice. I\'ll remind you again in a week if it stays quiet.' : 'Snoozed for a week');
+  loadFollowups();
+}
+
+async function snoozeFollowup(i) {
+  fuCurrent = fuJobs[i];
+  await finishFollowup(false);
+}
+
+document.addEventListener('input', e => {
+  if (e.target && (e.target.id === 'fu-subject' || e.target.id === 'fu-text')) updateFollowupMailto();
+});
+document.addEventListener('keydown', e => {
+  const m = document.getElementById('fu-modal');
+  if (e.key === 'Escape' && m && !m.hidden) closeFollowup();
+});
+
 function toggleDailyPicksBody() {
   const body = document.getElementById('daily-picks-body');
   const btn = document.getElementById('daily-picks-toggle-btn');
@@ -5501,6 +5643,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   loadDailyRecommendations();
+  loadFollowups();
 
   document.querySelectorAll('.sidebar a').forEach(link => {
     link.addEventListener('click', () => {
