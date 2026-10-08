@@ -935,7 +935,7 @@ input, select, textarea, button { font-family: inherit; }
 * { scrollbar-width: thin; scrollbar-color: var(--bdr-strong) transparent; }
 </style>
 </head>
-<body>
+<body data-uid="{{ session.get('user_id') or '' }}">
 
 {% if view_mode == 'board' %}
 <!-- Global Page Loader -->
@@ -1250,7 +1250,7 @@ input, select, textarea, button { font-family: inherit; }
       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
       {{ session.get('username', 'Admin') }}
     </span>
-    <a href="/logout" style="color:var(--rd);text-decoration:none;font-weight:600;font-size:11px;">Logout</a>
+    <a href="/logout" onclick="try { Object.keys(sessionStorage).filter(k => k.startsWith('va_')).forEach(k => sessionStorage.removeItem(k)); } catch (e) {}" style="color:var(--rd);text-decoration:none;font-weight:600;font-size:11px;">Logout</a>
   </div>
 
   <div class="ns">Stats</div>
@@ -2168,7 +2168,9 @@ const VA = {
   hintTimer: null,
   reloadTimer: null,
 };
-const VA_STATE_KEY = 'va_state_v1';
+// Chat state is kept per tab AND per person, so a different account never sees someone else's chat
+const VA_UID = document.body.dataset.uid || '';
+const VA_STATE_KEY = 'va_state_v2:' + VA_UID;
 const VA_MAX_MESSAGES = 40;
 
 // Sunny speaks English or Hindi. The choice is per browser; the server answers in whatever we send.
@@ -2177,6 +2179,29 @@ function vaInitialLang() {
   const saved = vaGet('localStorage', 'va_lang');
   if (saved === 'hi' || saved === 'en') return saved;
   return (navigator.language || '').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+}
+
+// Every Sunny request says which account this page belongs to. If that account signed out, or
+// someone else signed in from another tab, the chat is wiped instead of carrying on.
+function vaFetch(url, opts = {}) {
+  opts.headers = { ...(opts.headers || {}), 'X-Sunny-User': VA_UID };
+  return fetch(url, opts).then(res => {
+    if (res.status !== 401) return res;
+    const msg = vaT("You've been signed out, or someone else signed in from another tab. Refresh the page to keep chatting.",
+                    'आप साइन आउट हो गए हैं, या किसी और ने दूसरे टैब से साइन इन किया है। बात जारी रखने के लिए पेज रिफ्रेश करें।');
+    vaForgetChat();
+    return new Response(JSON.stringify({ ok: false, error: msg, reply_text: msg, suggestions: [] }),
+                        { status: 401, headers: { 'Content-Type': 'application/json' } });
+  });
+}
+
+function vaForgetChat() {
+  VA.messages = [];
+  VA.history = [];
+  VA.contextJobIds = [];
+  VA.pendingToken = null;
+  vaRemove('sessionStorage', VA_STATE_KEY);
+  document.querySelectorAll('#voice-messages .va-msg').forEach(el => el.remove());
 }
 
 function vaGet(store, key) { try { return window[store].getItem(key); } catch (e) { return null; } }
@@ -2203,13 +2228,17 @@ function initVoiceAssistant() {
 
   loadAssistantWelcome(true);
 
+  // Drop chats left in this tab by other accounts (and by the old unscoped key)
+  try {
+    Object.keys(sessionStorage).filter(k => k.startsWith('va_state_') && k !== VA_STATE_KEY).forEach(k => sessionStorage.removeItem(k));
+  } catch (e) {}
   restoreAssistantState();
   document.addEventListener('keydown', handleAssistantKeys);
   ['pointerdown', 'keydown', 'touchend'].forEach(evt => document.addEventListener(evt, vaUnlockAudio, { capture: true, passive: true }));
 }
 
 function loadAssistantWelcome(first) {
-  fetch('/api/voice/welcome?lang=' + VA.lang)
+  vaFetch('/api/voice/welcome?lang=' + VA.lang)
     .then(r => r.ok ? r.json() : null)
     .then(res => {
       if (!res || !res.ok) return;
@@ -2361,7 +2390,7 @@ function openVoiceAssistant() {
   if (!VA.welcomed) {
     VA.welcomed = true;
     if ((VA.welcome?.digest_count || 0) > 0 && !VA.messages.length) {
-      fetch('/api/voice/digest?lang=' + VA.lang)
+      vaFetch('/api/voice/digest?lang=' + VA.lang)
         .then(r => r.json())
         .then(res => {
           if (!res.ok || !res.count) return;
@@ -2613,7 +2642,7 @@ async function submitRecording(blob) {
   form.append('file', blob, 'recording.' + ext);
   form.append('lang', VA.lang);
   try {
-    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+    const res = await vaFetch('/api/voice/transcribe', { method: 'POST', body: form });
     const data = await res.json();
     if (data.ok && data.transcript) {
       handleUserText(data.transcript, true);
@@ -2725,7 +2754,7 @@ function vaIsYes(t) { return VA_YES_RE.test(t); }
 function sendAssistantQuery(text) {
   setAssistantStatus('thinking');
   const typing = showTyping();
-  fetch('/api/voice/query', {
+  vaFetch('/api/voice/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ transcript: text, chat_history: VA.history.slice(0, -1), context_job_ids: VA.contextJobIds, lang: VA.lang })
@@ -2784,7 +2813,7 @@ function confirmVoiceAction() {
   if (!token) { addAssistantNote(vaT('That request has expired. Just ask me again.', 'वह रिक्वेस्ट पुरानी हो गई। बस फिर से पूछ लीजिए।')); return; }
   setAssistantStatus('thinking', vaT('Working on it…', 'कर रही हूँ…'));
   const typing = showTyping();
-  fetch('/api/voice/confirm', {
+  vaFetch('/api/voice/confirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, lang: VA.lang })
@@ -2809,7 +2838,7 @@ function cancelVoiceAction() {
   VA.pendingToken = null;
   hideConfirmButtons();
   const fallback = vaT('No problem, cancelled.', 'कोई बात नहीं, रद्द कर दिया।');
-  fetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) })
+  vaFetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) })
     .then(r => r.json())
     .then(res => handleAssistantReply({ reply_text: res.reply_text || fallback }))
     .catch(() => handleAssistantReply({ reply_text: fallback }));
@@ -2867,7 +2896,7 @@ function speakResponse(text, onDone) {
     if (settled || myToken !== VA.speakToken) return;
     timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 4500 : 15000);
   });
-  fetch('/api/voice/synthesize', {
+  vaFetch('/api/voice/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, lang: VA.lang }),
@@ -2951,18 +2980,25 @@ function vaVoicesReady() {
   });
 }
 
-function pickBrowserVoice(voices, lang) {
+// Local voices first: Chrome's "Google ..." voices stream from the network and, when that fails,
+// sit in "speaking" forever without a sound. Network voices are only a last resort.
+function pickBrowserVoice(voices, lang, avoid) {
   const base = lang.slice(0, 2);
+  const usable = voices.filter(v => v !== avoid && (v.lang || '').toLowerCase().replace('_', '-').startsWith(base));
+  const local = usable.filter(v => v.localService !== false);
   const preferred = base === 'hi'
-    ? ['Google हिन्दी', 'Lekha', 'Microsoft Swara', 'Microsoft Kalpana', 'Microsoft Hemant']
-    : ['Google US English', 'Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Google UK English Female'];
-  for (const name of preferred) {
-    const v = voices.find(v => v.name.includes(name) && v.lang.toLowerCase().startsWith(base));
-    if (v) return v;
+    ? ['Lekha', 'Microsoft Swara', 'Microsoft Kalpana', 'Microsoft Hemant', 'Google हिन्दी']
+    : ['Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira', 'Karen', 'Daniel', 'Google US English', 'Google UK English Female'];
+  for (const pool of [local, usable]) {
+    for (const name of preferred) {
+      const v = pool.find(v => v.name.includes(name));
+      if (v) return v;
+    }
+    const exact = pool.find(v => v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase());
+    if (exact) return exact;
+    if (pool.length) return pool[0];
   }
-  return voices.find(v => /natural|neural|online/i.test(v.name) && v.lang.toLowerCase().startsWith(base))
-    || voices.find(v => v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase())
-    || voices.find(v => v.lang.toLowerCase().startsWith(base)) || null;
+  return null;
 }
 
 // Chrome cuts off long utterances and can drop one spoken straight after cancel(),
@@ -2979,13 +3015,13 @@ function vaChunks(text) {
   return chunks;
 }
 
-async function speakWithBrowser(text, done, token) {
+async function speakWithBrowser(text, done, token, avoid) {
   if (!('speechSynthesis' in window)) { vaSoundProblem(); done(); return; }
   const synth = window.speechSynthesis;
   const lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
   const voices = await vaVoicesReady();
   if (token !== undefined && token !== VA.speakToken) return;
-  const voice = pickBrowserVoice(voices, lang);
+  const voice = pickBrowserVoice(voices, lang, avoid);
   if (synth.speaking || synth.pending) synth.cancel();
   synth.resume();
   const chunks = vaChunks(text);
@@ -2994,6 +3030,7 @@ async function speakWithBrowser(text, done, token) {
     const u = new SpeechSynthesisUtterance(chunk);
     if (voice) u.voice = voice;
     u.lang = voice?.lang || lang;
+    u.volume = 1;
     u.rate = 1.02;
     u.pitch = 1.05;
     u.onstart = () => { started = true; };
@@ -3005,15 +3042,17 @@ async function speakWithBrowser(text, done, token) {
   setTimeout(() => {
     if (token !== undefined && token !== VA.speakToken) return;
     VA.utterances.forEach(u => synth.speak(u));
+    // Nothing started: the voice is stuck (Chrome reports "speaking" anyway). Try another voice
+    // once, then give up and say so instead of showing "Speaking…" in silence.
     setTimeout(() => {
-      if (!started && !synth.speaking && (token === undefined || token === VA.speakToken)) { vaSoundProblem(); done(); }
-    }, 4000);
+      if (started || (token !== undefined && token !== VA.speakToken)) return;
+      VA.utterances.forEach(u => { u.onend = null; u.onerror = null; });
+      synth.cancel();
+      if (!avoid && voice) { speakWithBrowser(text, done, token, voice); return; }
+      vaSoundProblem();
+      done();
+    }, 3000);
   }, 80);
-  clearInterval(VA.keepAlive);
-  VA.keepAlive = setInterval(() => {
-    if (!synth.speaking) { clearInterval(VA.keepAlive); return; }
-    synth.pause(); synth.resume();
-  }, 10000);
 }
 
 function vaSoundProblem() {
@@ -3187,7 +3226,7 @@ function clearAssistantChat() {
   VA.history = [];
   VA.contextJobIds = [];
   VA.pendingToken = null;
-  fetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) }).catch(() => {});
+  vaFetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) }).catch(() => {});
   const container = document.getElementById('voice-messages');
   const starter = document.getElementById('voice-starter-container');
   if (container && starter) {

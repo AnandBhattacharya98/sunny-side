@@ -366,3 +366,17 @@ def test_hindi_confirm_flow(client):
     assert res["ok"] and DEVANAGARI.search(res["reply_text"])
     res = client.post("/api/voice/cancel", json={"lang": "hi"}).get_json()
     assert DEVANAGARI.search(res["reply_text"])
+
+
+# ── One account per page ──────────────────────────────────────────────────
+
+def test_page_from_another_account_is_refused(client):
+    res = client.post("/api/voice/query", json={"transcript": "how's my pipeline"}, headers={"X-Sunny-User": "102"})
+    assert res.status_code == 401 and res.get_json()["account_changed"]
+    res = client.post("/api/voice/query", json={"transcript": "how's my pipeline"}, headers={"X-Sunny-User": "101"})
+    assert res.status_code == 200
+
+
+def test_dashboard_page_carries_the_signed_in_account(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-uid="101"' in html
