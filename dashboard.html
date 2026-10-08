@@ -19,6 +19,9 @@
     document.documentElement.setAttribute('data-theme', t);
   })();
 </script>
+{% if view_mode in ('login', 'signup', 'mock_auth', 'onboarding') %}
+<script>document.documentElement.setAttribute('data-theme', 'light');</script>
+{% endif %}
 {% if view_mode in ('login', 'signup', 'onboarding') %}
 <style>
 body {
@@ -646,6 +649,108 @@ input, select, textarea, button { font-family: inherit; }
 .auth-input { border-radius: 12px; }
 .auth-card h1, .auth-card h2, .auth-card h3 { font-family: var(--font-sans); letter-spacing: -0.03em; }
 
+/* Sign in, sign up and resume onboarding: same look as the homepage (light only) */
+.auth-shell { min-height: 100vh; width: 100%; background: var(--bg); color: var(--txt);
+              font-family: var(--font-sans); display: flex; flex-direction: column; }
+.auth-nav { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 24px;
+            border-bottom: 1px solid var(--bdr); }
+.auth-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px;
+             letter-spacing: -0.03em; color: var(--txt); text-decoration: none; }
+.auth-logo-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--yolk); }
+.auth-main { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 56px 16px 72px; }
+.auth-shell .auth-card { max-width: 420px; padding: 32px; gap: 22px; border-radius: 18px; }
+.auth-shell .auth-card-wide { max-width: 560px; }
+.auth-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+.auth-head p { margin-top: 8px; color: var(--mut); font-size: 15px; }
+.auth-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+                color: var(--pur); margin-bottom: 10px; }
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-shell .auth-label { font-family: var(--font-sans); font-size: 13px; font-weight: 600; letter-spacing: 0;
+                          text-transform: none; color: var(--txt); }
+.auth-shell .auth-input { border-radius: 10px; padding: 11px 12px; font-size: 14px; background: var(--sur) !important; }
+.auth-shell .auth-input:focus { border-color: var(--txt) !important; box-shadow: 0 0 0 3px var(--purl) !important; }
+.auth-pw { position: relative; display: flex; align-items: center; }
+.auth-pw .auth-input { padding-right: 60px; }
+.auth-show { position: absolute; right: 8px; background: none; border: none; cursor: pointer; padding: 4px 6px;
+             font-family: var(--font-mono); font-size: 11px; color: var(--mut); }
+.auth-show:hover { color: var(--txt); }
+.auth-hint { font-size: 12.5px; color: var(--mut); margin-top: -6px; }
+.auth-muted { color: var(--hin); font-weight: 400; }
+
+.auth-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px;
+            border-radius: 10px; border: 1px solid var(--bdr-strong); background: transparent; color: var(--txt);
+            font-family: var(--font-sans); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
+            transition: background .15s, border-color .15s, transform .15s; }
+.auth-btn:hover { background: var(--sur2); }
+.auth-btn:active { transform: translateY(1px); }
+.auth-btn-p { background: var(--yolk); border-color: var(--yolk); color: var(--ink); }
+.auth-btn-p:hover { background: #FFB938; border-color: #FFB938; }
+.auth-btn-block { width: 100%; padding: 12px 16px; }
+.auth-btn-lg { padding: 14px 18px; font-size: 15px; }
+.auth-btn-quiet { border-color: transparent; color: var(--mut); }
+
+.auth-or { display: flex; align-items: center; gap: 12px; color: var(--hin); font-family: var(--font-mono); font-size: 11px; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--bdr); }
+.auth-switch { text-align: center; font-size: 14px; color: var(--mut); }
+.auth-switch a { color: var(--txt); font-weight: 600; text-decoration: underline; text-decoration-color: var(--yolk);
+                 text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.auth-error { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px;
+              background: var(--rdl); color: var(--rd); border: 1px solid rgba(180, 35, 24, 0.2); }
+.auth-error svg { flex-shrink: 0; margin-top: 3px; }
+.auth-option { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 10px 12px;
+               border-radius: 10px; border: 1px solid var(--bdr); background: var(--sur); cursor: pointer;
+               font-family: var(--font-sans); font-size: 14px; color: var(--txt); text-align: left; }
+.auth-option:hover { border-color: var(--bdr-strong); background: var(--sur2); }
+.auth-option span { font-family: var(--font-mono); font-size: 11.5px; color: var(--mut); }
+
+.auth-shell .accordion-wrapper { border-radius: 12px; background: var(--sur); }
+.auth-shell .accordion-toggle { font-family: var(--font-sans); font-size: 14px; font-weight: 600; padding: 12px 16px; color: var(--txt); }
+.auth-accordion-body { padding: 4px 0 16px; }
+
+.auth-shell .dropzone-box { border: 1.5px dashed var(--bdr-strong); border-radius: 12px; background: var(--bg); padding: 16px; gap: 4px; }
+.auth-shell .dropzone-box:hover, .auth-shell .dropzone-box.over { border-color: var(--yolk); background: var(--purl); }
+.auth-shell .dropzone-box.has-file { border-style: solid; border-color: var(--yolk); background: var(--purl); }
+.dropzone-lg { padding: 36px 16px !important; }
+.dz-icon { color: var(--mut); margin-bottom: 6px; }
+.dz-title { font-size: 14px; font-weight: 600; color: var(--txt); }
+.dz-sub { font-family: var(--font-mono); font-size: 11px; color: var(--hin); }
+
+/* Reading step: a thin progress bar and a checklist that fills in */
+.onboard-progress { height: 4px; border-radius: 999px; background: var(--sur2); overflow: hidden; }
+#onboard-progress-fill { width: 0%; height: 100%; background: var(--yolk); transition: width .4s ease-out; }
+.onboard-steps { display: flex; flex-direction: column; gap: 10px; min-height: 150px; }
+.onboard-steps .log-line { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--mut);
+                           animation: authRise .35s cubic-bezier(.2,.7,.2,1) both; }
+.onboard-steps .log-line::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--yolk); flex-shrink: 0; }
+.onboard-steps .log-line:last-child { color: var(--txt); }
+.onboard-steps .log-line:last-child::before { animation: authPulse 1s ease-in-out infinite; }
+
+.onboard-suggestions { display: flex; flex-direction: column; gap: 10px; }
+.suggested-job-card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 12px; padding: 14px 16px;
+                      animation: authRise .4s cubic-bezier(.2,.7,.2,1) both; }
+.suggested-job-card .sj-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.suggested-job-card h4 { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
+.suggested-job-card .sj-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.suggested-job-card .sj-score { font-family: var(--font-mono); font-size: 12px; font-weight: 700; background: var(--yolk);
+                                color: var(--ink); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+.suggested-job-card .sj-sum { font-size: 13.5px; color: var(--mut); margin-top: 8px; line-height: 1.5; }
+.onboard-empty { border: 1px dashed var(--bdr-strong); border-radius: 12px; padding: 18px; font-size: 14px; color: var(--mut); }
+
+.auth-reveal { animation: authRise .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes authRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes authPulse { 50% { transform: scale(1.4); opacity: .6; } }
+@media (prefers-reduced-motion: reduce) {
+  .auth-reveal, .onboard-steps .log-line, .suggested-job-card, .onboard-steps .log-line:last-child::before { animation: none; }
+}
+@media (max-width: 480px) {
+  .auth-nav { padding: 0 16px; }
+  .auth-main { padding: 32px 16px 48px; }
+  .auth-shell .auth-card { padding: 24px 20px; }
+  .auth-grid { grid-template-columns: 1fr; }
+}
+
 /* Toast */
 #toast { background: var(--ink); color: var(--paper); font-family: var(--font-mono); font-size: 12px; border-radius: 999px; padding: 10px 18px; }
 [data-theme="dark"] #toast { background: var(--paper); color: var(--ink); }
@@ -683,306 +788,238 @@ input, select, textarea, button { font-family: inherit; }
 
 
 {% if view_mode == 'login' or view_mode == 'signup' or view_mode == 'mock_auth' %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
-  <div class="auth-card">
+<div class="auth-shell">
+  <nav class="auth-nav">
+    <a class="auth-logo" href="/"><span class="auth-logo-dot"></span>Sunny Side</a>
+    {% if view_mode == 'login' %}
+    <a class="auth-btn" href="/signup">Sign up</a>
+    {% else %}
+    <a class="auth-btn" href="/login">Log in</a>
+    {% endif %}
+  </nav>
+
+  <main class="auth-main">
+  <div class="auth-card auth-reveal">
     {% if view_mode == 'mock_auth' %}
-    <div style="text-align:center; border-bottom:1px solid var(--bdr); padding-bottom:12px; margin-bottom:16px;">
-      {% if provider == 'google' %}
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px; display:inline-block;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-      <h3 style="font-size:18px; font-weight:700; color:var(--txt); font-family:'Space Grotesk', sans-serif; margin:0;">Sign in with Google</h3>
-      {% else %}
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="#0077B5" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px; display:inline-block;"><path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9H7.12v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7H9.33V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/></svg>
-      <h3 style="font-size:18px; font-weight:700; color:var(--txt); font-family:'Space Grotesk', sans-serif; margin:0;">Sign in with LinkedIn</h3>
-      {% endif %}
-      <p style="font-size:12px; color:var(--mut); margin:4px 0 0 0;">to continue to Sunny Side (Dev Mode)</p>
+    <div class="auth-head">
+      <div class="auth-eyebrow">Dev mode</div>
+      <h1>Sign in with {% if provider == 'google' %}Google{% else %}LinkedIn{% endif %}</h1>
+      <p>Pick a test profile or enter your own.</p>
     </div>
 
-    <form method="POST" action="/auth/mock/callback" style="display:flex; flex-direction:column; gap:16px;">
+    <form method="POST" action="/auth/mock/callback" class="auth-form">
       <input type="hidden" name="provider" value="{{ provider }}">
-      
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase; text-align: left;">Select a test profile:</label>
-        
-        <button type="submit" onclick="document.getElementById('mock-email').value='test.user@example.com'; document.getElementById('mock-name').value='Test User';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
-          <strong style="color:var(--txt);">Test User</strong>
-          <span style="font-size:11px; color:var(--mut);">test.user@example.com</span>
+
+      <div class="auth-field">
+        <label class="auth-label">Test profiles</label>
+        <button type="submit" onclick="document.getElementById('mock-email').value='test.user@example.com'; document.getElementById('mock-name').value='Test User';" class="auth-option">
+          <strong>Test User</strong>
+          <span>test.user@example.com</span>
         </button>
-        
-        <button type="submit" onclick="document.getElementById('mock-email').value='guest@gmail.com'; document.getElementById('mock-name').value='Guest User';" class="btn" style="text-align:left; font-size:12px; display:flex; flex-direction:column; padding:10px; border-radius:12px; background:var(--bg); border:1px solid var(--bdr); width:100%;">
-          <strong style="color:var(--txt);">Guest User</strong>
-          <span style="font-size:11px; color:var(--mut);">guest@gmail.com</span>
+        <button type="submit" onclick="document.getElementById('mock-email').value='guest@gmail.com'; document.getElementById('mock-name').value='Guest User';" class="auth-option">
+          <strong>Guest User</strong>
+          <span>guest@gmail.com</span>
         </button>
       </div>
 
-      <div style="text-align:center; font-size:10px; color:var(--hin); font-weight:600; text-transform:uppercase;">Or customize profile</div>
+      <div class="auth-or"><span>or</span></div>
 
-      <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
-        <label class="auth-label">Custom Full Name</label>
-        <input type="text" id="mock-name" name="name" class="auth-input" placeholder="e.g. Test User">
+      <div class="auth-field">
+        <label class="auth-label" for="mock-name">Full name</label>
+        <input type="text" id="mock-name" name="name" class="auth-input" placeholder="Test User">
+      </div>
+      <div class="auth-field">
+        <label class="auth-label" for="mock-email">Email</label>
+        <input type="email" id="mock-email" name="email" class="auth-input" placeholder="name@gmail.com">
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:6px; text-align: left;">
-        <label class="auth-label">Custom Email Address</label>
-        <input type="email" id="mock-email" name="email" class="auth-input" placeholder="e.g. name@gmail.com">
-      </div>
-
-      <button type="submit" class="btn btn-p" style="padding:12px; font-size:13px; font-weight:700; border-radius:24px; width:100%; margin-top:8px;">
-        Authorize & Sign In
-      </button>
-      
-      <a href="/login" class="btn" style="text-align:center; background:none; border:1px solid var(--bdr); border-radius:24px; padding:10px; font-size:12px; font-weight:600; color:var(--mut); text-decoration:none;">
-        Back to Login
-      </a>
+      <button type="submit" class="auth-btn auth-btn-p auth-btn-block">Continue</button>
+      <a href="/login" class="auth-btn auth-btn-block">Back to log in</a>
     </form>
     {% else %}
-    <div style="text-align:center;">
-      <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:8px; justify-content:center; margin-bottom:6px; transition:transform 0.15s;">
-        <img src="/logo.svg" alt="Logo" style="width:28px; height:28px; border-radius:6px; object-fit:contain;">
-        <h2 style="font-size:24px; font-weight:700; letter-spacing:-0.02em; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; margin: 0;">Sunny Side</h2>
-      </a>
-      <p style="font-size:13px; color:var(--mut);">
-        {% if view_mode == 'login' %}Sign in to your pipeline{% else %}Create your search pipeline{% endif %}
-      </p>
+    <div class="auth-head">
+      {% if view_mode == 'login' %}
+      <h1>Log in</h1>
+      <p>Welcome back. Your board is waiting.</p>
+      {% else %}
+      <h1>Create your account</h1>
+      <p>Free to use. Takes about a minute.</p>
+      {% endif %}
     </div>
-    
+
     {% if error %}
-    <div style="background:rgba(248, 113, 113, 0.12); color:#f87171; padding:10px 12px; border-radius:6px; font-size:12px; border:1px solid rgba(248, 113, 113, 0.2); display:flex; align-items:center; gap:6px;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f87171; flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-      {{ error }}
+    <div class="auth-error" role="alert">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      <span>{{ error }}</span>
     </div>
     {% endif %}
-    
-    <form method="POST" action="/{{ view_mode }}" {% if view_mode == 'signup' %}enctype="multipart/form-data"{% endif %} style="display:flex; flex-direction:column; gap:16px;">
-      <!-- Username -->
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label class="auth-label">Username</label>
-          {% if view_mode == 'signup' %}
-          <span style="font-size:11px; color:var(--mut); font-weight: 600;">Step 1 of 2</span>
-          {% endif %}
-        </div>
-        <input type="text" name="username" required class="auth-input" placeholder="Enter username">
+
+    <form method="POST" action="/{{ view_mode }}" {% if view_mode == 'signup' %}enctype="multipart/form-data"{% endif %} class="auth-form">
+      <div class="auth-field">
+        <label class="auth-label" for="auth-username">Username</label>
+        <input type="text" id="auth-username" name="username" required class="auth-input" autocomplete="username" placeholder="yourname">
       </div>
-      
-      <!-- Password -->
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <label class="auth-label">Password</label>
-        <div style="position:relative; display:flex; align-items:center;">
-          <input type="password" id="auth-password" name="password" required class="auth-input" placeholder="••••••••">
-          <button type="button" onclick="togglePasswordVisibility('auth-password', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:12px; color:var(--mut); font-weight:700;">
-            Show
-          </button>
+
+      <div class="auth-field">
+        <label class="auth-label" for="auth-password">Password</label>
+        <div class="auth-pw">
+          <input type="password" id="auth-password" name="password" required class="auth-input" autocomplete="{% if view_mode == 'login' %}current-password{% else %}new-password{% endif %}" placeholder="••••••••">
+          <button type="button" class="auth-show" onclick="togglePasswordVisibility('auth-password', this)">Show</button>
         </div>
       </div>
 
-      <!-- Collapsible Profile Setup Accordion (Sign Up view only) -->
       {% if view_mode == 'signup' %}
       <div class="accordion-wrapper">
         <button type="button" onclick="toggleAccordion('profile-setup-accordion', 'accordion-chevron')" class="accordion-toggle" id="accordion-toggle-btn">
-          <span style="display:flex; align-items:center; gap:6px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pur);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            Profile Setup (Optional)
-          </span>
+          <span>Add your profile now <span class="auth-muted">(optional)</span></span>
           <svg id="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; color: var(--mut);"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
-        
-        <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: transparent; padding: 0 14px;">
-          <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--bdr);">
-            
-            <!-- Name & Designation -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Full Name</label>
-                <input type="text" name="name" class="auth-input" style="padding:8px 12px;" placeholder="Your full name">
+
+        <div id="profile-setup-accordion" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; padding: 0 16px;">
+          <div class="auth-form auth-accordion-body">
+            <div class="auth-grid">
+              <div class="auth-field">
+                <label class="auth-label">Full name</label>
+                <input type="text" name="name" class="auth-input" placeholder="Your full name">
               </div>
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Designation / Title</label>
-                <input type="text" name="designation" class="auth-input" style="padding:8px 12px;" placeholder="Software Engineer">
+              <div class="auth-field">
+                <label class="auth-label">Job title</label>
+                <input type="text" name="designation" class="auth-input" placeholder="Software Engineer">
               </div>
             </div>
 
-            <!-- Show on landing page checkbox -->
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="checkbox" id="signup-share-profile" name="share_profile" style="width:16px;height:16px;cursor:pointer;">
-              <label for="signup-share-profile" style="font-size:12px; color:var(--txt); cursor:pointer;">Show my profile on landing page seekers wall</label>
-            </div>
-            
-            <!-- Resume File Upload / Drag & Drop -->
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Upload Resume (.pdf, .txt)</label>
-              <div id="resume-dropzone" class="dropzone-box" style="padding: 14px;" onclick="document.getElementById('signup-resume-file').click()"
-                   ondragover="event.preventDefault(); this.style.borderColor='var(--pur)'; this.style.background='var(--purl)';"
-                   ondragleave="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)';"
-                   ondrop="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)'; const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--mut);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span style="font-size: 12px; font-weight: 700; color: var(--txt);" id="dropzone-text">Click or drag & drop to upload</span>
-                <span style="font-size: 11px; color: var(--mut);">Supports PDF, TXT</span>
+            <div class="auth-field">
+              <label class="auth-label">Resume</label>
+              <div id="resume-dropzone" class="dropzone-box" onclick="document.getElementById('signup-resume-file').click()"
+                   ondragover="event.preventDefault(); this.classList.add('over');"
+                   ondragleave="event.preventDefault(); this.classList.remove('over');"
+                   ondrop="event.preventDefault(); this.classList.remove('over'); const input = document.getElementById('signup-resume-file'); input.files = event.dataTransfer.files; handleFileChange(input);">
+                <span class="dz-title" id="dropzone-text">Drop a PDF or TXT, or click to upload</span>
                 <input type="file" id="signup-resume-file" name="resume_file" accept=".pdf,.txt" style="display: none;" onchange="handleFileChange(this)">
               </div>
-            </div>
-            
-            <!-- Paste Resume Text -->
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Or Paste Resume Text</label>
-              <textarea name="resume_text" class="auth-input" style="border-radius:12px; resize:vertical; min-height:80px;" placeholder="Paste resume text details..."></textarea>
+              <textarea name="resume_text" class="auth-input" style="resize:vertical; min-height:80px;" placeholder="Or paste your resume text"></textarea>
             </div>
 
-            <!-- LinkedIn Profile URL -->
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">LinkedIn Profile URL</label>
-              <input type="text" name="linkedin_profile" class="auth-input" style="padding:8px 12px;" placeholder="https://linkedin.com/in/username">
+            <div class="auth-field">
+              <label class="auth-label">LinkedIn profile</label>
+              <input type="text" name="linkedin_profile" class="auth-input" placeholder="https://linkedin.com/in/username">
             </div>
 
-            <!-- Email IMAP Settings -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">IMAP Email</label>
-                <input type="email" name="imap_email" class="auth-input" style="padding:8px 12px;" placeholder="name@gmail.com">
-                <span style="font-size:10px; color:var(--mut); line-height:1.2;">Used to auto-scan job emails.</span>
+            <div class="auth-grid">
+              <div class="auth-field">
+                <label class="auth-label">Inbox email</label>
+                <input type="email" name="imap_email" class="auth-input" placeholder="name@gmail.com">
               </div>
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">IMAP App PW</label>
-                <div style="position:relative; display:flex; align-items:center;">
-                  <input type="password" id="signup-imap-pw" name="imap_password" class="auth-input" style="padding:8px 32px 8px 12px;" placeholder="•••• •••• •••• ••••">
-                  <button type="button" onclick="togglePasswordVisibility('signup-imap-pw', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:11px; color:var(--mut); font-weight:700;">
-                    Show
-                  </button>
+              <div class="auth-field">
+                <label class="auth-label">App password</label>
+                <div class="auth-pw">
+                  <input type="password" id="signup-imap-pw" name="imap_password" class="auth-input" placeholder="•••• •••• •••• ••••">
+                  <button type="button" class="auth-show" onclick="togglePasswordVisibility('signup-imap-pw', this)">Show</button>
                 </div>
               </div>
             </div>
+            <p class="auth-hint">We read your inbox to find application emails and add them to your board.</p>
 
-            <!-- Gemini API Key -->
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:11px; font-weight:600; color:var(--mut); text-transform:uppercase;">Gemini API Key</label>
-              <div style="position:relative; display:flex; align-items:center;">
-                <input type="password" id="signup-gemini-key" name="gemini_api_key" class="auth-input" style="padding:8px 32px 8px 12px;" placeholder="AIzaSy...">
-                <button type="button" onclick="togglePasswordVisibility('signup-gemini-key', this)" style="position:absolute; right:12px; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px; font-size:11px; color:var(--mut); font-weight:700;">
-                  Show
-                </button>
+            <div class="auth-field">
+              <label class="auth-label">Gemini API key</label>
+              <div class="auth-pw">
+                <input type="password" id="signup-gemini-key" name="gemini_api_key" class="auth-input" placeholder="AIzaSy...">
+                <button type="button" class="auth-show" onclick="togglePasswordVisibility('signup-gemini-key', this)">Show</button>
               </div>
             </div>
-            
-            <div style="font-size:11px; color:var(--mut); text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:12px;height:12px;margin-right:4px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              Stored securely, never shared
-            </div>
+
+            <p class="auth-hint">Stored encrypted, never shared.</p>
           </div>
         </div>
       </div>
       {% endif %}
 
-      <button type="submit" class="btn btn-p" style="padding:12px; font-size:13px; font-weight:700; border-radius:24px; width:100%; margin-top:8px;">
-        {% if view_mode == 'login' %}Log In{% else %}Sign Up & Setup{% endif %}
+      <button type="submit" class="auth-btn auth-btn-p auth-btn-block">
+        {% if view_mode == 'login' %}Log in{% else %}Create account{% endif %}
       </button>
-      
-      <div style="text-align:center; font-size:11px; color:var(--hin); font-weight:600; text-transform:uppercase; margin: 4px 0;">Or</div>
-      
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button type="button" onclick="window.location.href='/auth/google'" class="btn btn-g" style="padding:10px; font-size:12px; border-radius:24px; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:1px solid var(--bdr); font-weight:600; background:var(--sur); color:var(--txt);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          Continue with Google
-        </button>
-      </div>
+
+      <div class="auth-or"><span>or</span></div>
+
+      <button type="button" onclick="window.location.href='/auth/google'" class="auth-btn auth-btn-block">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Continue with Google
+      </button>
     </form>
-    
-    <div style="text-align:center; font-size:13px; color:var(--mut); margin-top:4px;">
+
+    <p class="auth-switch">
       {% if view_mode == 'login' %}
-      Don't have an account? <a href="/signup" style="color:var(--pur); text-decoration:none; font-weight:700;">Sign Up</a>
+      No account yet? <a href="/signup">Sign up</a>
       {% else %}
-      Already have an account? <a href="/login" style="color:var(--pur); text-decoration:none; font-weight:700;">Log In</a>
+      Already have an account? <a href="/login">Log in</a>
       {% endif %}
-    </div>
+    </p>
     {% endif %}
   </div>
+  </main>
 </div>
 {% elif view_mode == 'onboarding' %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background: radial-gradient(circle at 0% 0%, var(--glow-1) 0%, transparent 50%), radial-gradient(circle at 100% 100%, var(--glow-2) 0%, transparent 50%), var(--bg); width:100vw; padding:40px 16px; font-family:'Inter', sans-serif;">
-  <!-- Upload Zone -->
-  <div id="onboard-upload-step" class="auth-card" style="max-width:600px; gap:24px;">
-    <div style="text-align:center;">
-      <a href="/" style="text-decoration:none; display:inline-flex; align-items:center; gap:8px; justify-content:center; margin-bottom:12px; transition:transform 0.15s;">
-        <img src="/logo.svg" alt="Logo" style="width:32px; height:32px; border-radius:6px; object-fit:contain;">
-        <h2 style="font-size:26px; font-weight:700; letter-spacing:-0.02em; font-family:'Space Grotesk', sans-serif; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; margin: 0;">Sunny Side</h2>
-      </a>
-      <h3 style="font-size:18px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt); margin-top:8px;">Build Your Pipeline</h3>
-      <p style="font-size:13.5px; color:var(--mut); margin-top:4px;">Upload or paste your resume. Our AI scanner will read your credentials and immediately recommend the best opportunities.</p>
+<div class="auth-shell">
+  <nav class="auth-nav">
+    <a class="auth-logo" href="/"><span class="auth-logo-dot"></span>Sunny Side</a>
+    <button type="button" onclick="skipOnboarding()" class="auth-btn auth-btn-quiet">Skip for now</button>
+  </nav>
+
+  <main class="auth-main">
+  <!-- Upload step -->
+  <div id="onboard-upload-step" class="auth-card auth-card-wide auth-reveal">
+    <div class="auth-head">
+      <div class="auth-eyebrow">Welcome</div>
+      <h1>Add your resume</h1>
+      <p>We'll read it once, then score every job on your board against it.</p>
     </div>
 
-    <form onsubmit="startOnboardingParse(event)" style="display:flex; flex-direction:column; gap:20px;">
-      <!-- Drag and Drop Resume -->
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <label class="auth-label">Upload Resume Document</label>
-        <div id="onboard-dropzone" class="dropzone-box" onclick="document.getElementById('onboard-resume-file').click()"
-             ondragover="event.preventDefault(); this.style.borderColor='var(--pur)'; this.style.background='var(--purl)';"
-             ondragleave="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)';"
-             ondrop="event.preventDefault(); this.style.borderColor='var(--bdr)'; this.style.background='var(--bg)'; const input = document.getElementById('onboard-resume-file'); input.files = event.dataTransfer.files; handleOnboardFileChange(input);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pur); margin-bottom:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span style="font-size:13px; font-weight:700; color:var(--txt);" id="onboard-dropzone-text">Click or drag & drop to upload</span>
-          <span style="font-size:11px; color:var(--mut);">Supports PDF or TXT up to 10MB</span>
-          <input type="file" id="onboard-resume-file" accept=".pdf,.txt" style="display:none;" onchange="handleOnboardFileChange(this)">
-        </div>
+    <form onsubmit="startOnboardingParse(event)" class="auth-form">
+      <div id="onboard-dropzone" class="dropzone-box dropzone-lg" onclick="document.getElementById('onboard-resume-file').click()"
+           ondragover="event.preventDefault(); this.classList.add('over');"
+           ondragleave="event.preventDefault(); this.classList.remove('over');"
+           ondrop="event.preventDefault(); this.classList.remove('over'); const input = document.getElementById('onboard-resume-file'); input.files = event.dataTransfer.files; handleOnboardFileChange(input);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dz-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <span class="dz-title" id="onboard-dropzone-text">Drop your resume here, or click to upload</span>
+        <span class="dz-sub">PDF or TXT, up to 10 MB</span>
+        <input type="file" id="onboard-resume-file" accept=".pdf,.txt" style="display:none;" onchange="handleOnboardFileChange(this)">
       </div>
 
-      <div style="text-align:center; font-size:12px; color:var(--hin); font-weight:600; text-transform:uppercase;">Or</div>
+      <div class="auth-or"><span>or paste it</span></div>
 
-      <!-- Paste Area -->
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <label class="auth-label">Paste Resume Content</label>
-        <textarea id="onboard-resume-text" class="auth-input" style="height:120px; font-family:inherit; resize:vertical; border-radius:12px;" placeholder="Paste resume text details..."></textarea>
-      </div>
+      <textarea id="onboard-resume-text" class="auth-input" style="height:120px; resize:vertical;" placeholder="Paste your resume text"></textarea>
 
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button type="submit" class="btn btn-p" style="padding:14px; font-size:14px; border-radius:24px;">Upload and Parse Resume</button>
-        <button type="button" onclick="skipOnboarding()" class="btn btn-g" style="padding:10px; font-size:13px; border-radius:24px; border-color:transparent; background:transparent; color:var(--mut);">Skip onboarding and go to board</button>
-      </div>
+      <button type="submit" class="auth-btn auth-btn-p auth-btn-block auth-btn-lg">Read my resume</button>
     </form>
   </div>
 
-  <!-- Scanning / Parsing State -->
-  <div id="onboard-scanning-step" class="auth-card" style="max-width:600px; display:none; gap:24px; text-align:center;">
-    <div style="position:relative; width:80px; height:80px; margin:0 auto;">
-      <!-- Glowing pulsing yolk loader -->
-      <div style="width:100%; height:100%; background:radial-gradient(circle at 30% 30%, #FFF2CC 0%, var(--pur) 70%, #FF5E00 100%); border-radius:50% 40% 60% 50% / 50% 50% 50% 50%; box-shadow:0 8px 24px rgba(255, 167, 0, 0.4); animation: pulseYolk 1.5s infinite ease-in-out alternate;"></div>
-    </div>
-    
-    <div>
-      <h3 style="font-size:20px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt);">Scanning Resume...</h3>
-      <p style="font-size:13px; color:var(--mut); margin-top:4px;">Gemini is reading your credentials, mapping your experience, and filtering listings.</p>
+  <!-- Reading step -->
+  <div id="onboard-scanning-step" class="auth-card auth-card-wide" style="display:none;">
+    <div class="auth-head">
+      <div class="auth-eyebrow">One moment</div>
+      <h1>Reading your resume</h1>
+      <p>This usually takes under a minute. Keep this tab open.</p>
     </div>
 
-    <!-- Progress Bar -->
-    <div style="width:100%; height:6px; background:var(--bdr); border-radius:3px; overflow:hidden; position:relative; margin-top:-8px;">
-      <div id="onboard-progress-fill" style="width:0%; height:100%; background:var(--yolk); transition:width 0.4s ease-out;"></div>
-    </div>
+    <div class="onboard-progress"><div id="onboard-progress-fill"></div></div>
 
-    <!-- Scanner terminal screen -->
-    <div class="terminal-box" style="text-align:left; border-radius:16px;">
-      <div class="scan-bar"></div>
-      <div id="onboard-terminal" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; height:100%;">
-        <div>[info] Initializing scan engine...</div>
-      </div>
-    </div>
+    <div id="onboard-terminal" class="onboard-steps"></div>
   </div>
 
-  <!-- Suggested Jobs State -->
-  <div id="onboard-suggested-step" class="auth-card" style="max-width:650px; display:none; gap:24px;">
-    <div style="text-align:center;">
-      <div style="width:40px; height:40px; background:var(--purl); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; color:var(--pur);">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-      </div>
-      <h3 style="font-size:22px; font-weight:700; font-family:'Space Grotesk', sans-serif; color:var(--txt);">Resume Parsed Successfully!</h3>
-      <p style="font-size:13.5px; color:var(--mut); margin-top:4px;">We've found matching opportunities scored against your skills and experience.</p>
+  <!-- Suggestions step -->
+  <div id="onboard-suggested-step" class="auth-card auth-card-wide" style="display:none;">
+    <div class="auth-head">
+      <div class="auth-eyebrow">All set</div>
+      <h1>Here's where you fit best</h1>
+      <p>Each role is scored from 1 to 10 against your resume.</p>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <label class="auth-label" style="font-size:11px; text-transform:uppercase; color:var(--mut); letter-spacing:0.05em;">Top Suggested Jobs</label>
-      <div id="onboard-suggestions-grid" style="display:flex; flex-direction:column; gap:12px;">
-        <!-- Dynamically populated -->
-      </div>
+    <div id="onboard-suggestions-grid" class="onboard-suggestions">
+      <!-- Filled in by startOnboardingParse -->
     </div>
 
-    <button onclick="window.location.reload()" class="btn btn-p" style="padding:14px; font-size:14px; border-radius:24px;">Proceed to My Dashboard</button>
+    <button onclick="window.location.reload()" class="auth-btn auth-btn-p auth-btn-block auth-btn-lg">Go to my board</button>
   </div>
+  </main>
 </div>
 {% else %}
 <div class="app">
@@ -3191,6 +3228,10 @@ async function deleteUser(userId, username) {
 </div>
 
 <script>
+// esc() lives in the board's script, which the sign-in and onboarding pages don't load
+if (typeof window.esc !== 'function') {
+  window.esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+}
 function togglePasswordVisibility(inputId, btn) {
   const input = document.getElementById(inputId);
   const openSvg = btn.querySelector('.eye-open');
@@ -3235,9 +3276,8 @@ function handleFileChange(input) {
   const dropzone = document.getElementById('resume-dropzone');
   if (input.files && input.files.length > 0) {
     const file = input.files[0];
-    dropzoneText.textContent = `Selected: ${file.name}`;
-    dropzone.style.borderColor = '#2563eb';
-    dropzone.style.background = '#eff6ff';
+    dropzoneText.textContent = file.name;
+    dropzone.classList.add('has-file');
     const accordion = document.getElementById('profile-setup-accordion');
     if (accordion && accordion.style.maxHeight !== '0px') {
       accordion.style.maxHeight = accordion.scrollHeight + 'px';
@@ -3247,12 +3287,13 @@ function handleFileChange(input) {
 
 function handleOnboardFileChange(input) {
   const textSpan = document.getElementById('onboard-dropzone-text');
+  const dropzone = document.getElementById('onboard-dropzone');
   if (input.files && input.files.length) {
-    textSpan.textContent = "Selected: " + input.files[0].name;
-    textSpan.style.color = "var(--pur)";
+    textSpan.textContent = input.files[0].name;
+    dropzone.classList.add('has-file');
   } else {
-    textSpan.textContent = "Click or drag & drop to upload";
-    textSpan.style.color = "var(--txt)";
+    textSpan.textContent = "Drop your resume here, or click to upload";
+    dropzone.classList.remove('has-file');
   }
 }
 
@@ -3270,17 +3311,13 @@ async function startOnboardingParse(event) {
   document.getElementById('onboard-upload-step').style.display = 'none';
   document.getElementById('onboard-scanning-step').style.display = 'flex';
   
-  // Start fake terminal logs
+  // Progress checklist shown while the request runs
   const logs = [
-    "[init] Initializing parser...",
-    "[load] Opening resume container...",
-    "[read] Reading document layout and text contents...",
-    "[parse] Processing candidate experience and skills...",
-    "[scan] Scanning active Sunny Side listings database...",
-    "[eval] Evaluating role fit scores via Gemini...",
-    "[score] Scoring matching opportunities...",
-    "[save] Saving candidate profile data...",
-    "[done] Generating recommendations..."
+    "Opening your resume",
+    "Picking out your skills and experience",
+    "Looking through open roles",
+    "Scoring each role against your resume",
+    "Saving your profile"
   ];
   let logIdx = 0;
   const terminal = document.getElementById('onboard-terminal');
@@ -3299,7 +3336,7 @@ async function startOnboardingParse(event) {
       
       logIdx++;
     }
-  }, 400);
+  }, 900);
   
   // Make AJAX call to /api/onboard_resume
   const formData = new FormData();
@@ -3336,36 +3373,28 @@ async function startOnboardingParse(event) {
       
       if (!data.suggestions.length) {
         const note = document.createElement('div');
-        note.style.cssText = 'background:var(--sur); border:1px dashed var(--bdr); border-radius:16px; padding:20px; font-size:13px; color:var(--mut); line-height:1.5;';
+        note.className = 'onboard-empty';
         note.textContent = data.still_syncing
           ? "We're still searching for jobs that match your resume. They'll show up on your dashboard in a few minutes."
           : "No matching jobs found yet. Click Refresh on your dashboard later to search again.";
         grid.appendChild(note);
       }
 
-      data.suggestions.forEach(job => {
+      data.suggestions.forEach((job, i) => {
         const card = document.createElement('div');
-        card.style.background = 'var(--sur)';
-        card.style.border = '1px solid var(--bdr)';
-        card.style.borderRadius = '16px';
-        card.style.padding = '20px';
-        card.style.display = 'flex';
-        card.style.flexDirection = 'column';
-        card.style.gap = '8px';
-        card.style.transition = 'transform 0.2s';
         card.className = 'suggested-job-card';
-        
+        card.style.animationDelay = (i * 80) + 'ms';
+        const score = job.ai_score ? `<span class="sj-score">${Number(job.ai_score).toFixed(1)}</span>` : '';
+        const meta = [job.company, job.location].filter(Boolean).map(esc).join(' · ');
         card.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div class="sj-top">
             <div>
-              <h4 style="font-size:16px; font-weight:700; color:var(--txt); margin:0;">${esc(job.title)}</h4>
-              <p style="font-size:13px; color:var(--mut); margin:2px 0 0 0;">${esc(job.company)} &bull; ${esc(job.location)}</p>
+              <h4>${esc(job.title)}</h4>
+              <div class="sj-meta">${meta}</div>
             </div>
-            <span style="font-size:12px; font-weight:700; background:var(--purl); color:var(--pur); padding:4px 10px; border-radius:12px; white-space:nowrap;">
-              ${job.ai_score ? job.ai_score.toFixed(1) : '8.5'} / 10
-            </span>
+            ${score}
           </div>
-          <p style="font-size:12.5px; color:var(--mut); line-height:1.5; margin:8px 0 0 0;">${esc(job.ai_summary || '')}</p>
+          ${job.ai_summary ? `<p class="sj-sum">${esc(job.ai_summary)}</p>` : ''}
         `;
         grid.appendChild(card);
       });
@@ -3380,6 +3409,7 @@ async function startOnboardingParse(event) {
     alert("Connection error: " + error.message);
     document.getElementById('onboard-upload-step').style.display = 'flex';
     document.getElementById('onboard-scanning-step').style.display = 'none';
+    document.getElementById('onboard-suggested-step').style.display = 'none';
   }
 }
 
