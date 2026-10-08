@@ -73,7 +73,8 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 - **Speech providers**: Uses Gemini for speech-to-text and text-to-speech when a key is available, with your browser's Web Speech API as the fallback. API keys go in request headers and never appear in errors.
 - **Survives reloads**: The chat (kept per tab) and open panel come back after a board change reloads the page. Pronouns like "it" or "the first one" refer to the cards Sunny just showed.
 - **Speaks Hindi**: Tap **हिं** in Sunny's header, or just type or say something in Hindi. Sunny listens with Hindi speech recognition, replies in Hindi and understands Hinglish and company names written in Devanagari (स्विगी → Swiggy). Your choice is remembered in this browser.
-- **Interview practice**: In a job's Quiz Mode tab, tap **Start practice** (or ask Sunny "quiz me on the Swiggy job"). Sunny reads each prep question aloud, you answer by talking or typing, and you get a 1-5 score with what worked, what to sharpen and a stronger answer. A summary at the end lets you redo the skipped or tricky ones.
+- **Interview practice**: In a job's Quiz Mode tab, tap **Start practice** (or ask Sunny "quiz me on the Swiggy job"). Sunny reads each prep question aloud, you answer by talking or typing, and you get a 1-5 score with what worked, what to sharpen and a stronger answer. A summary at the end lets you redo the skipped or tricky ones. With **Hands-free** on, the mic opens after each question, a pause (or saying "done") sends your answer, and you can say "next", "repeat", "try again" or "stop".
+- **Reacts to your board**: Sunny peeks when you open a card, cheers when you move one forward, droops at a rejection and waves when you close a card.
 - **Limits**: Per-user rate limits, plus size caps on transcripts, chat history and audio uploads.
 - **Rich cards**: Pipeline stats, job cards and expandable emails inline.
 
