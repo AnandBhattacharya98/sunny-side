@@ -308,3 +308,61 @@ def test_speech_is_cached(monkeypatch):
     a = ve.synthesize_speech("Okay, cancelled.", "k")
     b = ve.synthesize_speech("Okay, cancelled.", "k")
     assert a == b and a[:4] == b"RIFF" and len(calls) == 1
+
+
+# ── Hindi ────────────────────────────────────────────────────────────────
+
+DEVANAGARI = __import__("re").compile(r"[ऀ-ॿ]")
+
+
+@pytest.mark.parametrize("text,intent,job_id", [
+    ("स्विगी वाली जॉब के बारे में बताओ", "job_lookup", "j2"),
+    ("रेज़रपे का स्कोर ऐसा क्यों है", "job_fit", "j1"),
+    ("क्रेड वाली जॉब आर्काइव करो", "archive_job", "j3"),
+    ("swiggy wali job ke baare mein batao", "job_lookup", "j2"),
+])
+def test_hindi_job_intents(text, intent, job_id):
+    result = classify(text)
+    assert result["intent"] == intent
+    assert result["slots"]["job_id"] == job_id
+
+
+@pytest.mark.parametrize("text,intent", [
+    ("मेरे टॉप मैच कौन से हैं?", "top_matches"),
+    ("कितनी जॉब्स शॉर्टलिस्ट हैं?", "column_count"),
+    ("नमस्ते", "greeting"),
+    ("धन्यवाद", "thanks"),
+    ("तुम क्या कर सकती हो?", "help"),
+])
+def test_hindi_general_intents(text, intent):
+    assert classify(text)["intent"] == intent
+
+
+def test_reply_language_follows_the_user():
+    assert ve.reply_lang("hi", "hello") == "hi"
+    assert ve.reply_lang(None, "स्विगी के बारे में बताओ") == "hi"
+    assert ve.reply_lang("en", "hello") == "en"
+    assert ve.reply_lang("fr", "hello") == "en"
+
+
+def test_hindi_welcome_and_replies(client):
+    data = client.get("/api/voice/welcome?lang=hi").get_json()
+    assert data["lang"] == "hi" and "नमस्ते" in data["greeting"]
+    assert all(DEVANAGARI.search(s) for s in data["suggestions"])
+    data = ask(client, "स्विगी वाली जॉब के बारे में बताओ", lang="hi")
+    assert data["lang"] == "hi" and DEVANAGARI.search(data["reply_text"])
+    assert data["context_job_ids"] == ["j2"]
+
+
+def test_typing_hindi_switches_the_reply_language(client):
+    data = ask(client, "कितनी जॉब्स शॉर्टलिस्ट हैं?")
+    assert data["lang"] == "hi" and DEVANAGARI.search(data["reply_text"])
+
+
+def test_hindi_confirm_flow(client):
+    data = ask(client, "स्विगी वाली जॉब applied में डालो", lang="hi")
+    assert data["requires_confirmation"] and DEVANAGARI.search(data["reply_text"])
+    res = client.post("/api/voice/confirm", json={"token": data["action"]["token"], "lang": "hi"}).get_json()
+    assert res["ok"] and DEVANAGARI.search(res["reply_text"])
+    res = client.post("/api/voice/cancel", json={"lang": "hi"}).get_json()
+    assert DEVANAGARI.search(res["reply_text"])

@@ -2171,6 +2171,14 @@ const VA = {
 const VA_STATE_KEY = 'va_state_v1';
 const VA_MAX_MESSAGES = 40;
 
+// Sunny speaks English or Hindi. The choice is per browser; the server answers in whatever we send.
+function vaT(en, hi) { return VA.lang === 'hi' ? hi : en; }
+function vaInitialLang() {
+  const saved = vaGet('localStorage', 'va_lang');
+  if (saved === 'hi' || saved === 'en') return saved;
+  return (navigator.language || '').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+}
+
 function vaGet(store, key) { try { return window[store].getItem(key); } catch (e) { return null; } }
 function vaSet(store, key, value) { try { window[store].setItem(key, value); } catch (e) {} }
 function vaRemove(store, key) { try { window[store].removeItem(key); } catch (e) {} }
@@ -2183,6 +2191,8 @@ function esc(value) {
 function initVoiceAssistant() {
   if (!document.getElementById('voice-overlay')) return;
   VA.ready = true;
+  VA.lang = vaInitialLang();
+  applyAssistantLang();
   // A new key, so anyone who muted Sunny while it was silent starts out hearing it again
   VA.speechOn = vaGet('localStorage', 'va_speech_on') !== 'false';
   updateVoiceToggleUI();
@@ -2191,7 +2201,15 @@ function initVoiceAssistant() {
   document.querySelectorAll('[data-sunny-mascot]').forEach(el => { el.innerHTML = vaMascot(false); });
   if (!vaGet('localStorage', 'va_used')) document.getElementById('va-fab')?.classList.add('pulse');
 
-  fetch('/api/voice/welcome')
+  loadAssistantWelcome(true);
+
+  restoreAssistantState();
+  document.addEventListener('keydown', handleAssistantKeys);
+  ['pointerdown', 'keydown', 'touchend'].forEach(evt => document.addEventListener(evt, vaUnlockAudio, { capture: true, passive: true }));
+}
+
+function loadAssistantWelcome(first) {
+  fetch('/api/voice/welcome?lang=' + VA.lang)
     .then(r => r.ok ? r.json() : null)
     .then(res => {
       if (!res || !res.ok) return;
@@ -2199,13 +2217,42 @@ function initVoiceAssistant() {
       VA.serverVoice = !!res.server_voice;
       renderStarter();
       setDigestBadge(res.digest_count);
-      scheduleAssistantHint();
+      if (first) scheduleAssistantHint();
     })
     .catch(err => console.error('Assistant welcome failed:', err));
+}
 
-  restoreAssistantState();
-  document.addEventListener('keydown', handleAssistantKeys);
-  ['pointerdown', 'keydown', 'touchend'].forEach(evt => document.addEventListener(evt, vaUnlockAudio, { capture: true, passive: true }));
+// Static panel text in the current language
+function applyAssistantLang() {
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  set('va-lang-toggle', VA.lang === 'hi' ? 'EN' : 'हिं');
+  const toggle = document.getElementById('va-lang-toggle');
+  if (toggle) {
+    toggle.title = vaT('हिंदी में बात करें (Talk in Hindi)', 'Talk in English');
+    toggle.setAttribute('aria-label', toggle.title);
+  }
+  set('va-big-mic-label', vaT('Tap me to talk', 'बात करने के लिए मुझे टैप करें'));
+  set('va-starter-text', vaT("Your job-search buddy. Tap Sunny above and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.",
+                             'मैं आपकी जॉब-सर्च दोस्त हूँ। ऊपर Sunny को टैप करें और दोस्त की तरह पूछें। मैं आपके सबसे अच्छे मैच ढूँढ सकती हूँ, स्कोर समझा सकती हूँ और जॉब्स को आगे बढ़ा सकती हूँ।'));
+  set('va-hint', vaT('Press space to talk · Esc to close', 'बोलने के लिए स्पेस दबाएँ · बंद करने के लिए Esc'));
+  set('va-nudge-text', vaT('Go on, tap the mic and ask me anything.', 'चलिए, माइक टैप करें और कुछ भी पूछें।'));
+  const input = document.getElementById('voice-text-input');
+  if (input && !VA.listening) input.placeholder = vaT('Ask me anything, or tap the mic', 'कुछ भी पूछें, या माइक टैप करें');
+  const status = document.getElementById('va-status');
+  if (status && !VA.listening) setAssistantStatus(status.dataset.state || 'ready');
+  document.getElementById('voice-overlay')?.setAttribute('lang', VA.lang);
+  document.getElementById('va-hint-bubble')?.setAttribute('lang', VA.lang);
+}
+
+function toggleAssistantLang() {
+  VA.lang = VA.lang === 'hi' ? 'en' : 'hi';
+  vaSet('localStorage', 'va_lang', VA.lang);
+  stopSpeaking();
+  cancelListening();
+  applyAssistantLang();
+  loadAssistantWelcome(false);
+  addAssistantNote(vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।'));
+  speakResponse(vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।'));
 }
 
 function setDigestBadge(count) {
@@ -2221,7 +2268,7 @@ function renderStarter() {
   const w = VA.welcome;
   if (!w) return;
   const greet = document.getElementById('va-greeting');
-  if (greet) greet.textContent = w.greeting.replace('What can I help you with?', "I'm Sunny.");
+  if (greet) greet.textContent = w.greeting.replace('What can I help you with?', "I'm Sunny.").replace('मैं आपकी क्या मदद करूँ?', 'मैं Sunny हूँ।');
   const chips = document.getElementById('va-starter-chips');
   if (chips && w.suggestions && w.suggestions.length) {
     chips.innerHTML = w.suggestions.map(s => `<button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">${esc(s)}</button>`).join('');
@@ -2239,10 +2286,11 @@ function scheduleAssistantHint() {
     const text = document.getElementById('va-hint-text');
     if (text) {
       if (digest) {
-        text.innerHTML = `You have <b>${esc(digest)} new match${digest === 1 ? '' : 'es'}</b>. Want me to walk you through ${digest === 1 ? 'it' : 'them'}?`;
+        text.innerHTML = vaT(`You have <b>${esc(digest)} new match${digest === 1 ? '' : 'es'}</b>. Want me to walk you through ${digest === 1 ? 'it' : 'them'}?`,
+                             `आपके लिए <b>${esc(digest)} नए मैच</b> हैं। क्या मैं आपको बताऊँ?`);
       } else {
-        const example = (VA.welcome?.suggestions || []).find(s => s.startsWith('Tell me about')) || 'What are my top matches?';
-        text.innerHTML = `Hi, I'm Sunny! Want to try talking to me? Say <b>"${esc(example)}"</b>`;
+        const example = (VA.welcome?.suggestions || []).find(s => s.startsWith('Tell me about') || s.includes('के बारे में')) || vaT('What are my top matches?', 'मेरे टॉप मैच कौन से हैं?');
+        text.innerHTML = vaT(`Hi, I'm Sunny! Want to try talking to me? Say <b>"${esc(example)}"</b>`, `नमस्ते, मैं Sunny हूँ! मुझसे बात करके देखें। बोलें <b>"${esc(example)}"</b>`);
       }
     }
     document.getElementById('va-hint-bubble')?.classList.add('show');
@@ -2276,7 +2324,7 @@ function updateVoiceToggleUI() {
   const icon = document.getElementById('voice-synthesis-speaker-icon');
   if (!btn || !icon) return;
   btn.classList.toggle('off', !VA.speechOn);
-  btn.title = VA.speechOn ? 'Reading replies out loud (tap to mute)' : 'Replies are muted (tap to unmute)';
+  btn.title = VA.speechOn ? vaT('Reading replies out loud (tap to mute)', 'जवाब बोलकर सुना रही हूँ (म्यूट करने के लिए टैप करें)') : vaT('Replies are muted (tap to unmute)', 'जवाब म्यूट हैं (अनम्यूट करने के लिए टैप करें)');
   icon.innerHTML = VA.speechOn
     ? `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>`
     : `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`;
@@ -2313,12 +2361,12 @@ function openVoiceAssistant() {
   if (!VA.welcomed) {
     VA.welcomed = true;
     if ((VA.welcome?.digest_count || 0) > 0 && !VA.messages.length) {
-      fetch('/api/voice/digest')
+      fetch('/api/voice/digest?lang=' + VA.lang)
         .then(r => r.json())
         .then(res => {
           if (!res.ok || !res.count) return;
           setDigestBadge(0);
-          addMessageBubble("What's new today?", 'user');
+          addMessageBubble(vaT("What's new today?", 'आज क्या नया है?'), 'user');
           handleAssistantReply(res);
         })
         .catch(err => console.error('Digest on open failed:', err));
@@ -2328,7 +2376,7 @@ function openVoiceAssistant() {
   if (!VA.messages.length && !vaGet('sessionStorage', 'va_said_hi')) {
     vaSet('sessionStorage', 'va_said_hi', '1');
     vaUnlockAudio();
-    speakResponse("Hi! I'm Sunny. Tap the mic and ask me anything.");
+    speakResponse(vaT("Hi! I'm Sunny. Tap the mic and ask me anything.", 'नमस्ते! मैं Sunny हूँ। माइक टैप करें और कुछ भी पूछें।'));
   }
   scheduleIdleNudge();
   if (window.matchMedia('(min-width: 769px)').matches) {
@@ -2368,8 +2416,8 @@ function scheduleIdleNudge() {
     if (document.getElementById('voice-text-input')?.value) return;
     const text = document.getElementById('va-nudge-text');
     const tries = VA.messages.length
-      ? 'Anything else? Tap the mic and just say it.'
-      : "Don't be shy! Tap the mic and ask me anything.";
+      ? vaT('Anything else? Tap the mic and just say it.', 'और कुछ? माइक टैप करें और बोल दें।')
+      : vaT("Don't be shy! Tap the mic and ask me anything.", 'शर्माइए मत! माइक टैप करें और कुछ भी पूछें।');
     if (text) text.textContent = tries;
     document.getElementById('va-nudge')?.classList.add('show');
     document.getElementById('voice-action-mic')?.classList.add('pulse');
@@ -2386,7 +2434,10 @@ function setAssistantStatus(state, label) {
   const text = document.getElementById('voice-status-text');
   if (status) status.dataset.state = state;
   document.body.dataset.sunny = state === 'ready' ? 'idle' : state;
-  if (text) text.textContent = label || { ready: 'Ready to help', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' }[state] || '';
+  const labels = VA.lang === 'hi'
+    ? { ready: 'मदद के लिए तैयार', listening: 'सुन रही हूँ…', thinking: 'सोच रही हूँ…', speaking: 'बोल रही हूँ…' }
+    : { ready: 'Ready to help', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' };
+  if (text) text.textContent = label || labels[state] || '';
 }
 
 // ── Listening ──
@@ -2421,7 +2472,7 @@ function startListening() {
   if (VA.serverVoice && canRecord) startRecorder();
   else if (SpeechRecognition) startBrowserRecognition(SpeechRecognition);
   else {
-    toast("Voice isn't supported in this browser, but you can type to me!");
+    toast(vaT("Voice isn't supported in this browser, but you can type to me!", 'इस ब्राउज़र में आवाज़ काम नहीं करती, पर आप टाइप कर सकते हैं!'));
     document.getElementById('voice-text-input')?.focus();
   }
 }
@@ -2430,12 +2481,12 @@ function setListeningUI(on, autoWave) {
   VA.listening = on;
   const mic = document.getElementById('voice-action-mic');
   mic?.classList.toggle('listening', on);
-  if (mic) mic.title = on ? 'Stop listening' : 'Talk to Sunny';
+  if (mic) mic.title = on ? vaT('Stop listening', 'सुनना बंद करें') : vaT('Talk to Sunny', 'Sunny से बात करें');
   const wave = document.getElementById('voice-visualizer-container');
   wave?.classList.toggle('show', on);
   wave?.classList.toggle('auto', on && !!autoWave);
   const input = document.getElementById('voice-text-input');
-  if (input) input.placeholder = on ? "I'm listening…" : 'Ask me anything, or tap the mic';
+  if (input) input.placeholder = on ? vaT("I'm listening…", 'मैं सुन रही हूँ…') : vaT('Ask me anything, or tap the mic', 'कुछ भी पूछें, या माइक टैप करें');
   if (on) setAssistantStatus('listening');
   else if (document.getElementById('va-status')?.dataset.state === 'listening') setAssistantStatus('ready');
 }
@@ -2454,7 +2505,7 @@ async function startRecorder() {
     VA.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   } catch (err) {
     console.error('Microphone access failed:', err);
-    toast('I need microphone access to hear you. You can allow it in your browser settings, or type instead.');
+    toast(vaT('I need microphone access to hear you. You can allow it in your browser settings, or type instead.', 'आपको सुनने के लिए मुझे माइक्रोफ़ोन की अनुमति चाहिए। ब्राउज़र सेटिंग्स में अनुमति दें, या टाइप करें।'));
     setListeningUI(false);
     return;
   }
@@ -2553,13 +2604,14 @@ function cancelListening() {
 
 async function submitRecording(blob) {
   if (!VA.heardSpeech || blob.size < 1500) {
-    addAssistantNote("I didn't catch anything that time. Tap the mic and try again?");
+    addAssistantNote(vaT("I didn't catch anything that time. Tap the mic and try again?", 'इस बार मुझे कुछ सुनाई नहीं दिया। माइक टैप करके फिर से कोशिश करें?'));
     return;
   }
-  setAssistantStatus('thinking', 'Transcribing…');
+  setAssistantStatus('thinking', vaT('Transcribing…', 'समझ रही हूँ…'));
   const ext = (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm');
   const form = new FormData();
   form.append('file', blob, 'recording.' + ext);
+  form.append('lang', VA.lang);
   try {
     const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
     const data = await res.json();
@@ -2568,15 +2620,15 @@ async function submitRecording(blob) {
       return;
     }
     if (data.ok) {
-      addAssistantNote("Hmm, I couldn't make that out. Mind saying it again?");
+      addAssistantNote(vaT("Hmm, I couldn't make that out. Mind saying it again?", 'मैं समझ नहीं पाई। एक बार फिर बोलेंगे?'));
       return;
     }
     if (data.provider_fallback) VA.serverVoice = false;  // use the browser's recognizer from now on
-    addAssistantNote(data.error ? data.error + ' Tap the mic to try again, or type it.' : "I had trouble hearing that. Tap the mic and try once more?");
+    addAssistantNote(data.error ? data.error + vaT(' Tap the mic to try again, or type it.', ' माइक टैप करके फिर कोशिश करें, या टाइप करें।') : vaT("I had trouble hearing that. Tap the mic and try once more?", 'मुझे ठीक से सुनाई नहीं दिया। माइक टैप करके एक बार और कोशिश करें?'));
   } catch (err) {
     console.error('Transcription failed:', err);
     VA.serverVoice = false;
-    addAssistantNote('I had trouble hearing that. Tap the mic and try once more?');
+    addAssistantNote(vaT('I had trouble hearing that. Tap the mic and try once more?', 'मुझे ठीक से सुनाई नहीं दिया। माइक टैप करके एक बार और कोशिश करें?'));
   }
 }
 
@@ -2584,7 +2636,7 @@ function startBrowserRecognition(SpeechRecognition) {
   VA.mode = 'browser';
   const rec = new SpeechRecognition();
   VA.recognition = rec;
-  rec.lang = navigator.language || 'en-US';
+  rec.lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
   rec.interimResults = true;
   rec.continuous = false;
   rec.maxAlternatives = 1;
@@ -2602,9 +2654,9 @@ function startBrowserRecognition(SpeechRecognition) {
   };
   rec.onerror = (event) => {
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-      toast('I need microphone access to hear you. You can allow it in your browser settings, or type instead.');
+      toast(vaT('I need microphone access to hear you. You can allow it in your browser settings, or type instead.', 'आपको सुनने के लिए मुझे माइक्रोफ़ोन की अनुमति चाहिए। ब्राउज़र सेटिंग्स में अनुमति दें, या टाइप करें।'));
     } else if (event.error === 'no-speech') {
-      addAssistantNote("I didn't hear anything. Tap the mic and try again?");
+      addAssistantNote(vaT("I didn't hear anything. Tap the mic and try again?", 'मुझे कुछ सुनाई नहीं दिया। माइक टैप करके फिर कोशिश करें?'));
     } else if (event.error !== 'aborted') {
       console.error('Speech recognition error:', event.error);
     }
@@ -2627,8 +2679,6 @@ function startBrowserRecognition(SpeechRecognition) {
 function sendSuggestionQuery(text) {
   text = (text || '').trim();
   if (!text) return;
-  if (/^yes\b/i.test(text) && VA.pendingToken) { addMessageBubble(text, 'user'); confirmVoiceAction(); return; }
-  if (/^no\b/i.test(text) && VA.pendingToken) { addMessageBubble(text, 'user'); cancelVoiceAction(); return; }
   handleUserText(text, false);
 }
 
@@ -2656,8 +2706,8 @@ function handleUserText(text, spoken) {
 
   if (VA.pendingToken) {
     const t = text.toLowerCase();
-    if (/\b(yes|yeah|yep|yup|sure|confirm|do it|go ahead|ok|okay|please do|absolutely|sounds good)\b/.test(t)) { confirmVoiceAction(); return; }
-    if (/\b(no|nope|cancel|stop|don't|dont|never ?mind|forget it|wait)\b/.test(t)) { cancelVoiceAction(); return; }
+    if (vaIsNo(t)) { cancelVoiceAction(); return; }
+    if (vaIsYes(t)) { confirmVoiceAction(); return; }
     // Anything else is a new request; the old question just lapses
     VA.pendingToken = null;
     hideConfirmButtons();
@@ -2665,28 +2715,41 @@ function handleUserText(text, spoken) {
   sendAssistantQuery(text);
 }
 
+// Yes/no answers to a confirm question, in English, Hindi or Hinglish.
+// "No" is checked first so "mat karo" / "नहीं करो" never reads as a yes.
+const VA_NO_RE = /(^|[^a-z\u0900-\u097F])(no|nope|nah|cancel|stop|don't|dont|never ?mind|forget it|wait|nahi|nahin|mat|ruko|rehne do|रहने दो|नहीं|नही|ना|मत|रद्द|रुको|कैंसल)(?=$|[^a-z\u0900-\u097F])/;
+const VA_YES_RE = /(^|[^a-z\u0900-\u097F])(yes|yeah|yep|yup|sure|confirm|do it|go ahead|ok|okay|please do|absolutely|sounds good|haan|han|ha|ji|theek hai|thik hai|kar do|karo|हाँ|हां|हा|जी|ठीक है|कर दो|करो|बिल्कुल|ओके)(?=$|[^a-z\u0900-\u097F])/;
+function vaIsNo(t) { return VA_NO_RE.test(t); }
+function vaIsYes(t) { return VA_YES_RE.test(t); }
+
 function sendAssistantQuery(text) {
   setAssistantStatus('thinking');
   const typing = showTyping();
   fetch('/api/voice/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript: text, chat_history: VA.history.slice(0, -1), context_job_ids: VA.contextJobIds })
+    body: JSON.stringify({ transcript: text, chat_history: VA.history.slice(0, -1), context_job_ids: VA.contextJobIds, lang: VA.lang })
   })
   .then(r => r.json().catch(() => ({ ok: false })))
   .then(res => {
     typing.remove();
-    if (!res.reply_text) res.reply_text = res.error || 'Sorry, something went wrong. Mind trying that again?';
+    if (!res.reply_text) res.reply_text = res.error || vaT('Sorry, something went wrong. Mind trying that again?', 'माफ़ कीजिए, कुछ गड़बड़ हो गई। फिर से कोशिश करेंगे?');
     handleAssistantReply(res);
   })
   .catch(err => {
     typing.remove();
     console.error('Assistant query failed:', err);
-    handleAssistantReply({ reply_text: "I can't reach the server right now. Check your connection and try again?", suggestions: [] });
+    handleAssistantReply({ reply_text: vaT("I can't reach the server right now. Check your connection and try again?", 'अभी सर्वर से कनेक्ट नहीं हो पा रहा। अपना कनेक्शन देखकर फिर कोशिश करें?'), suggestions: [] });
   });
 }
 
 function handleAssistantReply(res) {
+  if ((res.lang === 'hi' || res.lang === 'en') && res.lang !== VA.lang) {
+    // You spoke Hindi to me (or switched back): follow you
+    VA.lang = res.lang;
+    vaSet('localStorage', 'va_lang', VA.lang);
+    applyAssistantLang();
+  }
   if (res.requires_confirmation && res.action && res.action.token) {
     VA.pendingToken = res.action.token;
   }
@@ -2718,13 +2781,13 @@ function confirmVoiceAction() {
   const token = VA.pendingToken;
   VA.pendingToken = null;
   hideConfirmButtons();
-  if (!token) { addAssistantNote('That request has expired. Just ask me again.'); return; }
-  setAssistantStatus('thinking', 'Working on it…');
+  if (!token) { addAssistantNote(vaT('That request has expired. Just ask me again.', 'वह रिक्वेस्ट पुरानी हो गई। बस फिर से पूछ लीजिए।')); return; }
+  setAssistantStatus('thinking', vaT('Working on it…', 'कर रही हूँ…'));
   const typing = showTyping();
   fetch('/api/voice/confirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token })
+    body: JSON.stringify({ token, lang: VA.lang })
   })
   .then(r => r.json().catch(() => ({ ok: false })))
   .then(res => {
@@ -2732,23 +2795,24 @@ function confirmVoiceAction() {
     if (res.ok) {
       handleAssistantReply({ ...res, suggestions: res.suggestions || [], celebrate: true });
     } else {
-      handleAssistantReply({ reply_text: res.error || "Sorry, I couldn't do that. Please try again." });
+      handleAssistantReply({ reply_text: res.error || vaT("Sorry, I couldn't do that. Please try again.", 'माफ़ कीजिए, मैं यह नहीं कर पाई। कृपया फिर कोशिश करें।') });
     }
   })
   .catch(err => {
     typing.remove();
     console.error(err);
-    handleAssistantReply({ reply_text: "I couldn't reach the server, so nothing changed. Try again?" });
+    handleAssistantReply({ reply_text: vaT("I couldn't reach the server, so nothing changed. Try again?", 'सर्वर से कनेक्ट नहीं हो पाया, इसलिए कुछ नहीं बदला। फिर कोशिश करें?') });
   });
 }
 
 function cancelVoiceAction() {
   VA.pendingToken = null;
   hideConfirmButtons();
-  fetch('/api/voice/cancel', { method: 'POST' })
+  const fallback = vaT('No problem, cancelled.', 'कोई बात नहीं, रद्द कर दिया।');
+  fetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) })
     .then(r => r.json())
-    .then(res => handleAssistantReply({ reply_text: res.reply_text || 'No problem, cancelled.' }))
-    .catch(() => handleAssistantReply({ reply_text: 'No problem, cancelled.' }));
+    .then(res => handleAssistantReply({ reply_text: res.reply_text || fallback }))
+    .catch(() => handleAssistantReply({ reply_text: fallback }));
 }
 
 // A little hop and happy eyes when something got done
@@ -2757,8 +2821,8 @@ function celebrateSunny() {
   setTimeout(() => { if (document.body.dataset.sunny === 'happy') document.body.dataset.sunny = 'idle'; }, 1600);
 }
 
-function confirmBubbleAction() { addMessageBubble('Yes, go ahead', 'user'); confirmVoiceAction(); }
-function cancelBubbleAction() { addMessageBubble('No, cancel', 'user'); cancelVoiceAction(); }
+function confirmBubbleAction() { addMessageBubble(vaT('Yes, go ahead', 'हाँ, कर दो'), 'user'); confirmVoiceAction(); }
+function cancelBubbleAction() { addMessageBubble(vaT('No, cancel', 'नहीं, रद्द करो'), 'user'); cancelVoiceAction(); }
 
 function hideConfirmButtons() {
   document.querySelectorAll('#voice-messages .va-confirm, #voice-messages .va-confirm-hint').forEach(el => el.remove());
@@ -2955,7 +3019,7 @@ async function speakWithBrowser(text, done, token) {
 function vaSoundProblem() {
   if (VA.warnedSound) return;
   VA.warnedSound = true;
-  toast("I couldn't play my voice. Check your volume and that this tab isn't muted.");
+  toast(vaT("I couldn't play my voice. Check your volume and that this tab isn't muted.", 'मेरी आवाज़ नहीं चल पाई। वॉल्यूम देखें और ध्यान दें कि यह टैब म्यूट न हो।'));
   document.getElementById('voice-synthesis-toggle')?.classList.add('warn');
 }
 
@@ -3044,10 +3108,10 @@ function renderMessage(msg) {
     const cards = (msg.cards || []).map(renderCard).join('');
     const confirm = msg.confirm ? `
       <div class="va-confirm">
-        <button class="yes" type="button" onclick="confirmBubbleAction()">Yes, go ahead</button>
-        <button class="no" type="button" onclick="cancelBubbleAction()">Cancel</button>
+        <button class="yes" type="button" onclick="confirmBubbleAction()">${vaT('Yes, go ahead', 'हाँ, कर दो')}</button>
+        <button class="no" type="button" onclick="cancelBubbleAction()">${vaT('Cancel', 'रद्द करें')}</button>
       </div>
-      <div class="va-confirm-hint">Or just say "yes" or "no"</div>` : '';
+      <div class="va-confirm-hint">${vaT('Or just say "yes" or "no"', 'या बस "हाँ" या "नहीं" बोलें')}</div>` : '';
     const chips = !msg.confirm && msg.suggestions && msg.suggestions.length
       ? `<div class="va-chips left">${msg.suggestions.map(s => `<button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">${esc(s)}</button>`).join('')}</div>`
       : '';
@@ -3066,7 +3130,7 @@ function renderMessage(msg) {
 function renderCard(card) {
   if (card.type === 'stats') {
     const stat = (n, label) => `<div class="va-stat"><b>${esc(n ?? 0)}</b><span>${label}</span></div>`;
-    return `<div class="va-stats">${stat(card.total, 'On board')}${stat(card.avg_score, 'Avg score')}${stat(card.shortlisted, 'Shortlisted')}${stat(card.applied, 'Applied')}${stat(card.interviewing, 'Interviewing')}${stat(card.offers, 'Offers')}</div>`;
+    return `<div class="va-stats">${stat(card.total, vaT('On board', 'बोर्ड पर'))}${stat(card.avg_score, vaT('Avg score', 'औसत स्कोर'))}${stat(card.shortlisted, vaT('Shortlisted', 'शॉर्टलिस्ट'))}${stat(card.applied, vaT('Applied', 'अप्लाई किया'))}${stat(card.interviewing, vaT('Interviewing', 'इंटरव्यू'))}${stat(card.offers, vaT('Offers', 'ऑफ़र'))}</div>`;
   }
   if (card.type === 'job') {
     const score = card.score !== null && card.score !== undefined && card.score !== '' ? parseFloat(card.score) : null;
@@ -3081,7 +3145,7 @@ function renderCard(card) {
         <div class="va-card-sub">${esc(card.company)}${card.location ? ' · ' + esc(card.location) : ''}</div>
         <div class="va-card-foot">
           <span class="va-tag">${esc(statusLabel)}</span>
-          <button class="va-link" type="button" onclick="openJobModal(${esc(JSON.stringify(String(card.job_id)))})">Open details</button>
+          <button class="va-link" type="button" onclick="openJobModal(${esc(JSON.stringify(String(card.job_id)))})">${vaT('Open details', 'डिटेल्स देखें')}</button>
         </div>
       </div>`;
   }
@@ -3089,7 +3153,7 @@ function renderCard(card) {
     return `
       <div class="va-card va-email" onclick="this.classList.toggle('open')">
         <div class="va-card-title">${esc(card.subject)}</div>
-        <div class="va-card-sub">From ${esc(card.sender)}</div>
+        <div class="va-card-sub">${vaT('From', 'भेजने वाले:')} ${esc(card.sender)}</div>
         <div class="va-email-body">${esc(card.body)}</div>
       </div>`;
   }
@@ -3123,7 +3187,7 @@ function clearAssistantChat() {
   VA.history = [];
   VA.contextJobIds = [];
   VA.pendingToken = null;
-  fetch('/api/voice/cancel', { method: 'POST' }).catch(() => {});
+  fetch('/api/voice/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: VA.lang }) }).catch(() => {});
   const container = document.getElementById('voice-messages');
   const starter = document.getElementById('voice-starter-container');
   if (container && starter) {
@@ -4607,6 +4671,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 4px;">
+      <button id="va-lang-toggle" class="va-icon-btn va-lang" type="button" onclick="toggleAssistantLang()" title="हिंदी में बात करें (Talk in Hindi)" aria-label="हिंदी में बात करें (Talk in Hindi)">हिं</button>
       <button id="voice-synthesis-toggle" class="va-icon-btn" type="button" onclick="toggleVoiceSpeech()" title="Read replies out loud" aria-label="Read replies out loud">
         <svg id="voice-synthesis-speaker-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
       </button>
@@ -4625,9 +4690,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="va-sunny-slot" data-sunny-mascot></span>
         <span class="va-mascot-mic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></span>
       </button>
-      <div class="va-big-mic-label">Tap me to talk</div>
+      <div class="va-big-mic-label" id="va-big-mic-label">Tap me to talk</div>
       <h3 id="va-greeting">Hi there! I'm Sunny.</h3>
-      <p>Your job-search buddy. Tap Sunny above and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.</p>
+      <p id="va-starter-text">Your job-search buddy. Tap Sunny above and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.</p>
       <div class="va-chips" id="va-starter-chips">
         <button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">What's new today?</button>
         <button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">What are my top matches?</button>

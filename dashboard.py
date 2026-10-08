@@ -1,6 +1,6 @@
 import os, json, sqlite3, hmac, secrets, threading, time, base64
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
@@ -1321,10 +1321,11 @@ def voice_transcribe():
         return jsonify({"ok": False, "error": "No audio received."}), 400
     audio_bytes = audio_file.read(ve.MAX_AUDIO_BYTES + 1)
     if not audio_bytes:
-        return jsonify({"ok": False, "error": "I didn't catch any audio. Try again?"}), 400
+        return jsonify({"ok": False, "error": _t("I didn't catch any audio. Try again?", "मुझे कोई आवाज़ नहीं मिली। फिर से कोशिश करें?")}), 400
     if len(audio_bytes) > ve.MAX_AUDIO_BYTES:
-        return jsonify({"ok": False, "error": "That recording was a bit long. Try a shorter question."}), 413
+        return jsonify({"ok": False, "error": _t("That recording was a bit long. Try a shorter question.", "रिकॉर्डिंग थोड़ी लंबी थी। छोटा सवाल पूछकर देखें।")}), 413
     mime_type = (audio_file.mimetype or "audio/webm").lower()
+    g.voice_lang = ve.reply_lang(request.form.get("lang"))
     if mime_type not in ve.ALLOWED_AUDIO_TYPES:
         return jsonify({"ok": False, "error": "Unsupported audio format.", "provider_fallback": True}), 415
 
@@ -1336,11 +1337,11 @@ def voice_transcribe():
     if not api_key:
         return jsonify({"ok": False, "error": "Voice transcription isn't set up.", "provider_fallback": True}), 400
     try:
-        transcript = ve.transcribe_audio(audio_bytes, mime_type, api_key)
+        transcript = ve.transcribe_audio(audio_bytes, mime_type, api_key, lang=g.voice_lang)
     except ve.GeminiError as e:
         # The message never includes the API key; the key travels in a header
         app.logger.warning("Voice transcription failed for user %s: %s", uid, e)
-        return jsonify({"ok": False, "error": "I couldn't transcribe that just now.", "provider_fallback": True}), 502
+        return jsonify({"ok": False, "error": _t("I couldn't transcribe that just now.", "अभी मैं इसे समझ नहीं पाई।"), "provider_fallback": True}), 502
     return jsonify({"ok": True, "transcript": transcript})
 
 
@@ -1418,9 +1419,11 @@ def voice_query():
         return limited
     d = request.get_json(silent=True) or {}
     transcript = ve.sanitize_transcript(d.get("transcript"))
+    g.voice_lang = ve.reply_lang(d.get("lang"), transcript)
     if not transcript:
-        return jsonify(_voice_reply(None, "I didn't hear anything that time. Tap the mic and try again?",
-                                    suggestions=ve.follow_up_suggestions(None)))
+        return jsonify(_voice_reply(None, _t("I didn't hear anything that time. Tap the mic and try again?",
+                                             "इस बार मुझे कुछ सुनाई नहीं दिया। माइक दबाकर फिर से बोलिए?"),
+                                    suggestions=ve.follow_up_suggestions(None, lang=g.voice_lang)))
     history = ve.sanitize_history(d.get("chat_history"))
 
     conn = get_conn(DB_PATH)
@@ -1434,7 +1437,8 @@ def voice_query():
         return jsonify(_answer_voice_intent(conn, uid, settings, res, snapshot))
     except Exception:
         app.logger.exception("Voice query failed for user %s", uid)
-        return jsonify(_voice_reply(None, "Sorry, something went wrong on my side. Mind trying that again?",
+        return jsonify(_voice_reply(None, _t("Sorry, something went wrong on my side. Mind trying that again?",
+                                             "माफ़ कीजिए, मेरी तरफ़ से कुछ गड़बड़ हो गई। फिर से कोशिश करें?"),
                                     ok=False)), 500
     finally:
         conn.close()
@@ -1467,21 +1471,24 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
 
     if intent in ve.JOB_INTENTS and not job:
         session["voice_awaiting"] = {"intent": intent, "slots": slots, "needs": "job", "at": time.time()}
-        chips = [f"The {ve._spoken_company(clean_company(j['company']))} job" for j in snapshot[:3]]
-        return _voice_reply(intent, ve.which_job_reply(intent), suggestions=chips)
+        names = [ve._spoken_company(clean_company(j['company'])) for j in snapshot[:3]]
+        chips = [_t(f"The {c} job", f"{c} वाली") for c in names]
+        return _voice_reply(intent, ve.which_job_reply(intent, g.voice_lang), suggestions=chips)
 
     if intent in ve.MUTATING_INTENTS:
         return _propose_voice_action(conn, uid, intent, slots, job)
 
     cards = [_voice_card(job)] if job else []
-    follow = ve.follow_up_suggestions(intent, job)
+    lang = g.voice_lang
+    follow = ve.follow_up_suggestions(intent, job, lang=lang)
 
     if intent == "help":
-        return _voice_reply(intent, ve.HELP_TEXT, suggestions=follow)
+        return _voice_reply(intent, ve.HELP_TEXT[lang], suggestions=follow)
     if intent == "greeting":
-        return _voice_reply(intent, ve.greeting_text(settings.get("name")), suggestions=follow)
+        return _voice_reply(intent, ve.greeting_text(settings.get("name"), lang=lang), suggestions=follow)
     if intent == "thanks":
-        return _voice_reply(intent, ve.pick("Anytime!", "Happy to help!", "You got it. Good luck out there!"),
+        return _voice_reply(intent, _t(ve.pick("Anytime!", "Happy to help!", "You got it. Good luck out there!"),
+                                       ve.pick("कभी भी!", "मदद करके खुशी हुई!", "बिल्कुल। ऑल द बेस्ट!")),
                             suggestions=follow)
 
     if intent == "daily_digest":
@@ -1500,43 +1507,56 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
             "interviewing": by_status.get("interviewing", 0), "offers": by_status.get("offer", 0),
         }
         if not active:
-            text = "Your board is empty right now. Say \"refresh my listings\" and I'll go find some jobs for you."
+            text = _t("Your board is empty right now. Say \"refresh my listings\" and I'll go find some jobs for you.",
+                      "आपका बोर्ड अभी खाली है। \"लिस्टिंग रिफ्रेश करो\" कहिए और मैं आपके लिए जॉब्स ढूंढ लाऊँगी।")
         else:
-            text = (f"You've got {active} job{'s' if active != 1 else ''} on your board, with an average match of "
-                    f"{avg:.1f} out of 10. {counts['applied']} applied and {counts['interviewing']} interviewing.")
+            text = _t(f"You've got {active} job{'s' if active != 1 else ''} on your board, with an average match of "
+                      f"{avg:.1f} out of 10. {counts['applied']} applied and {counts['interviewing']} interviewing.",
+                      f"आपके बोर्ड पर {active} जॉब्स हैं, औसत मैच 10 में से {avg:.1f}। "
+                      f"{counts['applied']} में अप्लाई किया है और {counts['interviewing']} में इंटरव्यू चल रहा है।")
             if counts["offers"]:
-                text += f" And {counts['offers']} offer{'s' if counts['offers'] != 1 else ''}. Nice work!"
+                text += _t(f" And {counts['offers']} offer{'s' if counts['offers'] != 1 else ''}. Nice work!",
+                           f" और {counts['offers']} ऑफ़र भी! बहुत बढ़िया!")
             elif counts["applied"] == 0:
-                text += " Want me to pull up your top matches so you can start applying?"
+                text += _t(" Want me to pull up your top matches so you can start applying?",
+                           " क्या मैं आपके टॉप मैच दिखाऊँ ताकि आप अप्लाई करना शुरू कर सकें?")
         card = {"type": "stats", "total": active, "avg_score": round(avg, 1), **counts}
         return _voice_reply(intent, text, cards=[card], suggestions=follow)
 
     if intent == "column_count":
         column = slots.get("column")
         if not column:
-            return _voice_reply(intent, "Which column? New, Shortlisted, Interviewing, Applied, Offer or Rejected?",
-                                suggestions=["How many are shortlisted?", "How many have I applied to?"])
+            return _voice_reply(intent, _t("Which column? New, Shortlisted, Interviewing, Applied, Offer or Rejected?",
+                                           "कौन सा कॉलम? New, Shortlisted, Interviewing, Applied, Offer या Rejected?"),
+                                suggestions=[ve.chip("shortlisted", lang), ve.chip("applied_count", lang)])
         statuses = ("new", "scored", "ready") if column == "new" else (column,)
         marks = ",".join("?" * len(statuses))
         count = conn.execute(f"SELECT COUNT(*) FROM jobs WHERE user_id = ? AND status IN ({marks})",
                              (uid, *statuses)).fetchone()[0]
         label = ve.column_label(column)
         if count == 0:
-            text = f"Nothing in {label} yet."
+            text = _t(f"Nothing in {label} yet.", f"{label} में अभी कुछ नहीं है।")
         else:
-            text = f"You have {count} job{'s' if count != 1 else ''} in {label}."
+            text = _t(f"You have {count} job{'s' if count != 1 else ''} in {label}.", f"{label} में आपकी {count} जॉब्स हैं।")
         return _voice_reply(intent, text, suggestions=follow)
 
     if intent == "job_lookup":
-        score = f"It scored {job['score']:.1f} out of 10" if job["score"] is not None else "I haven't scored it yet"
-        text = f"Here's {job['title']} at {job['company']}. {score}, and it's in your {ve.column_label(job['status'])} column."
+        label = ve.column_label(job["status"])
+        if job["score"] is not None:
+            text = _t(f"Here's {job['title']} at {job['company']}. It scored {job['score']:.1f} out of 10, and it's in your {label} column.",
+                      f"यह रही {job['company']} की {job['title']} जॉब। इसका स्कोर 10 में से {job['score']:.1f} है, और यह {label} कॉलम में है।")
+        else:
+            text = _t(f"Here's {job['title']} at {job['company']}. I haven't scored it yet, and it's in your {label} column.",
+                      f"यह रही {job['company']} की {job['title']} जॉब। इसका स्कोर अभी नहीं बना है, और यह {label} कॉलम में है।")
         return _voice_reply(intent, text, cards=cards, suggestions=follow)
 
     if intent == "job_fit":
         if job["score"] is None:
-            text = f"I haven't scored {job['title']} at {job['company']} yet. Try refreshing and I'll take a look."
+            text = _t(f"I haven't scored {job['title']} at {job['company']} yet. Try refreshing and I'll take a look.",
+                      f"{job['company']} की जॉब का स्कोर अभी नहीं बना है। रिफ्रेश करके देखिए।")
         else:
-            text = f"{job['title']} at {job['company']} scored {job['score']:.1f} out of 10."
+            text = _t(f"{job['title']} at {job['company']} scored {job['score']:.1f} out of 10.",
+                      f"{job['company']} की {job['title']} जॉब का स्कोर 10 में से {job['score']:.1f} है।")
             if job.get("summary"):
                 text += " " + job["summary"].strip()
         return _voice_reply(intent, text, cards=cards, suggestions=follow)
@@ -1544,15 +1564,19 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
     if intent == "job_status":
         status = job["status"]
         if status == "applied":
-            text = f"Yes, you've applied to {job['company']}. Fingers crossed!"
+            text = _t(f"Yes, you've applied to {job['company']}. Fingers crossed!",
+                      f"हाँ, आपने {job['company']} में अप्लाई कर दिया है। ऑल द बेस्ट!")
         elif status in ("interviewing", "offer"):
-            text = f"{job['company']} is in your {ve.column_label(status)} column. Exciting!"
+            text = _t(f"{job['company']} is in your {ve.column_label(status)} column. Exciting!",
+                      f"{job['company']} आपके {ve.column_label(status)} कॉलम में है। वाह!")
         else:
-            text = f"Not yet. {job['title']} at {job['company']} is in your {ve.column_label(status)} column."
+            text = _t(f"Not yet. {job['title']} at {job['company']} is in your {ve.column_label(status)} column.",
+                      f"अभी नहीं। {job['company']} की {job['title']} जॉब {ve.column_label(status)} कॉलम में है।")
         return _voice_reply(intent, text, cards=cards, suggestions=follow)
 
     if intent == "quiz_mode":
-        reply = _voice_reply(intent, f"Let's practice for {job['title']} at {job['company']}. Opening the quiz now.")
+        reply = _voice_reply(intent, _t(f"Let's practice for {job['title']} at {job['company']}. Opening the quiz now.",
+                                        f"चलिए {job['company']} की {job['title']} जॉब के लिए अभ्यास करते हैं। क्विज़ खोल रही हूँ।"))
         reply["action"] = {"type": "open_quiz", "job_id": job["job_id"]}
         return reply
 
@@ -1564,26 +1588,27 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
                 "ORDER BY received_at DESC LIMIT 3",
                 (uid, f"%{company}%", f"%{company}%", f"%{company}%")
             ).fetchall()
-            text = (f"Here's the latest from {company}: \"{rows[0][1]}\"." if rows
-                    else f"Nothing from {company} yet. I'll keep an eye out.")
+            text = (_t(f"Here's the latest from {company}: \"{rows[0][1]}\".", f"{company} का सबसे नया ईमेल: \"{rows[0][1]}\"।") if rows
+                    else _t(f"Nothing from {company} yet. I'll keep an eye out.", f"{company} से अभी कुछ नहीं आया। मैं नज़र रखूँगी।"))
         else:
             rows = conn.execute(
                 "SELECT sender, subject, body FROM received_emails WHERE user_id = ? ORDER BY received_at DESC LIMIT 3", (uid,)
             ).fetchall()
-            text = "Here are your latest emails." if rows else "No synced emails yet. Connect your inbox in Settings and I'll watch for replies."
+            text = _t("Here are your latest emails.", "ये रहे आपके सबसे नए ईमेल।") if rows else _t("No synced emails yet. Connect your inbox in Settings and I'll watch for replies.", "अभी कोई ईमेल सिंक नहीं हुआ। Settings में अपना इनबॉक्स जोड़िए, मैं जवाबों पर नज़र रखूँगी।")
         email_cards = [{"type": "email", "sender": r[0], "subject": r[1], "body": (r[2] or "")[:2000]} for r in rows]
         return _voice_reply(intent, text, cards=cards + email_cards, suggestions=follow)
 
     if intent == "email_count":
         count = conn.execute("SELECT COUNT(*) FROM received_emails WHERE user_id = ?", (uid,)).fetchone()[0]
-        text = (f"You have {count} synced email{'s' if count != 1 else ''}." if count
-                else "No synced emails yet. Connect your inbox in Settings and I'll watch for replies.")
+        text = (_t(f"You have {count} synced email{'s' if count != 1 else ''}.", f"आपके {count} ईमेल सिंक हुए हैं।") if count
+                else _t("No synced emails yet. Connect your inbox in Settings and I'll watch for replies.", "अभी कोई ईमेल सिंक नहीं हुआ। Settings में अपना इनबॉक्स जोड़िए, मैं जवाबों पर नज़र रखूँगी।"))
         return _voice_reply(intent, text, suggestions=follow)
 
     if intent == "last_sync":
         row = conn.execute("SELECT last_scraped_at FROM users WHERE id = ?", (uid,)).fetchone()
-        when = _spoken_time(row[0]) if row and row[0] else None
-        text = f"I last refreshed your board {when}." if when else "Your board hasn't been refreshed yet. Want me to do it now?"
+        when = _spoken_time(row[0], lang) if row and row[0] else None
+        text = (_t(f"I last refreshed your board {when}.", f"आपका बोर्ड आखिरी बार {when} रिफ्रेश हुआ था।") if when
+                else _t("Your board hasn't been refreshed yet. Want me to do it now?", "आपका बोर्ड अभी तक रिफ्रेश नहीं हुआ है। अभी कर दूँ?"))
         return _voice_reply(intent, text, suggestions=follow)
 
     if intent == "top_matches":
@@ -1592,22 +1617,27 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
             "AND ai_score IS NOT NULL ORDER BY ai_score DESC LIMIT 3", (uid,)
         ).fetchall()
         if not rows:
-            return _voice_reply(intent, "I haven't scored any jobs for you yet. Say \"refresh my listings\" and I'll get started.",
-                                suggestions=["Refresh my listings"])
+            return _voice_reply(intent, _t("I haven't scored any jobs for you yet. Say \"refresh my listings\" and I'll get started.",
+                                           "मैंने अभी तक आपकी कोई जॉब स्कोर नहीं की है। \"लिस्टिंग रिफ्रेश करो\" कहिए, मैं शुरू करती हूँ।"),
+                                suggestions=[ve.chip("refresh", lang)])
         jobs = [_voice_job_from_row(r) for r in rows]
-        spoken = ", ".join(f"{j['title']} at {j['company']} ({j['score']:.1f})" for j in jobs)
-        text = f"Your top {'match is' if len(jobs) == 1 else str(len(jobs)) + ' matches are'}: {spoken}."
+        if lang == "hi":
+            spoken = ", ".join(f"{j['company']} की {j['title']} ({j['score']:.1f})" for j in jobs)
+            text = f"आपके टॉप {len(jobs)} मैच: {spoken}।"
+        else:
+            spoken = ", ".join(f"{j['title']} at {j['company']} ({j['score']:.1f})" for j in jobs)
+            text = f"Your top {'match is' if len(jobs) == 1 else str(len(jobs)) + ' matches are'}: {spoken}."
         return _voice_reply(intent, text, cards=[_voice_card(j) for j in jobs], suggestions=follow)
 
     if intent == "cover_letter_status":
         has_letter = conn.execute("SELECT 1 FROM cover_letters WHERE job_id = ? AND user_id = ?",
                                   (job["job_id"], uid)).fetchone()
         if has_letter:
-            text = f"Yes, there's a cover letter ready for {job['company']}."
-            follow = ["Send the application", "Rewrite the cover letter"]
+            text = _t(f"Yes, there's a cover letter ready for {job['company']}.", f"हाँ, {job['company']} के लिए कवर लेटर तैयार है।")
+            follow = [ve.chip("send", lang), ve.chip("rewrite", lang)]
         else:
-            text = f"Not yet. Want me to write one for {job['company']}?"
-            follow = ["Write a cover letter for it"]
+            text = _t(f"Not yet. Want me to write one for {job['company']}?", f"अभी नहीं। क्या मैं {job['company']} के लिए एक लिख दूँ?")
+            follow = [ve.chip("write_letter", lang)]
         return _voice_reply(intent, text, cards=cards, suggestions=follow)
 
     if intent in ("thumbs_up", "thumbs_down"):
@@ -1615,11 +1645,15 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
         conn.execute("UPDATE jobs SET feedback = ? WHERE job_id = ? AND user_id = ?", (1 if liked else -1, job["job_id"], uid))
         conn.commit()
         rescore_inbox_in_background(uid)
-        text = (f"Nice! I've marked {job['company']} as a favourite and I'll look for more jobs like it." if liked
-                else f"Got it, you're not into {job['company']}. I'll show you fewer jobs like that.")
+        if liked:
+            text = _t(f"Nice! I've marked {job['company']} as a favourite and I'll look for more jobs like it.",
+                      f"बढ़िया! मैंने {job['company']} को पसंदीदा में डाल दिया है, ऐसी और जॉब्स ढूंढूँगी।")
+        else:
+            text = _t(f"Got it, you're not into {job['company']}. I'll show you fewer jobs like that.",
+                      f"ठीक है, {job['company']} आपको पसंद नहीं। ऐसी जॉब्स कम दिखाऊँगी।")
         return _voice_reply(intent, text, cards=cards, suggestions=follow, board_changed=True)
 
-    return _voice_reply(None, ve.pick(*ve.UNKNOWN_REPLIES), suggestions=ve.follow_up_suggestions(None))
+    return _voice_reply(None, ve.pick(*ve.UNKNOWN_REPLIES[lang]), suggestions=ve.follow_up_suggestions(None, lang=lang))
 
 
 def _propose_voice_action(conn, uid, intent, slots, job):
@@ -1630,24 +1664,31 @@ def _propose_voice_action(conn, uid, intent, slots, job):
         status = slots.get("status")
         if not status:
             session["voice_awaiting"] = {"intent": intent, "slots": slots, "needs": "status", "at": time.time()}
-            return _voice_reply(intent, f"Sure! Which column should {job['company']} go to?", cards=cards,
+            return _voice_reply(intent, _t(f"Sure! Which column should {job['company']} go to?",
+                                           f"ज़रूर! {job['company']} को किस कॉलम में डालूँ?"), cards=cards,
                                 suggestions=["Shortlisted", "Applied", "Interviewing", "Rejected"])
         if job["status"] == status or (status == "new" and job["status"] in ("scored", "ready")):
-            return _voice_reply(intent, f"{job['company']} is already in {ve.column_label(status)}.", cards=cards)
-        text = f"Move {job['title']} at {job['company']} to {ve.column_label(status)}?"
+            return _voice_reply(intent, _t(f"{job['company']} is already in {ve.column_label(status)}.",
+                                           f"{job['company']} पहले से {ve.column_label(status)} में है।"), cards=cards)
+        text = _t(f"Move {job['title']} at {job['company']} to {ve.column_label(status)}?",
+                  f"{job['company']} की {job['title']} जॉब को {ve.column_label(status)} में डाल दूँ?")
     elif intent == "trigger_refresh":
-        text = "Want me to refresh your listings and look for new jobs?"
+        text = _t("Want me to refresh your listings and look for new jobs?", "क्या मैं आपकी लिस्टिंग रिफ्रेश करके नई जॉब्स ढूंढूँ?")
     elif intent == "regenerate_cover_letter":
-        text = f"Write a fresh cover letter for {job['title']} at {job['company']}?"
+        text = _t(f"Write a fresh cover letter for {job['title']} at {job['company']}?",
+                  f"{job['company']} की {job['title']} जॉब के लिए नया कवर लेटर लिख दूँ?")
     elif intent == "send_email":
         has_letter = conn.execute("SELECT 1 FROM cover_letters WHERE job_id = ? AND user_id = ?",
                                   (job["job_id"], uid)).fetchone()
         if not has_letter:
-            return _voice_reply(intent, f"There's no cover letter for {job['company']} yet. Want me to write one first?",
-                                cards=cards, suggestions=["Write a cover letter for it"])
-        text = f"Send the application email for {job['title']} at {job['company']}?"
+            return _voice_reply(intent, _t(f"There's no cover letter for {job['company']} yet. Want me to write one first?",
+                                           f"{job['company']} के लिए अभी कवर लेटर नहीं है। पहले एक लिख दूँ?"),
+                                cards=cards, suggestions=[ve.chip("write_letter", g.voice_lang)])
+        text = _t(f"Send the application email for {job['title']} at {job['company']}?",
+                  f"{job['company']} की {job['title']} जॉब का एप्लीकेशन ईमेल भेज दूँ?")
     else:  # archive_job
-        text = f"Archive {job['title']} at {job['company']}? It'll disappear from your board."
+        text = _t(f"Archive {job['title']} at {job['company']}? It'll disappear from your board.",
+                  f"{job['company']} की {job['title']} जॉब आर्काइव कर दूँ? यह आपके बोर्ड से हट जाएगी।")
 
     token = secrets.token_urlsafe(12)
     session["voice_pending_action"] = {"intent": intent, "slots": slots, "token": token, "at": time.time()}
@@ -1664,12 +1705,13 @@ def voice_confirm():
     if limited:
         return limited
     d = request.get_json(silent=True) or {}
+    g.voice_lang = ve.reply_lang(d.get("lang"))
     pending = session.get("voice_pending_action")
     if not pending or d.get("token") != pending.get("token"):
-        return jsonify({"ok": False, "error": "That request has expired. Just ask me again."}), 409
+        return jsonify({"ok": False, "error": _t("That request has expired. Just ask me again.", "वह अनुरोध पुराना हो गया। बस फिर से पूछिए।")}), 409
     session.pop("voice_pending_action", None)
     if time.time() - pending.get("at", 0) > ve.PENDING_ACTION_TTL:
-        return jsonify({"ok": False, "error": "That request has expired. Just ask me again."}), 409
+        return jsonify({"ok": False, "error": _t("That request has expired. Just ask me again.", "वह अनुरोध पुराना हो गया। बस फिर से पूछिए।")}), 409
 
     intent = pending.get("intent")
     job_id = (pending.get("slots") or {}).get("job_id")
@@ -1677,24 +1719,26 @@ def voice_confirm():
     try:
         job = _voice_job(conn, uid, job_id) if job_id else None
         if intent in ve.JOB_INTENTS and not job:
-            return jsonify({"ok": False, "error": "I couldn't find that job on your board anymore."}), 404
+            return jsonify({"ok": False, "error": _t("I couldn't find that job on your board anymore.", "वह जॉब अब आपके बोर्ड पर नहीं मिली।")}), 404
 
         if intent == "move_job":
             status = ve.normalize_column((pending.get("slots") or {}).get("status"))
             if not status:
-                return jsonify({"ok": False, "error": "I lost track of which column you wanted. Ask me again?"}), 400
+                return jsonify({"ok": False, "error": _t("I lost track of which column you wanted. Ask me again?", "मैं भूल गई कि कौन सा कॉलम चाहिए था। फिर से बताइए?")}), 400
             conn.execute("UPDATE jobs SET status = ? WHERE job_id = ? AND user_id = ?", (status, job_id, uid))
             add_timeline(conn, job_id, f"Pipeline → {status} (Voice)")
             conn.commit()
             rescore_inbox_in_background(uid)
-            text = ve.pick("Done!", "All set!", "You got it!") + f" {job['company']} is now in {ve.column_label(status)}."
+            text = _t(ve.pick("Done!", "All set!", "You got it!") + f" {job['company']} is now in {ve.column_label(status)}.",
+                      ve.pick("हो गया!", "बिल्कुल!", "कर दिया!") + f" {job['company']} अब {ve.column_label(status)} में है।")
             return jsonify({"ok": True, "reply_text": text, "reply_cards": [_voice_card({**job, "status": status})],
                             "board_changed": True})
 
         if intent == "trigger_refresh":
             started = run_in_background(("sync", uid), run_user_sync, uid)
-            text = ("On it! I'm looking for new jobs in the background. Your board will update when I'm done."
-                    if started else "I'm already refreshing your board. Hang tight!")
+            text = (_t("On it! I'm looking for new jobs in the background. Your board will update when I'm done.",
+                       "शुरू कर दिया! मैं पीछे से नई जॉब्स ढूंढ रही हूँ। काम होते ही आपका बोर्ड अपडेट हो जाएगा।")
+                    if started else _t("I'm already refreshing your board. Hang tight!", "बोर्ड पहले से रिफ्रेश हो रहा है। थोड़ा रुकिए!"))
             return jsonify({"ok": True, "reply_text": text, "reply_cards": []})
 
         if intent == "regenerate_cover_letter":
@@ -1716,7 +1760,8 @@ def voice_confirm():
                          (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid))
             add_timeline(conn, job_id, "Regenerated cover letter (Voice)")
             conn.commit()
-            text = f"Your new cover letter for {job['company']} is ready. Open the job to read it."
+            text = _t(f"Your new cover letter for {job['company']} is ready. Open the job to read it.",
+                      f"{job['company']} के लिए आपका नया कवर लेटर तैयार है। पढ़ने के लिए जॉब खोलिए।")
             return jsonify({"ok": True, "reply_text": text, "board_changed": True,
                             "reply_cards": [_voice_card({**job, "score": score_data["score"]})]})
 
@@ -1724,7 +1769,7 @@ def voice_confirm():
             j = dict(conn.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone())
             cl = conn.execute("SELECT * FROM cover_letters WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
             if not cl:
-                return jsonify({"ok": False, "error": "There's no cover letter to send yet."}), 400
+                return jsonify({"ok": False, "error": _t("There's no cover letter to send yet.", "भेजने के लिए अभी कोई कवर लेटर नहीं है।")}), 400
             cl = dict(cl)
             c = conn.execute("SELECT * FROM contacts WHERE job_id = ? AND user_id = ? LIMIT 1", (job_id, uid)).fetchone()
             c = dict(c) if c else {}
@@ -1739,11 +1784,11 @@ def voice_confirm():
                 "linkedin_note": cl.get("linkedin_note") or "",
             }
             if not send_email_digest([item], recipient=recipient_for_user(uid)):
-                return jsonify({"ok": False, "error": "I couldn't send that email. Check your email settings and try again."}), 502
+                return jsonify({"ok": False, "error": _t("I couldn't send that email. Check your email settings and try again.", "ईमेल नहीं भेज पाई। अपनी ईमेल सेटिंग्स देखकर फिर से कोशिश करें।")}), 502
             conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ? AND user_id = ?", (job_id, uid))
             add_timeline(conn, job_id, "Email sent → applied (Voice)")
             conn.commit()
-            text = f"Sent! I moved {job['company']} to Applied. Good luck!"
+            text = _t(f"Sent! I moved {job['company']} to Applied. Good luck!", f"भेज दिया! {job['company']} को Applied में डाल दिया। ऑल द बेस्ट!")
             return jsonify({"ok": True, "reply_text": text, "board_changed": True,
                             "reply_cards": [_voice_card({**job, "status": "applied"})]})
 
@@ -1751,13 +1796,14 @@ def voice_confirm():
             conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (job_id, uid))
             add_timeline(conn, job_id, "Pipeline → archived (Voice)")
             conn.commit()
-            text = f"Archived {job['title']} at {job['company']}. One less thing to think about."
+            text = _t(f"Archived {job['title']} at {job['company']}. One less thing to think about.",
+                      f"{job['company']} की {job['title']} जॉब आर्काइव कर दी।")
             return jsonify({"ok": True, "reply_text": text, "reply_cards": [], "board_changed": True})
 
-        return jsonify({"ok": False, "error": "I'm not sure what to do with that request."}), 400
+        return jsonify({"ok": False, "error": _t("I'm not sure what to do with that request.", "मुझे समझ नहीं आया कि इसका क्या करूँ।")}), 400
     except Exception:
         app.logger.exception("Voice action %s failed for user %s", intent, uid)
-        return jsonify({"ok": False, "error": "Something went wrong while doing that. Please try again."}), 500
+        return jsonify({"ok": False, "error": _t("Something went wrong while doing that. Please try again.", "यह करते समय कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।")}), 500
     finally:
         conn.close()
 
@@ -1766,7 +1812,9 @@ def voice_confirm():
 def voice_cancel():
     session.pop("voice_pending_action", None)
     session.pop("voice_awaiting", None)
-    return jsonify({"ok": True, "reply_text": ve.pick("No problem, cancelled.", "Okay, I'll leave it as it is.")})
+    g.voice_lang = ve.reply_lang((request.get_json(silent=True) or {}).get("lang"))
+    return jsonify({"ok": True, "reply_text": _t(ve.pick("No problem, cancelled.", "Okay, I'll leave it as it is."),
+                                                 ve.pick("ठीक है, रद्द कर दिया।", "ठीक है, जैसा है वैसा ही रहने देती हूँ।"))})
 
 
 @app.route("/api/voice/welcome", methods=["GET"])
@@ -1774,6 +1822,7 @@ def voice_welcome():
     """Everything the assistant panel needs when it opens: a greeting, starter chips from the
     user's own board, the unread digest count, and whether server-side speech is available."""
     uid = get_user_id()
+    lang = ve.reply_lang(request.args.get("lang"))
     conn = get_conn(DB_PATH)
     try:
         settings = get_user_settings(conn, uid)
@@ -1784,8 +1833,9 @@ def voice_welcome():
         conn.close()
     return jsonify({
         "ok": True,
-        "greeting": ve.greeting_text(settings.get("name")),
-        "suggestions": ve.default_suggestions(snapshot, digest_count),
+        "greeting": ve.greeting_text(settings.get("name"), lang=lang),
+        "suggestions": ve.default_suggestions(snapshot, digest_count, lang=lang),
+        "lang": lang,
         "digest_count": digest_count,
         "has_jobs": bool(snapshot),
         "server_voice": has_key,
@@ -1797,6 +1847,7 @@ def voice_digest():
     uid = get_user_id()
     conn = get_conn(DB_PATH)
     try:
+        g.voice_lang = ve.reply_lang(request.args.get("lang"))
         return jsonify(_digest_reply(conn, uid, mark_read=request.args.get("peek") != "true"))
     finally:
         conn.close()
@@ -1808,7 +1859,8 @@ def _voice_rate_limited(uid, bucket, limit):
     if ve.rate_limiter.allow(uid, bucket, limit):
         return None
     return jsonify({"ok": False, "rate_limited": True,
-                    "error": "You're going a little fast for me. Give me a few seconds and try again."}), 429
+                    "error": _t("You're going a little fast for me. Give me a few seconds and try again.",
+                                "आप थोड़ा तेज़ चल रहे हैं। कुछ सेकंड रुककर फिर से कोशिश करें।")}), 429
 
 
 def _voice_api_key(conn, uid):
@@ -1825,6 +1877,7 @@ def _voice_reply(intent, text, cards=None, suggestions=None, ok=True, **extra):
         "reply_cards": cards,
         "suggestions": suggestions or [],
         "context_job_ids": [c["job_id"] for c in cards if c.get("type") == "job"],
+        "lang": getattr(g, "voice_lang", "en"),
         **extra,
     }
 
@@ -1855,18 +1908,26 @@ def _voice_card(job):
             "score": job["score"], "status": job["status"], "location": job["location"]}
 
 
-def _spoken_time(value):
+def _spoken_time(value, lang="en"):
     try:
         dt = datetime.fromisoformat(str(value).split(".")[0])
     except ValueError:
         return None
     days = (datetime.now().date() - dt.date()).days
     clock = dt.strftime("%I:%M %p").lstrip("0")
+    if lang == "hi":
+        day = "आज" if days == 0 else "कल" if days == 1 else dt.strftime("%d %b")
+        return f"{day} {clock} बजे"
     if days == 0:
         return f"today at {clock}"
     if days == 1:
         return f"yesterday at {clock}"
     return f"on {dt.strftime('%b %d')} at {clock}"
+
+
+def _t(en, hi):
+    """Pick the assistant's wording for this request's language (set from the client and the transcript)."""
+    return hi if getattr(g, "voice_lang", "en") == "hi" else en
 
 
 def _digest_rows(conn, uid):
@@ -1884,17 +1945,25 @@ def _digest_reply(conn, uid, mark_read):
     if mark_read:
         conn.execute("UPDATE users SET last_digest_read_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
         conn.commit()
+    lang = getattr(g, "voice_lang", "en")
     if not jobs:
-        text = "You're all caught up! No new recommendations since you last checked."
-        follow = ["What are my top matches?", "Refresh my listings"]
+        text = _t("You're all caught up! No new recommendations since you last checked.",
+                  "सब देख लिया! पिछली बार के बाद कोई नई सिफारिश नहीं है।")
+        follow = [ve.chip("top", lang), ve.chip("refresh", lang)]
     else:
         top = jobs[0]
-        score = f" with a score of {top['score']:.1f}" if top["score"] is not None else ""
-        text = (f"Good news! You have {len(jobs)} new recommendation{'s' if len(jobs) != 1 else ''}. "
-                f"The best one is {top['title']} at {top['company']}{score}.")
-        if len(jobs) > 1:
-            text += " Also new: " + ", ".join(f"{j['title']} at {j['company']}" for j in jobs[1:]) + "."
-        follow = ["Tell me about the first one", "Why did the first one score that?"]
+        if lang == "hi":
+            score = f", स्कोर {top['score']:.1f}" if top["score"] is not None else ""
+            text = f"खुशखबरी! आपके लिए {len(jobs)} नई सिफारिशें हैं। सबसे अच्छी है {top['company']} की {top['title']}{score}।"
+            if len(jobs) > 1:
+                text += " और नई: " + ", ".join(f"{j['company']} की {j['title']}" for j in jobs[1:]) + "।"
+        else:
+            score = f" with a score of {top['score']:.1f}" if top["score"] is not None else ""
+            text = (f"Good news! You have {len(jobs)} new recommendation{'s' if len(jobs) != 1 else ''}. "
+                    f"The best one is {top['title']} at {top['company']}{score}.")
+            if len(jobs) > 1:
+                text += " Also new: " + ", ".join(f"{j['title']} at {j['company']}" for j in jobs[1:]) + "."
+        follow = [ve.chip("first", lang), ve.chip("first_why", lang)]
     reply = _voice_reply("daily_digest", text, cards=[_voice_card(j) for j in jobs], suggestions=follow)
     reply.update({"count": len(jobs), "jobs": [{k: j[k] for k in ("job_id", "title", "company", "score")} for j in jobs]})
     return reply
