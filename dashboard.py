@@ -95,6 +95,20 @@ SECRET_PLACEHOLDER = "********"
 # Initialize database on startup (crucial for Gunicorn/Render deployments)
 init_db(DB_PATH)
 
+
+def _rescore_saturated_once():
+    from db import _run_once
+    from ai_engine import rescore_saturated_scores
+    conn = get_conn(DB_PATH)
+    try:
+        _run_once(conn, "2026-10-rescore-saturated-scores", lambda c: rescore_saturated_scores(DB_PATH))
+    finally:
+        conn.close()
+
+# Runs once per database, off the request path so it never delays startup
+if os.getenv("SKIP_STARTUP_RESCORE", "0") != "1":
+    threading.Thread(target=_rescore_saturated_once, daemon=True).start()
+
 # Set session cookies lifetime to be long so login stays active
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
