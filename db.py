@@ -15,8 +15,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 IS_POSTGRES = bool(DATABASE_URL)
 
 if IS_POSTGRES:
+    import threading
     import psycopg2
     import psycopg2.extras
+    import psycopg2.pool
 
     class DictRowWrapper:
         def __init__(self, tuple_data, keys):
@@ -130,8 +132,10 @@ if IS_POSTGRES:
             return getattr(self.cursor, name)
 
     class PgConnectionWrapper:
-        def __init__(self, conn):
+        def __init__(self, conn, pool=None):
             self.conn = conn
+            self._pool = pool
+            self._released = False
 
         def cursor(self):
             return PgCursorWrapper(self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
@@ -153,16 +157,76 @@ if IS_POSTGRES:
             self.conn.rollback()
 
         def close(self):
-            self.conn.close()
+            if self._released:
+                return
+            self._released = True
+            if self._pool is None:
+                self.conn.close()
+                return
+            # Hand the connection back clean, or drop it if it broke
+            broken = bool(self.conn.closed)
+            if not broken:
+                try:
+                    self.conn.rollback()
+                except psycopg2.Error:
+                    broken = True
+            try:
+                self._pool.putconn(self.conn, close=broken)
+            except psycopg2.pool.PoolError:
+                self.conn.close()
+
+        def __del__(self):
+            # A caller that forgets close() must not leak a pooled connection
+            try:
+                self.close()
+            except Exception:
+                pass
 
         def __getattr__(self, name):
             return getattr(self.conn, name)
 
+    # One pool per process. Gunicorn forks workers, and a connection must never be
+    # shared across processes, so a new pool is made whenever the pid changes.
+    DB_POOL_MAX = int(os.getenv("DB_POOL_MAX", "8"))
+    # psycopg2 only keeps this many idle connections open; extras are closed on return.
+    # Matches gunicorn's 4 threads per worker.
+    DB_POOL_IDLE = min(int(os.getenv("DB_POOL_IDLE", "4")), DB_POOL_MAX)
+    _pool = None
+    _pool_pid = None
+    _pool_lock = threading.Lock()
+
+    def _get_pool():
+        global _pool, _pool_pid
+        with _pool_lock:
+            if _pool is None or _pool_pid != os.getpid():
+                _pool = psycopg2.pool.ThreadedConnectionPool(DB_POOL_IDLE, DB_POOL_MAX, DATABASE_URL)
+                _pool_pid = os.getpid()
+            return _pool
+
+    def _checkout():
+        """A live pooled connection, or a direct one when the pool is full."""
+        pool = _get_pool()
+        for _ in range(2):
+            try:
+                raw = pool.getconn()
+            except psycopg2.pool.PoolError:
+                break
+            try:
+                if raw.closed:
+                    raise psycopg2.InterfaceError("closed")
+                # The server may have dropped an idle connection; check before handing it out
+                with raw.cursor() as cur:
+                    cur.execute("SELECT 1")
+                raw.rollback()
+                return PgConnectionWrapper(raw, pool)
+            except psycopg2.Error:
+                pool.putconn(raw, close=True)
+        return PgConnectionWrapper(psycopg2.connect(DATABASE_URL))
+
 
 def get_conn(db_path: str = DB_PATH):
     if IS_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL)
-        return PgConnectionWrapper(conn)
+        return _checkout()
     else:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
