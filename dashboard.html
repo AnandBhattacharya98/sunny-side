@@ -838,13 +838,72 @@ input, select, textarea, button { font-family: inherit; }
   transition: max-width .25s ease, opacity .2s ease, padding .25s ease; }
 .bs-count.show { max-width: 120px; padding: 0 9px; opacity: 1; }
 .bs-count.none { background: var(--ink); color: var(--paper); }
+.bs-go { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; margin-left: 6px; padding: 0;
+  border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); cursor: pointer;
+  transition: background-color .15s ease, transform .15s ease; }
+.bs-go svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bs-go:hover { background: var(--yolk); color: var(--ink); }
+.bs-go:active { transform: scale(.94); }
+.bs-go.busy svg { animation: wrSpin 1.2s linear infinite; }
+[data-theme="dark"] .bs-go { background: var(--paper); color: var(--ink); }
+
+/* Web search results */
+.web-results { margin: 0 0 20px; padding: 16px 16px 12px; background: var(--sur); border: 1px solid var(--bdr-strong);
+  border-radius: 16px; box-shadow: var(--shadow); animation: wrIn .28s cubic-bezier(.2,.7,.2,1) both; }
+.wr-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.wr-heading { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.wr-kicker { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--txt); }
+.wr-kicker::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: var(--yolk); margin-right: 8px; vertical-align: 1px; }
+.wr-query { font-family: var(--font-sans); font-size: 15px; font-weight: 600; letter-spacing: -0.015em; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-query em { font-style: normal; font-family: var(--font-mono); font-size: 11.5px; font-weight: 400; color: var(--mut); margin-left: 6px; }
+.wr-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.wr-reload { font-family: var(--font-mono); font-size: 11px; font-weight: 700; border: 0; border-radius: 999px; padding: 6px 12px;
+  background: var(--yolk); color: var(--on-yolk, #0D0C0A); cursor: pointer; }
+.wr-close { width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--bdr-strong); background: transparent; color: var(--mut);
+  font-size: 16px; line-height: 1; cursor: pointer; transition: background-color .15s, color .15s; }
+.wr-close:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.wr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.wr-item { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--bdr); border-radius: 12px;
+  background: var(--bg); animation: wrIn .3s cubic-bezier(.2,.7,.2,1) both; transition: border-color .15s ease; }
+.wr-item:hover { border-color: var(--bdr-strong); }
+.wr-title { font-family: var(--font-sans); font-size: 14px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.35; color: var(--txt); }
+.wr-sub { font-size: 12px; color: var(--mut); line-height: 1.4; }
+.wr-sub b { font-weight: 600; color: var(--txt); }
+.wr-meta { display: flex; align-items: center; flex-wrap: wrap; row-gap: 8px; gap: 6px; margin-top: auto; }
+.wr-src { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; border-radius: 999px; padding: 2px 8px;
+  box-shadow: inset 0 0 0 1px var(--bdr-strong); color: var(--mut); white-space: nowrap; }
+.wr-age { font-family: var(--font-mono); font-size: 10px; color: var(--hin); white-space: nowrap; }
+.wr-spacer { flex: 1; }
+a.wr-title { text-decoration: none; }
+a.wr-title:hover { text-decoration: underline; text-decoration-color: var(--yolk); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.wr-arrow { font-family: var(--font-mono); font-size: 11px; color: var(--hin); margin-left: 6px; transition: color .15s, transform .15s; display: inline-block; }
+a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px); }
+.wr-add { font-family: var(--font-mono); font-size: 11px; font-weight: 700; border: 1px solid var(--yolk); border-radius: 999px;
+  padding: 5px 12px; background: var(--yolk); color: var(--on-yolk, #0D0C0A); cursor: pointer; white-space: nowrap;
+  transition: background-color .15s, color .15s, border-color .15s, transform .15s; }
+.wr-add:hover { filter: brightness(1.05); }
+.wr-add:active { transform: scale(.96); }
+.wr-add[disabled] { background: transparent; color: var(--txt); border-color: var(--bdr-strong); cursor: default; filter: none; }
+.wr-add.done { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.wr-foot { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); margin-top: 10px; }
+.wr-empty { grid-column: 1 / -1; padding: 18px; border: 1px dashed var(--bdr-strong); border-radius: 12px; font-size: 13.5px; color: var(--mut); }
+.wr-skel { height: 104px; border-radius: 12px; border: 1px solid var(--bdr);
+  background: linear-gradient(90deg, var(--sur2) 0%, var(--bg) 50%, var(--sur2) 100%); background-size: 200% 100%; animation: wrShimmer 1.3s ease-in-out infinite; }
+@keyframes wrIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes wrShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes wrSpin { to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   .board-search, .bs-icon, .bs-kbd, .bs-clear, .bs-count { transition: none; }
+  .web-results, .wr-item, .wr-skel, .bs-go.busy svg { animation: none; }
 }
 @media (max-width: 768px) {
   .board-header > .board-search { flex: 0 0 auto !important; height: 44px; flex-direction: row !important; align-items: center !important; gap: 0 !important; max-width: none; min-width: 0; }
-  .bs-loc { flex-basis: 110px; }
+  .bs-loc { flex-basis: 96px; }
   .bs-kbd { display: none; }
+  .wr-head { align-items: flex-start; }
+  .wr-heading { flex-direction: column; gap: 4px; }
+  .wr-query { white-space: normal; }
 }
 
 /* Job cards */
@@ -1373,7 +1432,7 @@ input, select, textarea, button { font-family: inherit; }
     <div class="board-search" role="search">
       <div class="bs-field bs-query">
         <svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line></svg>
-        <input type="search" id="global-search" placeholder="Company or role" aria-label="Search company or role" autocomplete="off" spellcheck="false" oninput="filterBoard()" onkeydown="boardSearchKey(event)">
+        <input type="search" id="global-search" placeholder="Search jobs" aria-label="Search jobs by company or role" autocomplete="off" spellcheck="false" oninput="filterBoard()" onkeydown="boardSearchKey(event)">
         <button type="button" class="bs-clear" onclick="clearBoardSearch('global-search')" aria-label="Clear search" tabindex="-1">&times;</button>
         <kbd class="bs-kbd" title="Press / to search">/</kbd>
       </div>
@@ -1384,6 +1443,9 @@ input, select, textarea, button { font-family: inherit; }
         <button type="button" class="bs-clear" onclick="clearBoardSearch('location-search')" aria-label="Clear location" tabindex="-1">&times;</button>
       </div>
       <span class="bs-count" id="board-search-count" aria-live="polite"></span>
+      <button type="button" class="bs-go" id="web-search-btn" onclick="searchWeb()" title="Find new jobs on the web (Enter)" aria-label="Find new jobs on the web">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"></path></svg>
+      </button>
     </div>
     
     <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
@@ -1411,6 +1473,22 @@ input, select, textarea, button { font-family: inherit; }
   </div>
 
 
+
+  <!-- Web search results -->
+  <section id="web-results" class="web-results" hidden aria-live="polite">
+    <div class="wr-head">
+      <div class="wr-heading">
+        <span class="wr-kicker">New on the web</span>
+        <span class="wr-query" id="wr-query"></span>
+      </div>
+      <div class="wr-actions">
+        <button type="button" class="wr-reload" id="wr-reload" hidden onclick="location.reload()"></button>
+        <button type="button" class="wr-close" onclick="closeWebResults()" aria-label="Close web results">&times;</button>
+      </div>
+    </div>
+    <div class="wr-list" id="wr-list"></div>
+    <div class="wr-foot" id="wr-foot"></div>
+  </section>
 
   <!-- Today's Picks Strip -->
   <div id="daily-picks-strip" style="display:none; margin: 0 20px 20px 20px; padding: 16px; background: linear-gradient(135deg, #FFFDF6 0%, #FFF2CC 100%); border: 1px solid #FFE082; border-radius: 16px; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.05);">
@@ -3738,10 +3816,123 @@ async function triggerRefresh() {
 }
 
 function boardSearchKey(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    searchWeb();
+    return;
+  }
   if (event.key === 'Escape') {
     if (event.target.value) clearBoardSearch(event.target.id);
     else event.target.blur();
   }
+}
+
+// ── Web search: find new jobs on LinkedIn and company career feeds ──
+const WEB_SEARCH = { results: [], added: 0, seq: 0 };
+const WR_SOURCE_LABEL = { linkedin: 'LinkedIn', direct: 'Company site' };
+
+function wrAge(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  if (isNaN(then)) return '';
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 month ago' : `${months} months ago`;
+}
+
+async function searchWeb() {
+  const q = document.getElementById('global-search').value.trim();
+  const loc = document.getElementById('location-search').value.trim();
+  if (q.length < 2) {
+    toast('Type a role or company first, like "Product Manager".');
+    document.getElementById('global-search').focus();
+    return;
+  }
+  const seq = ++WEB_SEARCH.seq;
+  const panel = document.getElementById('web-results');
+  const list = document.getElementById('wr-list');
+  const btn = document.getElementById('web-search-btn');
+  document.getElementById('wr-query').innerHTML = `${esc(q)}<em>${esc(loc || 'India')}</em>`;
+  document.getElementById('wr-foot').textContent = 'Searching LinkedIn and company career pages…';
+  list.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
+  panel.hidden = false;
+  btn.classList.add('busy');
+  try {
+    const res = await fetch(`/api/jobs/search?q=${encodeURIComponent(q)}&location=${encodeURIComponent(loc)}`);
+    const data = await res.json();
+    if (seq !== WEB_SEARCH.seq) return;
+    if (!data.ok) throw new Error(data.error || 'Search failed.');
+    WEB_SEARCH.results = data.results;
+    renderWebResults(data);
+  } catch (e) {
+    if (seq !== WEB_SEARCH.seq) return;
+    list.innerHTML = `<div class="wr-empty">${esc(e.message || 'Search failed.')} Try again in a moment.</div>`;
+    document.getElementById('wr-foot').textContent = '';
+  } finally {
+    if (seq === WEB_SEARCH.seq) btn.classList.remove('busy');
+  }
+}
+
+function renderWebResults(data) {
+  const list = document.getElementById('wr-list');
+  const foot = document.getElementById('wr-foot');
+  if (!data.results.length) {
+    list.innerHTML = '<div class="wr-empty">Nothing new turned up for that. Try a broader title, or clear the location.</div>';
+  } else {
+    list.innerHTML = data.results.map((r, i) => `
+      <article class="wr-item" style="animation-delay:${Math.min(i, 8) * 35}ms">
+        <a class="wr-title" href="${/^https?:\/\//i.test(r.url) ? esc(r.url) : '#'}" target="_blank" rel="noopener noreferrer" title="Open the posting">${esc(r.title)}<span class="wr-arrow" aria-hidden="true">↗</span></a>
+        <div class="wr-sub"><b>${esc(r.company)}</b> · ${esc(r.location)}</div>
+        <div class="wr-meta">
+          <span class="wr-src">${esc(WR_SOURCE_LABEL[r.source] || r.source)}</span>
+          <span class="wr-age">${esc(wrAge(r.posted_at))}</span>
+          <span class="wr-spacer"></span>
+          <button type="button" class="wr-add" data-i="${i}" onclick="addWebResult(this)" ${r.on_board ? 'disabled' : ''}>${r.on_board ? 'On board' : 'Add to board'}</button>
+        </div>
+      </article>`).join('');
+  }
+  const n = data.results.length;
+  const failed = (data.failed || []).map(f => WR_SOURCE_LABEL[f] || f);
+  foot.textContent = `${n} ${n === 1 ? 'opening' : 'openings'} from LinkedIn and company career pages` +
+    (failed.length ? `. ${failed.join(' and ')} didn't answer this time.` : '');
+}
+
+async function addWebResult(btn) {
+  const r = WEB_SEARCH.results[+btn.dataset.i];
+  if (!r || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const res = await fetch('/api/jobs/search/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: r.source, ref: r.ref, title: r.title, company: r.company, location: r.location, posted_at: r.posted_at }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not add it.');
+    r.on_board = true;
+    btn.textContent = data.already ? 'On board' : 'Added ✓';
+    btn.classList.toggle('done', !data.already);
+    if (!data.already) {
+      WEB_SEARCH.added++;
+      const reload = document.getElementById('wr-reload');
+      reload.textContent = `Show ${WEB_SEARCH.added} on board`;
+      reload.hidden = false;
+      toast('Added to your Inbox. Scoring it now.');
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Add to board';
+    toast(e.message || 'Could not add it.');
+  }
+}
+
+function closeWebResults() {
+  WEB_SEARCH.seq++;
+  document.getElementById('web-results').hidden = true;
+  document.getElementById('web-search-btn').classList.remove('busy');
 }
 
 function clearBoardSearch(id) {
