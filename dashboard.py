@@ -1563,9 +1563,13 @@ def voice_synthesize():
         return jsonify({"ok": False, "error": "Voice playback isn't set up.", "provider_fallback": True}), 400
     try:
         wav_bytes = ve.synthesize_speech(text, api_key)
+    except ve.TTSQuotaError:
+        return jsonify({"ok": False, "error": "Gemini's voice quota is used up for now.", "provider_fallback": True,
+                        "reason": "quota"}), 429
     except ve.GeminiError as e:
         app.logger.warning("Voice synthesis failed for user %s: %s", uid, e)
-        return jsonify({"ok": False, "error": "Voice playback is unavailable right now.", "provider_fallback": True}), 502
+        return jsonify({"ok": False, "error": "Voice playback is unavailable right now.", "provider_fallback": True,
+                        "reason": "error"}), 502
     return jsonify({"ok": True, "audio_base64": base64.b64encode(wav_bytes).decode("ascii")})
 
 

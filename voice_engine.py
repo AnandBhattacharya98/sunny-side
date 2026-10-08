@@ -290,6 +290,20 @@ class _TTSCache:
 _tts_cache = _TTSCache()
 
 
+# When Gemini says a key is out of voice quota (HTTP 429), skip it for a while so replies fall
+# back to the browser voice at once instead of waiting on a request that will fail.
+TTS_QUOTA_COOLDOWN = 120  # seconds
+_tts_cooldown: dict[str, float] = {}
+
+
+class TTSQuotaError(GeminiError):
+    pass
+
+
+def _key_id(api_key: str) -> str:
+    return hashlib.sha256((api_key or "").encode()).hexdigest()[:16]
+
+
 def synthesize_speech(text: str, api_key: str) -> bytes:
     text = re.sub(r"\s+", " ", text or "").strip()[:MAX_TTS_CHARS]
     if not text:
@@ -299,12 +313,20 @@ def synthesize_speech(text: str, api_key: str) -> bytes:
     cached = _tts_cache.get(key)
     if cached:
         return cached
+    if _tts_cooldown.get(_key_id(api_key), 0) > time.time():
+        raise TTSQuotaError("Gemini voice quota used up for now")
     parts = [{"text": "Say this in a warm, upbeat, friendly voice: " + text}]  # Gemini picks the language from the text
     config = {
         "responseModalities": ["AUDIO"],
         "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": TTS_VOICE}}},
     }
-    res = gemini_generate(api_key, parts, model=TTS_MODEL, generation_config=config, timeout=20)
+    try:
+        res = gemini_generate(api_key, parts, model=TTS_MODEL, generation_config=config, timeout=20, retries=0)
+    except GeminiError as e:
+        if "HTTP 429" in str(e):
+            _tts_cooldown[_key_id(api_key)] = time.time() + TTS_QUOTA_COOLDOWN
+            raise TTSQuotaError("Gemini voice quota used up for now") from e
+        raise
     inline = _first_part(res).get("inlineData") or {}
     if not inline.get("data"):
         raise GeminiError("Gemini returned no audio")

@@ -2354,6 +2354,9 @@ const VA = {
   nudgeTimer: null,
   hintTimer: null,
   reloadTimer: null,
+  voiceSource: null,
+  voiceNoted: false,
+  geminiQuietUntil: 0,
   actTimer: null,
   actBubbleTimer: null,
   afterConsent: null,
@@ -2576,7 +2579,8 @@ function updateVoiceToggleUI() {
   const icon = document.getElementById('voice-synthesis-speaker-icon');
   if (!btn || !icon) return;
   btn.classList.toggle('off', !VA.speechOn);
-  btn.title = VA.speechOn ? vaT('Reading replies out loud (tap to mute)', 'जवाब बोलकर सुना रही हूँ (म्यूट करने के लिए टैप करें)') : vaT('Replies are muted (tap to unmute)', 'जवाब म्यूट हैं (अनम्यूट करने के लिए टैप करें)');
+  const using = VA.speechOn && vaVoiceLabel() ? ' · ' + vaVoiceLabel() : '';
+  btn.title = (VA.speechOn ? vaT('Reading replies out loud (tap to mute)', 'जवाब बोलकर सुना रही हूँ (म्यूट करने के लिए टैप करें)') : vaT('Replies are muted (tap to unmute)', 'जवाब म्यूट हैं (अनम्यूट करने के लिए टैप करें)')) + using;
   icon.innerHTML = VA.speechOn
     ? `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>`
     : `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`;
@@ -3107,7 +3111,7 @@ function speakResponse(text, onDone) {
   const myToken = ++VA.speakToken;
   if (!VA.speechOn || !text) { setAssistantStatus('ready'); onDone && onDone(); return; }
   setAssistantStatus('speaking');
-  if (!VA.serverVoice) { speakWithBrowser(text, done, myToken); return; }
+  if (!VA.serverVoice) { VA.voiceSource = 'browser'; updateVoiceToggleUI(); vaVoiceNote('nokey'); speakWithBrowser(text, done, myToken); return; }
 
   // Gemini's voice sounds nicer but can be slow. If it isn't back quickly and the browser has a
   // voice of its own, that answers instead. Without one, we wait longer for Gemini rather than
@@ -3118,12 +3122,16 @@ function speakResponse(text, onDone) {
     if (settled || myToken !== VA.speakToken) return;
     settled = true;
     clearTimeout(timer);
+    VA.voiceSource = 'browser';
+    updateVoiceToggleUI();
     speakWithBrowser(text, done, myToken);
   };
+  // Gemini's voice quota is spent: use the browser voice straight away until it resets
+  if (VA.geminiQuietUntil > Date.now()) { fallback(); return; }
   const controller = new AbortController();
   vaBrowserCanSpeak().then(canSpeak => {
     if (settled || myToken !== VA.speakToken) return;
-    timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 4500 : 15000);
+    timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 7000 : 15000);
   });
   vaFetch('/api/voice/synthesize', {
     method: 'POST',
@@ -3134,9 +3142,15 @@ function speakResponse(text, onDone) {
   .then(r => r.json())
   .then(data => {
     if (settled || myToken !== VA.speakToken) return;
-    if (!data.audio_base64) { fallback(); return; }
+    if (!data.audio_base64) {
+      if (data.reason === 'quota') { VA.geminiQuietUntil = Date.now() + 120000; vaVoiceNote('quota'); }
+      fallback();
+      return;
+    }
     settled = true;
     clearTimeout(timer);
+    VA.voiceSource = 'gemini';
+    updateVoiceToggleUI();
     vaPlayAudio('data:audio/wav;base64,' + data.audio_base64, done, myToken, () => { settled = false; fallback(); });
   })
   .catch(() => fallback());
@@ -3209,25 +3223,31 @@ function vaVoicesReady() {
   });
 }
 
-// Local voices first: Chrome's "Google ..." voices stream from the network and, when that fails,
-// sit in "speaking" forever without a sound. Network voices are only a last resort.
+// Natural-sounding voices first (Google's, Microsoft's "Online (Natural)", Apple's Enhanced and
+// Premium ones), then the rest. Chrome's Google voices stream from the network and can stall
+// without a sound, so speakWithBrowser() retries with the next voice if one never starts.
 function pickBrowserVoice(voices, lang, avoid) {
   const base = lang.slice(0, 2);
-  const usable = voices.filter(v => v !== avoid && (v.lang || '').toLowerCase().replace('_', '-').startsWith(base));
-  const local = usable.filter(v => v.localService !== false);
   const preferred = base === 'hi'
-    ? ['Lekha', 'Microsoft Swara', 'Microsoft Kalpana', 'Microsoft Hemant', 'Google हिन्दी']
-    : ['Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira', 'Karen', 'Daniel', 'Google US English', 'Google UK English Female'];
-  for (const pool of [local, usable]) {
-    for (const name of preferred) {
-      const v = pool.find(v => v.name.includes(name));
-      if (v) return v;
-    }
-    const exact = pool.find(v => v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase());
-    if (exact) return exact;
-    if (pool.length) return pool[0];
-  }
-  return null;
+    ? ['Google हिन्दी', 'Microsoft Swara Online', 'Microsoft Madhur Online', 'Lekha (Enhanced)', 'Lekha', 'Microsoft Swara', 'Microsoft Kalpana', 'Microsoft Hemant']
+    : ['Google US English', 'Microsoft Ava Online', 'Microsoft Jenny Online', 'Microsoft Aria Online', 'Microsoft Emma Online',
+       'Ava (Premium)', 'Samantha (Enhanced)', 'Zoe (Premium)', 'Google UK English Female', 'Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira', 'Karen'];
+  const score = (v) => {
+    let n = 0;
+    const i = preferred.findIndex(name => v.name.includes(name));
+    if (i >= 0) n += 200 - i;
+    if (/natural|neural|online|premium|enhanced/i.test(v.name) || v.name.startsWith('Google')) n += 100;
+    if (v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase()) n += 10;
+    return n;
+  };
+  const usable = voices.filter(v => v !== avoid && (v.lang || '').toLowerCase().replace('_', '-').startsWith(base));
+  return usable.sort((x, y) => score(y) - score(x))[0] || null;
+}
+
+function vaVoiceLabel() {
+  if (VA.voiceSource === 'gemini') return vaT("Sunny's natural voice (Gemini)", 'Sunny की नैचुरल आवाज़ (Gemini)');
+  if (VA.voiceSource === 'browser') return vaT("your browser's voice", 'आपके ब्राउज़र की आवाज़');
+  return '';
 }
 
 // Chrome cuts off long utterances and can drop one spoken straight after cancel(),
@@ -3282,6 +3302,15 @@ async function speakWithBrowser(text, done, token, avoid) {
       done();
     }, 3000);
   }, 80);
+}
+
+// Say once per visit why the browser voice is being used, so it's clear how to get the natural one
+function vaVoiceNote(why) {
+  if (VA.voiceNoted || !VA.speechOn) return;
+  VA.voiceNoted = true;
+  toast(why === 'quota'
+    ? vaT("Gemini's voice limit is used up for now, so I'm using your browser's voice for a bit.", 'Gemini की आवाज़ की लिमिट अभी खत्म हो गई है, इसलिए कुछ देर ब्राउज़र की आवाज़ इस्तेमाल कर रही हूँ।')
+    : vaT('Add a Gemini API key in Profile Settings to give me a more natural voice.', 'मेरी आवाज़ और नैचुरल बनाने के लिए Profile Settings में Gemini API key जोड़ें।'));
 }
 
 function vaSoundProblem() {
