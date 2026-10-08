@@ -169,7 +169,7 @@ def _ai_score(title: str, company: str, description: str, resume_text: str = Non
         resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=45)
         prompt = f"""Score this job for fit with this candidate. Reply ONLY with JSON, no markdown.
 
 CANDIDATE RESUME:
@@ -197,21 +197,36 @@ Return exactly:
         return result
 
 
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_TIMEOUT = float(os.getenv("GEMINI_TIMEOUT", "45"))
+
+
 def _call_gemini(prompt: str, response_json: bool = False, api_key: str = None) -> str:
+    import time
     import requests
     key_to_use = api_key or get_fallback_gemini_key()
     if not key_to_use:
         raise ValueError("No Gemini API key configured. Provide it in profile settings or set GEMINI_API_KEY env.")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key_to_use}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
     if response_json:
         payload["generationConfig"] = {"responseMimeType": "application/json"}
-    
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers)
-    response.raise_for_status()
+
+    # The key goes in a header, not the URL, so it can't leak into logs or exception text
+    headers = {"Content-Type": "application/json", "x-goog-api-key": key_to_use}
+    for attempt in range(2):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=GEMINI_TIMEOUT)
+        except requests.Timeout:
+            raise RuntimeError(f"Gemini timed out after {GEMINI_TIMEOUT:.0f}s")
+        if response.status_code in (429, 500, 502, 503, 504) and attempt == 0:
+            time.sleep(1.5)
+            continue
+        if response.status_code != 200:
+            raise RuntimeError(f"Gemini returned HTTP {response.status_code}")
+        break
     res_data = response.json()
     return res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
@@ -399,7 +414,7 @@ def _ai_cover_letter(title: str, company: str, description: str,
         resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=45)
         prompt = f"""Write a cover letter for this job application. Under 300 words. 
 Start with impact — not "I am writing to express my interest". Be specific, confident, human.
 Reply ONLY with JSON, no markdown.
@@ -476,7 +491,7 @@ def generate_linkedin_note(contact_name: str, contact_title: str,
     if ANTHROPIC_API_KEY:
         try:
             import anthropic
-            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=45)
             msg = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=80,
@@ -692,7 +707,7 @@ def _local_interview_prep(title, company):
 def _ai_interview_prep(title, company, description, resume_text):
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=45)
         prompt = f"""
         You are an elite interview coach preparing a candidate for a {title} role at {company}.
         
