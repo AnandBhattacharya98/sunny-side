@@ -185,6 +185,17 @@ class RateLimiter:
             q.append(now)
             return True
 
+    def count(self, user_id, bucket: str, window: float = 60.0) -> int:
+        """Hits in the window, without recording a new one."""
+        now = time.monotonic()
+        with self._lock:
+            q = self._hits.get((user_id, bucket))
+            if not q:
+                return 0
+            while q and now - q[0] > window:
+                q.popleft()
+            return len(q)
+
     def reset(self):
         with self._lock:
             self._hits.clear()
