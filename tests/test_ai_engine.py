@@ -56,3 +56,54 @@ def test_call_gemini_timeout_is_reported(monkeypatch):
     monkeypatch.setattr(requests, "post", boom)
     with pytest.raises(RuntimeError, match="timed out"):
         ai_engine._call_gemini("hi", api_key="k")
+
+
+def _fake_gemini(monkeypatch, text):
+    monkeypatch.setattr(ai_engine, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(requests, "post", lambda *a, **k: FakeResponse(200, text))
+
+
+def test_gemini_score_is_normalized(monkeypatch):
+    _fake_gemini(monkeypatch, '{"score": "14", "key_requirements": "SQL"}')
+    res = ai_engine.score_job("Product Manager", "Acme", "Own the roadmap. SQL.", resume_text="PM with SQL", api_key="k")
+    assert res["score"] == 10.0
+    assert res["mode"] == "gemini"
+    assert res["fit_summary"]
+    assert res["key_requirements"] == ["SQL"]
+    assert "matched_skills" in res
+
+
+def test_bad_gemini_reply_falls_back_to_full_local_scorer(monkeypatch):
+    _fake_gemini(monkeypatch, "not json")
+    res = ai_engine.score_job("Product Manager", "Acme", "Own the roadmap.", resume_text="PM", api_key="k")
+    assert res["mode"] == "local"
+    assert "AI scoring was unavailable" in res["fit_summary"]
+
+
+def test_force_local_skips_ai(monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("no network expected")
+    monkeypatch.setattr(requests, "post", boom)
+    res = ai_engine.score_job("Product Manager", "Acme", "Own the roadmap.", api_key="k", force_local=True)
+    assert res["mode"] == "local"
+    assert "unavailable" not in res["fit_summary"]
+
+
+def test_rescore_saturated_scores_only_touches_inbox_tens():
+    from db import get_conn, DB_PATH, init_db
+    init_db(DB_PATH)
+    conn = get_conn(DB_PATH)
+    conn.execute("INSERT OR IGNORE INTO users (id, username, password_hash) VALUES (901, 'sat_user', 'x')")
+    for jid, score, status in [("sat1", 10, "scored"), ("sat2", 10, "applied"), ("sat3", 6.5, "scored")]:
+        conn.execute("DELETE FROM jobs WHERE job_id = ?", (jid,))
+        conn.execute("INSERT INTO jobs (job_id, title, company, description, ai_score, status, user_id) VALUES (?, ?, ?, ?, ?, ?, 901)",
+                     (jid, "Chef", "Cafe", "Cook food", score, status))
+    conn.commit()
+    conn.close()
+    assert ai_engine.rescore_saturated_scores(DB_PATH) >= 1
+    conn = get_conn(DB_PATH)
+    scores = {r[0]: r[1] for r in conn.execute("SELECT job_id, ai_score FROM jobs WHERE user_id = 901")}
+    conn.close()
+    assert scores["sat1"] < 9.5
+    assert scores["sat2"] == 10
+    assert scores["sat3"] == 6.5

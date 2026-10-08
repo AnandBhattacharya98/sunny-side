@@ -187,14 +187,12 @@ Return exactly:
             messages=[{"role": "user", "content": prompt}],
         )
         raw = re.sub(r"```json|```", "", msg.content[0].text).strip()
-        data = json.loads(raw)
+        data = _normalize_ai_score(json.loads(raw))
         data["mode"] = "ai"
         return data
     except Exception as e:
         print(f"  [AI score fallback] {e}")
-        result = _local_score(title, company, description)
-        result["fit_summary"] += " (scored locally — add ANTHROPIC_API_KEY for AI scoring)"
-        return result
+        return None
 
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -254,18 +252,35 @@ Return exactly:
 {{"score": <0-10 float>, "fit_summary": "<2 sentences>", "key_requirements": ["<req1>","<req2>","<req3>"]}}"""
 
         raw = _call_gemini(prompt, response_json=True, api_key=api_key)
-        data = json.loads(raw)
+        data = _normalize_ai_score(json.loads(raw))
         data["mode"] = "gemini"
         return data
     except Exception as e:
         print(f"  [Gemini score fallback] {e}")
-        result = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                             w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text)
-        result["fit_summary"] += " (scored locally — Gemini API error)"
-        return result
+        return None
 
 
-def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None, user_id: int = 1) -> dict:
+def _normalize_ai_score(data) -> dict:
+    """Checks a model's score reply and coerces it to the shape the app stores."""
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        data = data[0]
+    if not isinstance(data, dict):
+        raise ValueError("score reply is not an object")
+    score = float(data.get("score"))
+    if score != score:  # NaN
+        raise ValueError("score is not a number")
+    reqs = data.get("key_requirements") or []
+    if not isinstance(reqs, list):
+        reqs = [str(reqs)]
+    return {
+        "score": round(max(1.0, min(10.0, score)), 1),
+        "fit_summary": str(data.get("fit_summary") or "").strip() or "Scored by AI.",
+        "key_requirements": [str(r) for r in reqs][:5],
+    }
+
+
+def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None, user_id: int = 1,
+              force_local: bool = False) -> dict:
     if not resume_text:
         resume_text = RESUME_TEXT or "(No resume provided yet. Keep the assessment general.)"
 
@@ -351,25 +366,27 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
         else:
             missing.append(name)
 
-    # Call underlying scoring engine
-    if ANTHROPIC_API_KEY:
+    # AI scoring when a key is set; the full local scorer is the fallback if it fails
+    res = None
+    key_to_use = None if force_local else (api_key or get_fallback_gemini_key())
+    if ANTHROPIC_API_KEY and not force_local:
         res = _ai_score(title, company, description, resume_text)
-    else:
-        key_to_use = api_key or get_fallback_gemini_key()
-        if key_to_use:
-            res = _gemini_score(title, company, description, resume_text, api_key=key_to_use,
-                                 liked_titles=liked_titles, disliked_titles=disliked_titles,
-                                 w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
-        else:
-            try:
-                years_exp = float(resume_profile.get("years_experience") or 0) or None
-            except (TypeError, ValueError):
-                years_exp = None
-            target_titles = [designation] + list(resume_profile.get("titles") or [])
-            res = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
-                                w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text,
-                                years_exp=years_exp, target_titles=target_titles,
-                                user_skills=user_skills, job_skills=job_skills)
+    elif key_to_use:
+        res = _gemini_score(title, company, description, resume_text, api_key=key_to_use,
+                            liked_titles=liked_titles, disliked_titles=disliked_titles,
+                            w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej)
+    if res is None:
+        try:
+            years_exp = float(resume_profile.get("years_experience") or 0) or None
+        except (TypeError, ValueError):
+            years_exp = None
+        target_titles = [designation] + list(resume_profile.get("titles") or [])
+        res = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
+                           w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text,
+                           years_exp=years_exp, target_titles=target_titles,
+                           user_skills=user_skills, job_skills=job_skills)
+        if not force_local and (ANTHROPIC_API_KEY or key_to_use):
+            res["fit_summary"] += " (scored locally, AI scoring was unavailable)"
 
     # Attach matched and missing lists
     res["matched_skills"] = json.dumps(matched)
@@ -554,6 +571,33 @@ Guidelines for tailoring:
 
 
 # ── Process all new jobs ───────────────────────────────────────────────────
+
+def rescore_saturated_scores(db_path: str = DB_PATH) -> int:
+    """Jobs scored by the old keyword scorer mostly sit at 10. Re-score those inbox jobs with
+    the current local scorer (no API calls) so the board's ranking means something again."""
+    conn = get_conn(db_path)
+    rows = conn.execute(
+        "SELECT j.job_id, j.title, j.company, j.description, j.user_id, u.resume_text FROM jobs j "
+        "JOIN users u ON u.id = j.user_id "
+        "WHERE j.ai_score >= 9.5 AND j.status IN ('new', 'scored', 'ready')"
+    ).fetchall()
+    conn.close()
+    done = 0
+    for job_id, title, company, description, uid, resume_text in [tuple(r) for r in rows]:
+        data = score_job(title or "", company or "", description or "", resume_text=resume_text,
+                         user_id=uid, force_local=True)
+        conn = get_conn(db_path)
+        conn.execute(
+            "UPDATE jobs SET ai_score=?, ai_summary=?, key_reqs=?, matched_skills=?, missing_skills=? WHERE job_id=? AND user_id=?",
+            (data["score"], data["fit_summary"], json.dumps(data.get("key_requirements", [])),
+             data["matched_skills"], data["missing_skills"], job_id, uid),
+        )
+        conn.commit()
+        conn.close()
+        done += 1
+    print(f"Re-scored {done} jobs that still had saturated scores")
+    return done
+
 
 def process_new_jobs(db_path: str = DB_PATH, min_score: float = 6.0, user_id: int = 1) -> list[dict]:
     """Score and generate cover letters for all 'new' jobs in the DB."""
