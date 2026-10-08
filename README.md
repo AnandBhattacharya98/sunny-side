@@ -36,6 +36,8 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `SESSION_COOKIE_SECURE` | Optional | Defaults to `1` (cookies only over HTTPS). Set `0` for plain-http testing on a non-localhost address |
 | `ANTHROPIC_API_KEY` | Optional | Enables Claude-powered scoring and cover letter generation (high quality) |
 | `GEMINI_API_KEY` | Optional | Server-wide Gemini key for scoring, STT, TTS, and quiz feedback. Users can add their own key in settings; a user's personal key is never used for anyone else |
+| `GEMINI_VOICE_MODEL` | Optional | Gemini model the assistant uses to understand requests and transcribe speech (default `gemini-2.5-flash`) |
+| `GEMINI_TTS_MODEL` / `GEMINI_TTS_VOICE` | Optional | Gemini text-to-speech model and voice for the assistant (defaults `gemini-2.5-flash-preview-tts` / `Puck`) |
 | `DATABASE_URL` | Optional | Set to a PostgreSQL connection string to use Postgres instead of SQLite |
 | `SENDER_EMAIL` | Optional | Gmail address used to send digests. Each user's digest goes to their own sign-in email (or the Gmail they connected); `RECIPIENT_EMAIL` is only used for the admin account |
 | `SENDER_PASSWORD` | Optional | Gmail App Password matching the sender email |
@@ -63,12 +65,15 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 
 ## Core Features
 
-### 1. Board Assistant (Voice & Chat Companion)
-- **Slide-in Panel**: A right-docked panel that lets you interact with your jobs board through text or voice commands.
-- **Privacy First**: Displays a consent prompt modal before accessing the microphone.
-- **Dual STT/TTS Providers**: Upgrades automatically to Gemini's audio models if an API key is present in settings, with browser-native Web Speech API fallback.
-- **Persisted Session Context**: Keeps conversation history in-memory for the current tab session so the assistant can resolve pronouns ("it", "move that one") from previous turns.
-- **Rich Cards**: Inline rendering of pipeline statistics, compact job-card nodes, and synced email expandables.
+### 1. Sunny, the Board Assistant (Voice & Chat)
+- **Talk or type**: A floating mic button on the board opens a right-docked panel. Ask things like "what's new today?", "why did the Swiggy job score that?" or "move it to applied".
+- **Nudges you to start**: A one-time hint bubble on the board, starter suggestions built from your own jobs, and a gentle "tap the mic" prompt when the panel sits idle. Every answer comes with follow-up chips.
+- **Hands-free**: Recording stops on its own when you finish talking. When you asked by voice, Sunny listens for your "yes" or "no" after asking you to confirm a change.
+- **Safe changes**: Moves, archives, cover-letter rewrites, emails and refreshes always need a confirmation. A one-time token backs each confirmation, and it expires after two minutes. Job ids from the AI are checked against your own board.
+- **Speech providers**: Uses Gemini for speech-to-text and text-to-speech when a key is available, with your browser's Web Speech API as the fallback. API keys go in request headers and never appear in errors.
+- **Survives reloads**: The chat (kept per tab) and open panel come back after a board change reloads the page. Pronouns like "it" or "the first one" refer to the cards Sunny just showed.
+- **Limits**: Per-user rate limits, plus size caps on transcripts, chat history and audio uploads.
+- **Rich cards**: Pipeline stats, job cards and expandable emails inline.
 
 ### 2. Kanban Application Pipeline
 - Tracks listings across columns: `Self-Import`, `Inbox`, `Shortlist`, `Interviewing`, `Applied`, `Offer`, `Rejected`.
