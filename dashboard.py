@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, redirect, session, u
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
+import quiz_coach
 from notifier import send_email_digest, recipient_for_user
 from auth import signup_user, login_user
 from crypto_util import get_app_secret, encrypt_secret
@@ -1227,6 +1228,31 @@ def get_job_interview_prep(job_id):
     except Exception as e:
         conn.close()
         return jsonify({"ok": False, "error": f"Failed to generate prep questions: {e}"}), 500
+
+
+@app.route("/api/job/<job_id>/interview-prep/feedback", methods=["POST"])
+def interview_prep_feedback(job_id):
+    """Grades one practice answer (spoken or typed) for a job the user owns."""
+    uid = get_user_id()
+    d = request.get_json(silent=True) or {}
+    g.voice_lang = ve.reply_lang(d.get("lang"), str(d.get("answer") or ""))
+    limited = _voice_rate_limited(uid, "quiz_feedback", 20)
+    if limited:
+        return limited
+    question = str(d.get("question") or "").strip()
+    if not question:
+        return jsonify({"ok": False, "error": "No question provided"}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        job = conn.execute("SELECT title, company FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if not job:
+            return jsonify({"ok": False, "error": "Job not found"}), 404
+        api_key = _voice_api_key(conn, uid)
+    finally:
+        conn.close()
+    result = quiz_coach.grade_answer(question, d.get("hints") or "", d.get("answer") or "",
+                                     title=job[0] or "", company=job[1] or "", api_key=api_key, lang=g.voice_lang)
+    return jsonify({"ok": True, "lang": g.voice_lang, **result})
 
 
 @app.route("/api/job/<job_id>/interview-prep/regenerate", methods=["POST"])
