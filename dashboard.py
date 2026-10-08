@@ -101,6 +101,12 @@ def require_login():
             if request.path.startswith("/api/"):
                 return jsonify({"ok": False, "error": "Not signed in"}), 401
             return redirect(url_for("login"))
+    # The login cookie is shared by every tab. A board page opened as one person must not
+    # keep talking to Sunny after someone else signs in from another tab.
+    page_user = request.headers.get("X-Sunny-User")
+    if page_user and request.path.startswith("/api/voice/") and session.get("user_id") \
+            and page_user != str(session.get("user_id")):
+        return jsonify({"ok": False, "error": "Signed in as someone else", "account_changed": True}), 401
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
