@@ -476,6 +476,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   display: flex; align-items: center; justify-content: center; }
 .va-icon-btn:hover { background: var(--sur2); color: var(--txt); }
 .va-icon-btn.off { opacity: 0.5; }
+.va-icon-btn.warn { color: #D9480F; background: rgba(217,72,15,0.1); }
 
 .va-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--yolk); color: var(--ink);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -2182,7 +2183,8 @@ function esc(value) {
 function initVoiceAssistant() {
   if (!document.getElementById('voice-overlay')) return;
   VA.ready = true;
-  VA.speechOn = vaGet('localStorage', 'voice_speech_enabled') !== 'false';
+  // A new key, so anyone who muted Sunny while it was silent starts out hearing it again
+  VA.speechOn = vaGet('localStorage', 'va_speech_on') !== 'false';
   updateVoiceToggleUI();
   document.body.classList.add('has-va-fab');
   document.body.dataset.sunny = 'idle';
@@ -2282,7 +2284,7 @@ function updateVoiceToggleUI() {
 
 function toggleVoiceSpeech() {
   VA.speechOn = !VA.speechOn;
-  vaSet('localStorage', 'voice_speech_enabled', VA.speechOn);
+  vaSet('localStorage', 'va_speech_on', VA.speechOn);
   updateVoiceToggleUI();
   if (!VA.speechOn) { stopSpeaking(); return; }
   vaUnlockAudio();
@@ -2322,6 +2324,11 @@ function openVoiceAssistant() {
         .catch(err => console.error('Digest on open failed:', err));
       return;
     }
+  }
+  if (!VA.messages.length && !vaGet('sessionStorage', 'va_said_hi')) {
+    vaSet('sessionStorage', 'va_said_hi', '1');
+    vaUnlockAudio();
+    speakResponse("Hi! I'm Sunny. Tap the mic and ask me anything.");
   }
   scheduleIdleNudge();
   if (window.matchMedia('(min-width: 769px)').matches) {
@@ -2780,16 +2787,22 @@ function speakResponse(text, onDone) {
   setAssistantStatus('speaking');
   if (!VA.serverVoice) { speakWithBrowser(text, done, myToken); return; }
 
-  // Gemini's voice sounds nicer but can be slow. If it isn't back quickly, the browser voice
-  // answers instead, so Sunny is never silent while waiting.
+  // Gemini's voice sounds nicer but can be slow. If it isn't back quickly and the browser has a
+  // voice of its own, that answers instead. Without one, we wait longer for Gemini rather than
+  // staying silent.
   let settled = false;
+  let timer = null;
   const fallback = () => {
     if (settled || myToken !== VA.speakToken) return;
     settled = true;
+    clearTimeout(timer);
     speakWithBrowser(text, done, myToken);
   };
   const controller = new AbortController();
-  const timer = setTimeout(() => { controller.abort(); fallback(); }, 4500);
+  vaBrowserCanSpeak().then(canSpeak => {
+    if (settled || myToken !== VA.speakToken) return;
+    timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 4500 : 15000);
+  });
   fetch('/api/voice/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2798,17 +2811,43 @@ function speakResponse(text, onDone) {
   })
   .then(r => r.json())
   .then(data => {
-    clearTimeout(timer);
     if (settled || myToken !== VA.speakToken) return;
     if (!data.audio_base64) { fallback(); return; }
     settled = true;
-    const player = vaPlayer();
-    player.onended = done;
-    player.onerror = () => { settled = false; fallback(); };
-    player.src = 'data:audio/wav;base64,' + data.audio_base64;
-    player.play().catch(() => { settled = false; fallback(); });
+    clearTimeout(timer);
+    vaPlayAudio('data:audio/wav;base64,' + data.audio_base64, done, myToken, () => { settled = false; fallback(); });
   })
-  .catch(() => { clearTimeout(timer); fallback(); });
+  .catch(() => fallback());
+}
+
+// Plays Gemini's audio, and hands over to the browser voice if it errors, is blocked, or simply
+// never starts (some browsers resolve play() and then sit there in silence).
+function vaPlayAudio(src, done, token, onFail) {
+  const player = vaPlayer();
+  let playing = false;
+  let failed = false;
+  const fail = () => {
+    if (failed || playing || token !== VA.speakToken) return;
+    failed = true;
+    player.onended = null; player.onerror = null; player.onplaying = null;
+    player.pause();
+    onFail();
+  };
+  player.muted = false;
+  player.volume = 1;
+  player.onplaying = () => { playing = true; };
+  player.onended = done;
+  player.onerror = fail;
+  player.src = src;
+  const p = player.play();
+  if (p && p.catch) p.catch(fail);
+  setTimeout(() => { if (!playing && player.currentTime === 0) fail(); }, 2500);
+}
+
+// True when the browser has a voice to speak with at all (some Linux builds and privacy browsers don't)
+function vaBrowserCanSpeak() {
+  if (!('speechSynthesis' in window)) return Promise.resolve(false);
+  return vaVoicesReady().then(voices => voices.length > 0);
 }
 
 // One reused <audio> element. Safari only lets a page play sound from an element that was
@@ -2917,6 +2956,7 @@ function vaSoundProblem() {
   if (VA.warnedSound) return;
   VA.warnedSound = true;
   toast("I couldn't play my voice. Check your volume and that this tab isn't muted.");
+  document.getElementById('voice-synthesis-toggle')?.classList.add('warn');
 }
 
 function stopSpeaking() {
