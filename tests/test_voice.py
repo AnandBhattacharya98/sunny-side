@@ -433,3 +433,19 @@ def test_feedback_falls_back_when_gemini_fails(monkeypatch):
         raise ve.GeminiError("down")
     monkeypatch.setattr(ve, "gemini_generate", fail)
     assert quiz_coach.grade_answer("q", "", STAR_ANSWER, api_key="k")["source"] == "local"
+
+
+def test_tts_quota_backs_off(monkeypatch):
+    calls = []
+
+    def quota(api_key, parts, **kw):
+        calls.append(1)
+        raise ve.GeminiError("Gemini returned HTTP 429")
+    monkeypatch.setattr(ve, "gemini_generate", quota)
+    ve._tts_cooldown.clear()
+    with pytest.raises(ve.TTSQuotaError):
+        ve.synthesize_speech("first line", "quota-key")
+    with pytest.raises(ve.TTSQuotaError):
+        ve.synthesize_speech("second line", "quota-key")
+    assert len(calls) == 1  # the second reply doesn't wait on Gemini
+    ve._tts_cooldown.clear()
