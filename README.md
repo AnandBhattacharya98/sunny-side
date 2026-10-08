@@ -36,6 +36,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `SESSION_COOKIE_SECURE` | Optional | Defaults to `1` (cookies only over HTTPS). Set `0` for plain-http testing on a non-localhost address |
 | `ANTHROPIC_API_KEY` | Optional | Enables Claude-powered scoring and cover letter generation (high quality) |
 | `GEMINI_API_KEY` | Optional | Server-wide Gemini key for scoring, STT, TTS, and quiz feedback. Users can add their own key in settings; a user's personal key is never used for anyone else |
+| `GEMINI_MODEL` | Optional | Gemini model for scoring, cover letters, interview prep and resume parsing (default `gemini-2.5-flash`) |
 | `GEMINI_VOICE_MODEL` | Optional | Gemini model the assistant uses to understand requests and transcribe speech (default `gemini-2.5-flash`) |
 | `GEMINI_TTS_MODEL` / `GEMINI_TTS_VOICE` | Optional | Gemini text-to-speech model and voice for the assistant (defaults `gemini-2.5-flash-preview-tts` / `Puck`) |
 | `DATABASE_URL` | Optional | Set to a PostgreSQL connection string to use Postgres instead of SQLite |

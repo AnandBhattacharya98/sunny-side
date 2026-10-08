@@ -296,7 +296,8 @@ def auth_google_callback():
             "client_secret": client_secret,
             "redirect_uri": redirect_uri,
             "grant_type": "authorization_code"
-        }
+        },
+        timeout=15,
     )
     token_data = token_resp.json()
     access_token = token_data.get("access_token")
@@ -306,7 +307,8 @@ def auth_google_callback():
         
     user_resp = requests.get(
         "https://www.googleapis.com/oauth2/v2/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"}
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=15,
     )
     user_info = user_resp.json()
     email = user_info.get("email")
@@ -364,7 +366,8 @@ def auth_linkedin_callback():
             "client_secret": client_secret,
             "redirect_uri": redirect_uri,
             "grant_type": "authorization_code"
-        }
+        },
+        timeout=15,
     )
     token_data = token_resp.json()
     access_token = token_data.get("access_token")
@@ -374,7 +377,8 @@ def auth_linkedin_callback():
         
     user_resp = requests.get(
         "https://api.linkedin.com/v2/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"}
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=15,
     )
     user_info = user_resp.json()
     email = user_info.get("email")
