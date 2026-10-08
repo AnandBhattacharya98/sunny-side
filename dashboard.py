@@ -1,4 +1,4 @@
-import os, json, sqlite3, hmac, secrets, threading, time, base64
+import os, re, json, sqlite3, hmac, secrets, threading, time, base64
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
@@ -1312,6 +1312,98 @@ def refresh_listings():
     uid = get_user_id()
     started = run_in_background(("sync", uid), run_user_sync, uid)
     return jsonify({"ok": True, "message": "Sync started in background" if started else "A sync is already running"})
+
+
+# ── Web job search (the board's search bar) ───────────────────────────────
+
+_LINKEDIN_JOB_URL = re.compile(r"^https://([a-z]{2,3}\.)?linkedin\.com/jobs/view/[\w%-]+/?$")
+
+
+@app.route("/api/jobs/search", methods=["GET"])
+def search_web_jobs_api():
+    from scraper import search_web_jobs
+    uid = get_user_id()
+    query = (request.args.get("q") or "").strip()[:80]
+    location = (request.args.get("location") or "").strip()[:60]
+    if len(query) < 2:
+        return jsonify({"ok": False, "error": "Type at least two letters to search."}), 400
+    if not ve.rate_limiter.allow(uid, "web_search", 10):
+        return jsonify({"ok": False, "error": "That's a lot of searches. Give it a minute and try again."}), 429
+
+    found = search_web_jobs(query, location)
+    conn = get_conn(DB_PATH)
+    rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
+    conn.close()
+    on_board_urls = {r[0] for r in rows if r[0]}
+    on_board_pairs = {(r[1], r[2]) for r in rows}
+    for r in found["results"]:
+        r["on_board"] = r["url"] in on_board_urls or (r["title"].lower(), r["company"].lower()) in on_board_pairs
+    return jsonify({"ok": True, "query": query, "location": location, **found})
+
+
+def _score_added_job(uid, job_id):
+    conn = get_conn(DB_PATH)
+    try:
+        job = conn.execute("SELECT title, company, description FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if not job:
+            return
+        settings = get_user_settings(conn, uid)
+        data = score_job(job["title"], job["company"], job["description"] or "", resume_text=settings.get("resume_text"),
+                         api_key=settings.get("gemini_api_key"), user_id=uid)
+        conn.execute("UPDATE jobs SET ai_score = ?, ai_summary = ?, key_reqs = ?, status = 'scored' WHERE job_id = ? AND user_id = ?",
+                     (data.get("score"), data.get("fit_summary") or data.get("summary", ""),
+                      json.dumps(data.get("key_requirements", [])), job_id, uid))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@app.route("/api/jobs/search/add", methods=["POST"])
+def add_web_search_result():
+    from scraper import find_board_posting, linkedin_job_id, _fetch_description, _insert_job
+    uid = get_user_id()
+    data = request.get_json(silent=True) or {}
+    source = data.get("source")
+
+    if source == "direct":
+        try:
+            job = find_board_posting(str(data.get("ref", "")))
+        except Exception as e:
+            print(f"[web search add] {e}")
+            job = None
+        if not job:
+            return jsonify({"ok": False, "error": "That opening isn't listed anymore."}), 404
+    elif source == "linkedin":
+        url = str(data.get("ref", "")).strip()
+        if not _LINKEDIN_JOB_URL.match(url):
+            return jsonify({"ok": False, "error": "That doesn't look like a LinkedIn job link."}), 400
+        title = str(data.get("title", "")).strip()[:200]
+        company = str(data.get("company", "")).strip()[:120]
+        if not title or not company:
+            return jsonify({"ok": False, "error": "Missing title or company."}), 400
+        job = {
+            "job_id": linkedin_job_id(url), "title": title, "company": company,
+            "location": str(data.get("location", "")).strip()[:120] or "India",
+            "url": url, "source": "linkedin", "description": _fetch_description(url),
+            "posted_at": str(data.get("posted_at", ""))[:40],
+        }
+    else:
+        return jsonify({"ok": False, "error": "Unknown source."}), 400
+
+    conn = get_conn(DB_PATH)
+    try:
+        dup = conn.execute("SELECT job_id FROM jobs WHERE user_id = ? AND (url = ? OR (LOWER(title) = ? AND LOWER(company) = ?))",
+                           (uid, job["url"], job["title"].lower(), job["company"].lower())).fetchone()
+        if dup:
+            return jsonify({"ok": True, "already": True, "job_id": dup[0]})
+        if not _insert_job(conn, job, user_id=uid):
+            return jsonify({"ok": True, "already": True, "job_id": job["job_id"]})
+        add_timeline(conn, job["job_id"], "Added from web search")
+        conn.commit()
+    finally:
+        conn.close()
+    run_in_background(("score", uid, job["job_id"]), _score_added_job, uid, job["job_id"])
+    return jsonify({"ok": True, "job_id": job["job_id"]})
 
 
 # ── Board Assistant (voice + chat) ─────────────────────────────────────────
