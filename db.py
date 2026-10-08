@@ -294,7 +294,8 @@ def migrate_db(conn) -> None:
         ("is_daily_pick", "INTEGER", "0"),
         ("picked_at", "TEXT", "NULL"),
         ("interview_round", "TEXT", "NULL"),
-        ("interview_round_updated_at", "TEXT", "NULL")
+        ("interview_round_updated_at", "TEXT", "NULL"),
+        ("followup_snoozed_until", "TEXT", "NULL")
     ]:
         if col not in jobs_cols:
             alter_q = f"ALTER TABLE jobs ADD COLUMN {col} {ctype}"
@@ -308,7 +309,8 @@ def migrate_db(conn) -> None:
         ("daily_recs_enabled", "INTEGER", "1"),
         ("daily_recs_min_score", "REAL", "7.5"),
         ("daily_recs_time", "TEXT", "'07:30'"),
-        ("last_digest_read_at", "TEXT", "NULL")
+        ("last_digest_read_at", "TEXT", "NULL"),
+        ("weekly_summary_sent_at", "TEXT", "NULL")
     ]:
         if col not in user_cols:
             alter_q = f"ALTER TABLE users ADD COLUMN {col} {ctype}"
@@ -493,6 +495,14 @@ def init_db(db_path: str = DB_PATH):
             subject       TEXT,
             body          TEXT,
             received_at   TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       INTEGER,
+            token_hash    TEXT UNIQUE,
+            expires_at    TEXT,
+            used_at       TEXT
         );
 
         CREATE TABLE IF NOT EXISTS tailored_resumes (

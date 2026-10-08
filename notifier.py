@@ -113,7 +113,7 @@ def send_email_digest(jobs: list[dict], recipient: str = None) -> bool:
     msg.attach(MIMEText(_build_html(jobs), "html"))
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as srv:
             srv.login(SENDER_EMAIL, SENDER_PASSWORD)
             srv.sendmail(SENDER_EMAIL, recipient, msg.as_string())
         print(f"  [Email] Digest sent to {recipient}")
@@ -121,6 +121,29 @@ def send_email_digest(jobs: list[dict], recipient: str = None) -> bool:
     except Exception as e:
         print(f"  [Email] Failed: {e}")
         return False
+
+
+def send_email(recipient: str, subject: str, html: str) -> bool:
+    """Sends one HTML email from SENDER_EMAIL. Returns False when email isn't configured or fails."""
+    if not SENDER_EMAIL or not SENDER_PASSWORD or not recipient:
+        return False
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = recipient
+    msg.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as srv:
+            srv.login(SENDER_EMAIL, SENDER_PASSWORD)
+            srv.sendmail(SENDER_EMAIL, recipient, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"  [Email] Failed to send '{subject}': {e}")
+        return False
+
+
+def email_configured() -> bool:
+    return bool(SENDER_EMAIL and SENDER_PASSWORD)
 
 
 def send_telegram_ping(jobs: list[dict]) -> None:

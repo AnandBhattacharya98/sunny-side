@@ -12,9 +12,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 @pytest.fixture
 def pgdb(monkeypatch):
+    import db
+    # Reloading recomputes db.DB_PATH from the environment; keep it pointing at the same file
+    monkeypatch.setenv("DB_PATH", db.DB_PATH)
     monkeypatch.setenv("DATABASE_URL", URL)
     monkeypatch.setenv("DB_POOL_MAX", "2")
-    import db
     mod = importlib.reload(db)
     yield mod
     monkeypatch.delenv("DATABASE_URL")
