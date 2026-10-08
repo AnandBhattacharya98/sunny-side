@@ -449,59 +449,144 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   animation: syncSpinner 1s infinite linear;
 }
 
+/* ── Board Assistant ("Sunny") ─────────────────────────────────────────────── */
 #voice-overlay {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 380px;
-  height: 100%;
-  background: var(--sur);
-  border-left: 1px solid var(--bdr);
-  z-index: 11000;
-  box-shadow: -10px 0 40px rgba(0,0,0,0.05);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(100%);
+  position: fixed; top: 0; right: 0; width: 400px; height: 100%;
+  background: var(--sur); border-left: 1px solid var(--bdr); z-index: 11000;
+  box-shadow: -10px 0 40px rgba(13, 12, 10, 0.08);
+  display: flex; flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateX(100%);
+  font-family: var(--font-sans);
 }
-[data-theme="dark"] #voice-overlay {
-  background: #181512 !important;
-  border-left-color: var(--bdr) !important;
-  box-shadow: -10px 0 40px rgba(0,0,0,0.4) !important;
-}
-@media (max-width: 768px) {
-  #voice-overlay {
-    width: 100% !important;
-  }
-}
-.suggestion-chip {
-  padding: 6px 12px;
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  color: var(--txt);
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 16px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-.suggestion-chip:hover {
-  border-color: var(--pur);
-  background: var(--purl);
-  color: var(--pur);
-}
-.voice-bar {
-  animation: voiceWave 1.2s infinite ease-in-out alternate;
-}
-.voice-bar:nth-child(2) { animation-delay: 0.15s; }
-.voice-bar:nth-child(3) { animation-delay: 0.3s; }
-.voice-bar:nth-child(4) { animation-delay: 0.45s; }
-.voice-bar:nth-child(5) { animation-delay: 0.6s; }
+[data-theme="dark"] #voice-overlay { box-shadow: -10px 0 40px rgba(0, 0, 0, 0.4); }
+@media (max-width: 768px) { #voice-overlay { width: 100%; } }
 
-@keyframes voiceWave {
-  0% { height: 10px; }
-  100% { height: 35px; }
+.va-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px;
+  border-bottom: 1px solid var(--bdr); flex-shrink: 0; }
+.va-who { display: flex; align-items: center; gap: 10px; }
+.va-name { font-size: 15px; font-weight: 700; color: var(--txt); letter-spacing: -0.01em; }
+.va-status { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--mut); }
+.va-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hin); transition: background 0.2s; }
+.va-status[data-state="listening"] .va-dot { background: var(--rd); animation: vaBlink 1s infinite; }
+.va-status[data-state="thinking"] .va-dot,
+.va-status[data-state="speaking"] .va-dot { background: var(--yolk); }
+.va-status[data-state="ready"] .va-dot { background: #2E9E5B; }
+.va-icon-btn { background: none; border: none; cursor: pointer; color: var(--mut); padding: 6px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; }
+.va-icon-btn:hover { background: var(--sur2); color: var(--txt); }
+.va-icon-btn.off { opacity: 0.5; }
+
+.va-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--yolk); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.va-avatar.lg { width: 64px; height: 64px; }
+
+#voice-messages { flex: 1; overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
+
+.va-starter { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: auto 0; text-align: center; padding: 0 8px; }
+.va-starter h3 { margin: 6px 0 0; font-size: 20px; font-weight: 700; color: var(--txt); letter-spacing: -0.02em; }
+.va-starter p { margin: 0 0 6px; font-size: 13.5px; color: var(--mut); line-height: 1.5; max-width: 290px; }
+.va-big-mic { width: 84px; height: 84px; border-radius: 50%; border: none; cursor: pointer; background: var(--yolk); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; margin: 8px 0 4px; box-shadow: 0 10px 30px -8px rgba(255, 167, 0, 0.7);
+  animation: vaBreathe 2.6s ease-in-out infinite; transition: transform 0.15s; }
+.va-big-mic:hover { transform: scale(1.05); }
+.va-big-mic-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mut); margin-bottom: 10px; }
+.va-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.va-chips.left { justify-content: flex-start; margin-top: 2px; }
+.suggestion-chip { padding: 7px 12px; background: var(--sur); border: 1px solid var(--bdr-strong); color: var(--txt);
+  font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; border-radius: 999px; cursor: pointer;
+  transition: all 0.15s ease; text-align: left; }
+.suggestion-chip:hover { border-color: var(--yolk); background: var(--purl); }
+
+.va-msg { display: flex; gap: 8px; animation: logFadeIn 0.25s ease-out; max-width: 100%; }
+.va-msg.user { align-self: flex-end; flex-direction: column; align-items: flex-end; max-width: 82%; }
+.va-msg.assistant { align-self: flex-start; align-items: flex-start; max-width: 92%; }
+.va-bubble { padding: 10px 14px; font-size: 13.5px; line-height: 1.5; word-break: break-word; }
+.va-msg.user .va-bubble { background: var(--yolk); color: var(--ink); border-radius: 16px 16px 4px 16px; }
+.va-msg.assistant .va-bubble { background: var(--sur2); color: var(--txt); border-radius: 4px 16px 16px 16px; }
+.va-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.va-meta { font-family: var(--font-mono); font-size: 9.5px; color: var(--hin); }
+.va-typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+.va-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--hin); animation: vaTyping 1s infinite ease-in-out; }
+.va-typing span:nth-child(2) { animation-delay: 0.15s; }
+.va-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+.va-card { border: 1px solid var(--bdr); border-radius: 12px; padding: 10px 12px; background: var(--sur); display: flex; flex-direction: column; gap: 4px; }
+.va-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.va-card-title { font-weight: 600; font-size: 13px; color: var(--txt); }
+.va-card-sub { font-size: 11.5px; color: var(--mut); }
+.va-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.va-tag { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 4px; background: var(--tll); color: var(--mut); }
+.va-link { font-size: 12px; font-weight: 600; color: var(--pur); background: none; border: none; cursor: pointer; padding: 0; }
+.va-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.va-stat { background: var(--sur); border: 1px solid var(--bdr); border-radius: 10px; padding: 8px; text-align: center; }
+.va-stat b { display: block; font-size: 17px; color: var(--txt); }
+.va-stat span { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--mut); }
+.va-email { cursor: pointer; text-align: left; }
+.va-email-body { display: none; font-size: 11.5px; line-height: 1.45; color: var(--txt); border-top: 1px solid var(--bdr); padding-top: 6px; margin-top: 4px; white-space: pre-wrap; }
+.va-email.open .va-email-body { display: block; }
+.va-confirm { display: flex; gap: 8px; margin-top: 2px; }
+.va-confirm button { padding: 7px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; cursor: pointer; font-family: var(--font-sans); }
+.va-confirm .yes { background: var(--yolk); color: var(--ink); border: none; }
+.va-confirm .no { background: none; border: 1px solid var(--bdr-strong); color: var(--txt); }
+.va-confirm-hint { font-family: var(--font-mono); font-size: 10px; color: var(--hin); }
+
+.va-nudge { display: none; align-items: center; gap: 8px; margin: 0 16px 8px; padding: 9px 12px; border-radius: 12px;
+  background: var(--purl); color: var(--txt); font-size: 12.5px; animation: logFadeIn 0.3s ease-out; cursor: pointer; }
+.va-nudge.show { display: flex; }
+
+.va-wave { display: none; align-items: center; justify-content: center; gap: 4px; height: 34px; flex-shrink: 0; }
+.va-wave.show { display: flex; }
+.va-wave i { display: block; width: 4px; height: 6px; border-radius: 2px; background: var(--yolk); transition: height 0.08s linear; }
+.va-wave.auto i { animation: voiceWave 0.9s infinite ease-in-out alternate; }
+.va-wave.auto i:nth-child(2n) { animation-delay: 0.15s; }
+.va-wave.auto i:nth-child(3n) { animation-delay: 0.3s; }
+
+.va-footer { padding: 10px 14px 16px; border-top: 1px solid var(--bdr); display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.va-input-row { display: flex; align-items: center; gap: 8px; }
+.va-mic { position: relative; border: none; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink); background: var(--yolk); flex-shrink: 0; transition: background 0.2s, transform 0.15s; }
+.va-mic:hover { transform: scale(1.05); }
+.va-mic.listening { background: var(--rd); color: #fff; }
+.va-mic.pulse::after, .va-mic.listening::after { content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid var(--yolk); animation: vaRing 1.6s ease-out infinite; }
+.va-mic.listening::after { border-color: var(--rd); }
+#voice-text-input { flex: 1; border: 1px solid var(--bdr-strong); border-radius: 999px; padding: 11px 16px; font-size: 13.5px;
+  color: var(--txt); background: var(--bg); outline: none; min-width: 0; }
+#voice-text-input:focus { border-color: var(--yolk); }
+.va-send { border: none; background: none; color: var(--mut); cursor: pointer; padding: 8px; border-radius: 50%; display: flex; }
+.va-send:hover { color: var(--txt); background: var(--sur2); }
+.va-hint { font-family: var(--font-mono); font-size: 10px; color: var(--hin); text-align: center; }
+@media (hover: none) { .va-hint { display: none; } }
+
+/* Floating "talk to me" button and its one-time hint */
+#va-fab { position: fixed; right: 24px; bottom: 24px; z-index: 10500; width: 58px; height: 58px; border-radius: 50%; border: none;
+  background: var(--yolk); color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 12px 30px -10px rgba(255, 167, 0, 0.8), 0 2px 6px rgba(13, 12, 10, 0.15); transition: transform 0.2s; }
+#va-fab:hover { transform: scale(1.06); }
+#va-fab.pulse::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--yolk); animation: vaRing 1.8s ease-out infinite; }
+#va-fab .va-fab-badge { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+  background: var(--ink); color: var(--paper); font-family: var(--font-mono); font-size: 10.5px; display: none; align-items: center; justify-content: center; }
+#va-hint-bubble { position: fixed; right: 24px; bottom: 94px; z-index: 10500; max-width: 270px; background: var(--ink); color: var(--paper);
+  border-radius: 16px 16px 4px 16px; padding: 12px 34px 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--shadow);
+  display: none; cursor: pointer; animation: logFadeIn 0.3s ease-out; }
+#va-hint-bubble.show { display: block; }
+#va-hint-bubble b { color: var(--yolk); font-weight: 600; }
+#va-hint-bubble .va-hint-x { position: absolute; top: 6px; right: 6px; background: none; border: none; color: var(--paper); opacity: 0.6; cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; }
+[data-theme="dark"] #va-hint-bubble { background: var(--paper); color: var(--ink); }
+[data-theme="dark"] #va-hint-bubble .va-hint-x { color: var(--ink); }
+[data-theme="dark"] #va-hint-bubble b { color: #A86400; }
+body.va-panel-open #va-fab, body.va-panel-open #va-hint-bubble { display: none; }
+body.has-va-fab #toast { bottom: 96px; }
+
+@keyframes voiceWave { 0% { height: 6px; } 100% { height: 26px; } }
+@keyframes vaBreathe { 0%, 100% { box-shadow: 0 10px 30px -8px rgba(255, 167, 0, 0.7), 0 0 0 0 rgba(255, 167, 0, 0.35); }
+  50% { box-shadow: 0 10px 30px -8px rgba(255, 167, 0, 0.7), 0 0 0 14px rgba(255, 167, 0, 0); } }
+@keyframes vaRing { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
+@keyframes vaTyping { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@keyframes vaBlink { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .va-big-mic, #va-fab.pulse::after, .va-mic.pulse::after, .va-mic.listening::after, .va-wave.auto i, .va-typing span { animation: none !important; }
 }
 </style>
 <style>
@@ -1098,7 +1183,7 @@ input, select, textarea, button { font-family: inherit; }
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh Now
     </button>
     <button id="voice-assistant-btn" class="btn btn-sec" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;" onclick="toggleVoiceAssistant()">
-      <svg id="voice-assistant-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Board Assistant
+      <svg id="voice-assistant-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Ask Sunny
       <span id="assistant-badge" class="nc" style="display: none; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: auto;"></span>
     </button>
   </div>
@@ -1944,576 +2029,823 @@ async function performCardDelete(jobId, btn) {
   }
 }
 
-// Voice & Chat Assistant JS Controller
-let voiceRecognition = null;
-let voiceIsListening = false;
-let voiceSessionId = Math.random().toString(36).substring(2);
-let isWaitingForConfirmation = false;
-let mediaRecorder = null;
-let audioChunks = [];
-let voiceSpeechEnabled = localStorage.getItem('voice_speech_enabled') !== 'false';
-let currentAudioElement = null;
-let currentUtterance = null;
-let isFirstOpen = true;
-let chatHistory = [];
-let micConsentAccepted = sessionStorage.getItem('mic_consent_accepted') === 'true';
+// ── Board Assistant ("Sunny"): voice + chat ───────────────────────────────
+// Talks to /api/voice/*. Speech-to-text uses Gemini on the server when available, otherwise the
+// browser's own speech recognition. The chat survives the page reload that follows a board change.
+const VA = {
+  ready: false,
+  listening: false,
+  mode: null,              // 'server' (record + Gemini) or 'browser' (Web Speech API)
+  serverVoice: false,
+  recognition: null,
+  recorder: null,
+  stream: null,
+  chunks: [],
+  audioCtx: null,
+  meterRaf: null,
+  heardSpeech: false,
+  silenceSince: 0,
+  listenStartedAt: 0,
+  discardRecording: false,
+  pendingToken: null,
+  lastInputSpoken: false,
+  history: [],
+  contextJobIds: [],
+  messages: [],
+  welcome: null,
+  welcomed: false,
+  speechOn: true,
+  audioEl: null,
+  speakToken: 0,
+  nudgeTimer: null,
+  hintTimer: null,
+  reloadTimer: null,
+};
+const VA_STATE_KEY = 'va_state_v1';
+const VA_MAX_MESSAGES = 40;
 
-function initVoiceAssistant() {
-  updateVoiceToggleUI();
-  
-  // Check unseen digest count on load
-  fetch('/api/voice/digest?peek=true')
-    .then(r => r.json())
-    .then(res => {
-      if (res.ok && res.count > 0) {
-        const badge = document.getElementById('assistant-badge');
-        if (badge) {
-          badge.textContent = res.count;
-          badge.style.display = 'inline-block';
-        }
-      }
-    })
-    .catch(err => console.error("Failed to check digest badge:", err));
-}
-
-function updateVoiceToggleUI() {
-  const btn = document.getElementById('voice-synthesis-toggle');
-  const icon = document.getElementById('voice-synthesis-speaker-icon');
-  if (!btn || !icon) return;
-  if (voiceSpeechEnabled) {
-    btn.style.opacity = '1';
-    icon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>`;
-  } else {
-    btn.style.opacity = '0.5';
-    icon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`;
-  }
-}
-
-function toggleVoiceSpeech() {
-  voiceSpeechEnabled = !voiceSpeechEnabled;
-  localStorage.setItem('voice_speech_enabled', voiceSpeechEnabled);
-  updateVoiceToggleUI();
-  if (!voiceSpeechEnabled) {
-    stopSpeaking();
-  }
-}
-
-function toggleVoiceAssistant() {
-  const overlay = document.getElementById('voice-overlay');
-  if (!overlay) return;
-  if (overlay.style.display === 'none') {
-    overlay.style.display = 'flex';
-    setTimeout(() => {
-      overlay.style.transform = 'translateX(0)';
-    }, 10);
-    
-    // Clear digest badge if present
-    const badge = document.getElementById('assistant-badge');
-    if (badge) badge.style.display = 'none';
-    
-    // Auto-trigger digest query if first open and had pending count
-    if (isFirstOpen) {
-      isFirstOpen = false;
-      fetch('/api/voice/digest')
-        .then(r => r.json())
-        .then(res => {
-          if (res.ok && res.count > 0) {
-            addMessageBubble("Show me today's recommendations", 'user', false);
-            addMessageBubble(res.reply_text, 'assistant', false, res.reply_cards);
-            speakResponse(res.reply_text);
-          }
-        })
-        .catch(err => console.error("Failed to run digest on open:", err));
-    }
-  } else {
-    closeVoiceAssistant();
-  }
-}
-
-function closeVoiceAssistant() {
-  stopSpeaking();
-  stopVoiceListening();
-  const overlay = document.getElementById('voice-overlay');
-  if (!overlay) return;
-  overlay.style.transform = 'translateX(100%)';
-  setTimeout(() => {
-    overlay.style.display = 'none';
-  }, 300);
-}
-
-function startVoiceListening() {
-  const hasGeminiKey = !!document.getElementById('settings-gemini-key')?.value;
-  
-  if (hasGeminiKey && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    startGeminiRecording();
-  } else {
-    startWebSpeechListening();
-  }
-}
-
-async function startGeminiRecording() {
-  audioChunks = [];
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.ondataavailable = event => {
-      if (event.data.size > 0) {
-        audioChunks.push(event.data);
-      }
-    };
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      document.getElementById('voice-status-text').textContent = "Transcribing...";
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.webm');
-      
-      try {
-        const res = await fetch('/api/voice/transcribe', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (data.transcript) {
-          const transcript = data.transcript.trim();
-          addMessageBubble(transcript, 'user', true);
-          handleFinalQuery(transcript);
-        } else {
-          toast("Sorry, I couldn't transcribe that audio clip.");
-          resetMicUI();
-        }
-      } catch (err) {
-        console.error("Gemini transcribe failed:", err);
-        toast("Gemini transcription failed. Falling back to local Speech Recognition.");
-        fallbackToWebSpeechRecognition();
-      }
-    };
-    mediaRecorder.start();
-    voiceIsListening = true;
-    document.getElementById('voice-status-dot').style.background = '#ef4444';
-    document.getElementById('voice-status-text').textContent = isWaitingForConfirmation ? "Confirming..." : "Listening...";
-    document.getElementById('voice-visualizer-container').style.display = 'flex';
-    document.getElementById('voice-action-mic').style.background = '#ef4444';
-  } catch (err) {
-    console.error("Failed to start MediaRecorder:", err);
-    toast("Microphone access failed. Please ensure mic permissions are enabled.");
-    resetMicUI();
-  }
-}
-
-function stopGeminiRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach(track => track.stop());
-  }
-  voiceIsListening = false;
-  resetMicUI();
-}
-
-function startWebSpeechListening() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    toast("Speech Recognition is not supported in this browser. Please type your message.");
-    return;
-  }
-  
-  voiceRecognition = new SpeechRecognition();
-  voiceRecognition.lang = 'en-US';
-  voiceRecognition.interimResults = true;
-  voiceRecognition.continuous = false;
-  
-  voiceRecognition.onstart = () => {
-    voiceIsListening = true;
-    document.getElementById('voice-status-dot').style.background = '#ef4444';
-    document.getElementById('voice-status-text').textContent = isWaitingForConfirmation ? "Confirming..." : "Listening...";
-    document.getElementById('voice-visualizer-container').style.display = 'flex';
-    document.getElementById('voice-action-mic').style.background = '#ef4444';
-  };
-  
-  voiceRecognition.onresult = (event) => {
-    let interimTranscript = '';
-    let finalTranscript = '';
-    
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        finalTranscript += event.results[i][0].transcript;
-      } else {
-        interimTranscript += event.results[i][0].transcript;
-      }
-    }
-    
-    const display = finalTranscript || interimTranscript;
-    const input = document.getElementById('voice-text-input');
-    if (input) input.value = display;
-    
-    if (finalTranscript) {
-      const transcript = finalTranscript.trim();
-      addMessageBubble(transcript, 'user', true);
-      handleFinalQuery(transcript);
-    }
-  };
-  
-  voiceRecognition.onerror = (event) => {
-    console.error("Speech recognition error:", event.error);
-    if (event.error === 'not-allowed') {
-      toast("Microphone access blocked. Please enable it in browser settings.");
-    }
-    resetMicUI();
-  };
-  
-  voiceRecognition.onend = () => {
-    voiceIsListening = false;
-    resetMicUI();
-  };
-  
-  try {
-    voiceRecognition.start();
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-function fallbackToWebSpeechRecognition() {
-  resetMicUI();
-  startWebSpeechListening();
-}
-
-function stopVoiceListening() {
-  const hasGeminiKey = !!document.getElementById('settings-gemini-key')?.value;
-  if (hasGeminiKey) {
-    stopGeminiRecording();
-  } else {
-    if (voiceRecognition) {
-      try {
-        voiceRecognition.stop();
-      } catch(e) {}
-      voiceRecognition = null;
-    }
-    voiceIsListening = false;
-    resetMicUI();
-  }
-}
-
-function toggleVoiceListening() {
-  if (voiceIsListening) {
-    stopVoiceListening();
-  } else {
-    if (!micConsentAccepted) {
-      document.getElementById('mic-consent-modal').style.display = 'flex';
-    } else {
-      startVoiceListening();
-    }
-  }
-}
-
-function acceptMicConsent() {
-  micConsentAccepted = true;
-  sessionStorage.setItem('mic_consent_accepted', 'true');
-  document.getElementById('mic-consent-modal').style.display = 'none';
-  startVoiceListening();
-}
-
-function closeMicConsent() {
-  document.getElementById('mic-consent-modal').style.display = 'none';
-}
-
-function resetMicUI() {
-  document.getElementById('voice-status-dot').style.background = 'var(--mut)';
-  document.getElementById('voice-status-text').textContent = "Board Assistant";
-  document.getElementById('voice-visualizer-container').style.display = 'none';
-  document.getElementById('voice-action-mic').style.background = 'var(--pur)';
-}
-
-function sendSuggestionQuery(text) {
-  addMessageBubble(text, 'user', false);
-  handleFinalQuery(text);
-}
-
-function handleTextInputKey(event) {
-  if (event.key === 'Enter') {
-    sendTextInput();
-  }
-}
-
-function sendTextInput() {
-  const input = document.getElementById('voice-text-input');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  addMessageBubble(text, 'user', false);
-  handleFinalQuery(text);
-}
-
-function handleFinalQuery(text) {
-  stopVoiceListening();
-  
-  if (isWaitingForConfirmation) {
-    const textLower = text.toLowerCase();
-    if (textLower.includes("yes") || textLower.includes("confirm") || textLower.includes("sure")) {
-      confirmVoiceAction();
-    } else if (textLower.includes("no") || textLower.includes("cancel") || textLower.includes("stop")) {
-      cancelVoiceAction();
-    } else {
-      speakResponse("I didn't catch that. Please confirm or cancel using the buttons.");
-      addMessageBubble("I didn't catch that. Please confirm or cancel using the buttons.", 'assistant');
-    }
-    return;
-  }
-  
-  document.getElementById('voice-status-text').textContent = "Thinking...";
-  
-  fetch('/api/voice/query', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript: text, session_id: voiceSessionId, chat_history: chatHistory.slice(0, -1) })
-  })
-  .then(r => r.json())
-  .then(res => {
-    addMessageBubble(res.reply_text, 'assistant', false, res.reply_cards, res.requires_confirmation);
-    speakResponse(res.reply_text);
-    
-    if (res.action && res.action.type === 'open_quiz') {
-      let jobId = res.action.job_id;
-      if (!jobId) {
-        const openBackdrop = document.querySelector('div[id^="modal-backdrop-"][style*="display: flex"]');
-        if (openBackdrop) {
-          jobId = openBackdrop.id.replace('modal-backdrop-', '');
-        }
-      }
-      if (jobId) {
-        openJobModal(jobId);
-        setTimeout(() => {
-          const modal = document.getElementById('modal-backdrop-' + jobId);
-          if (modal) {
-            const quizBtn = modal.querySelector('button[onclick*="quiz"]');
-            if (quizBtn) {
-              quizBtn.click();
-            }
-          }
-        }, 200);
-      }
-    }
-    
-    if (res.requires_confirmation) {
-      isWaitingForConfirmation = true;
-    } else {
-      isWaitingForConfirmation = false;
-    }
-    document.getElementById('voice-status-text').textContent = "Board Assistant";
-  })
-  .catch(err => {
-    console.error("Voice query failed:", err);
-    addMessageBubble("Sorry, something went wrong.", 'assistant');
-    speakResponse("Sorry, something went wrong. Please try again.");
-    resetMicUI();
-  });
-}
-
-function confirmVoiceAction() {
-  isWaitingForConfirmation = false;
-  document.getElementById('voice-status-text').textContent = "Executing...";
-  
-  fetch('/api/voice/confirm', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(r => r.json())
-  .then(res => {
-    if (res.ok) {
-      addMessageBubble(res.reply_text, 'assistant', false, res.reply_cards);
-      speakResponse(res.reply_text);
-      setTimeout(() => {
-        location.reload();
-      }, 1500);
-    } else {
-      toast("Error: " + res.error);
-      speakResponse("Error executing action.");
-      addMessageBubble("Error executing action: " + res.error, 'assistant');
-    }
-    document.getElementById('voice-status-text').textContent = "Board Assistant";
-  })
-  .catch(err => {
-    console.error(err);
-    toast("Action execution failed.");
-    addMessageBubble("Action execution failed.", 'assistant');
-    document.getElementById('voice-status-text').textContent = "Board Assistant";
-  });
-}
-
-function confirmBubbleAction(btn) {
-  const group = btn.closest('.confirm-actions-bubble');
-  if (group) group.style.display = 'none';
-  confirmVoiceAction();
-}
-
-function cancelBubbleAction(btn) {
-  const group = btn.closest('.confirm-actions-bubble');
-  if (group) group.style.display = 'none';
-  cancelVoiceAction();
-}
-
-function cancelVoiceAction() {
-  isWaitingForConfirmation = false;
-  speakResponse("Action cancelled.");
-  addMessageBubble("Action cancelled.", 'assistant');
-}
-
-async function speakResponse(text) {
-  if (!voiceSpeechEnabled) return;
-  
-  const hasGeminiKey = !!document.getElementById('settings-gemini-key')?.value;
-  
-  if (hasGeminiKey) {
-    try {
-      if (currentAudioElement) {
-        currentAudioElement.pause();
-        currentAudioElement = null;
-      }
-      const res = await fetch('/api/voice/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
-      });
-      const data = await res.json();
-      if (data.audio_base64) {
-        currentAudioElement = new Audio("data:audio/wav;base64," + data.audio_base64);
-        currentAudioElement.play();
-      } else {
-        fallbackToWebSpeechSynthesis(text);
-      }
-    } catch (err) {
-      console.error("Gemini synthesis failed, falling back:", err);
-      fallbackToWebSpeechSynthesis(text);
-    }
-  } else {
-    fallbackToWebSpeechSynthesis(text);
-  }
-}
-
-function fallbackToWebSpeechSynthesis(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = 'en-US';
-  window.speechSynthesis.speak(currentUtterance);
-}
-
-function stopSpeaking() {
-  if (currentAudioElement) {
-    currentAudioElement.pause();
-    currentAudioElement = null;
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
-}
+function vaGet(store, key) { try { return window[store].getItem(key); } catch (e) { return null; } }
+function vaSet(store, key, value) { try { window[store].setItem(key, value); } catch (e) {} }
+function vaRemove(store, key) { try { window[store].removeItem(key); } catch (e) {} }
 
 // Escape untrusted text (scraped job data, email bodies, AI output) before it goes into innerHTML
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
 }
 
-function addMessageBubble(text, sender, isSpoken = false, replyCards = null, requiresConfirmation = false) {
-  chatHistory.push({ role: sender === 'user' ? 'user' : 'model', text: text });
-  if (chatHistory.length > 20) {
-    chatHistory.shift();
+function initVoiceAssistant() {
+  if (!document.getElementById('voice-overlay')) return;
+  VA.ready = true;
+  VA.speechOn = vaGet('localStorage', 'voice_speech_enabled') !== 'false';
+  updateVoiceToggleUI();
+  document.body.classList.add('has-va-fab');
+  if (!vaGet('localStorage', 'va_used')) document.getElementById('va-fab')?.classList.add('pulse');
+
+  fetch('/api/voice/welcome')
+    .then(r => r.ok ? r.json() : null)
+    .then(res => {
+      if (!res || !res.ok) return;
+      VA.welcome = res;
+      VA.serverVoice = !!res.server_voice;
+      renderStarter();
+      setDigestBadge(res.digest_count);
+      scheduleAssistantHint();
+    })
+    .catch(err => console.error('Assistant welcome failed:', err));
+
+  restoreAssistantState();
+  document.addEventListener('keydown', handleAssistantKeys);
+}
+
+function setDigestBadge(count) {
+  ['assistant-badge', 'va-fab-badge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = count;
+    el.style.display = count > 0 ? (id === 'va-fab-badge' ? 'flex' : 'inline-block') : 'none';
+  });
+}
+
+function renderStarter() {
+  const w = VA.welcome;
+  if (!w) return;
+  const greet = document.getElementById('va-greeting');
+  if (greet) greet.textContent = w.greeting.replace('What can I help you with?', "I'm Sunny.");
+  const chips = document.getElementById('va-starter-chips');
+  if (chips && w.suggestions && w.suggestions.length) {
+    chips.innerHTML = w.suggestions.map(s => `<button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">${esc(s)}</button>`).join('');
   }
-  
+}
+
+// One gentle hint per visit until the user has tried the assistant (or closes the hint for good)
+function scheduleAssistantHint() {
+  if (vaGet('localStorage', 'va_hint_off') || vaGet('sessionStorage', 'va_hint_seen')) return;
+  const used = vaGet('localStorage', 'va_used');
+  const digest = VA.welcome?.digest_count || 0;
+  if (used && !digest) return;
+  VA.hintTimer = setTimeout(() => {
+    if (document.body.classList.contains('va-panel-open')) return;
+    const text = document.getElementById('va-hint-text');
+    if (text) {
+      if (digest) {
+        text.innerHTML = `You have <b>${esc(digest)} new match${digest === 1 ? '' : 'es'}</b>. Want me to walk you through ${digest === 1 ? 'it' : 'them'}?`;
+      } else {
+        const example = (VA.welcome?.suggestions || []).find(s => s.startsWith('Tell me about')) || 'What are my top matches?';
+        text.innerHTML = `Hi, I'm Sunny! Tap the mic and try <b>"${esc(example)}"</b>`;
+      }
+    }
+    document.getElementById('va-hint-bubble')?.classList.add('show');
+    vaSet('sessionStorage', 'va_hint_seen', '1');
+    VA.hintTimer = setTimeout(() => dismissAssistantHint(false), 14000);
+  }, 5000);
+}
+
+function dismissAssistantHint(forever) {
+  clearTimeout(VA.hintTimer);
+  document.getElementById('va-hint-bubble')?.classList.remove('show');
+  if (forever) vaSet('localStorage', 'va_hint_off', '1');
+}
+
+function openAssistantFromHint() {
+  dismissAssistantHint(false);
+  if (!document.body.classList.contains('va-panel-open')) toggleVoiceAssistant();
+}
+
+function updateVoiceToggleUI() {
+  const btn = document.getElementById('voice-synthesis-toggle');
+  const icon = document.getElementById('voice-synthesis-speaker-icon');
+  if (!btn || !icon) return;
+  btn.classList.toggle('off', !VA.speechOn);
+  btn.title = VA.speechOn ? 'Reading replies out loud (tap to mute)' : 'Replies are muted (tap to unmute)';
+  icon.innerHTML = VA.speechOn
+    ? `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>`
+    : `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`;
+}
+
+function toggleVoiceSpeech() {
+  VA.speechOn = !VA.speechOn;
+  vaSet('localStorage', 'voice_speech_enabled', VA.speechOn);
+  updateVoiceToggleUI();
+  if (!VA.speechOn) stopSpeaking();
+}
+
+function toggleVoiceAssistant() {
+  if (!VA.ready) return;
+  if (document.body.classList.contains('va-panel-open')) closeVoiceAssistant();
+  else openVoiceAssistant();
+}
+
+function openVoiceAssistant() {
+  const overlay = document.getElementById('voice-overlay');
+  if (!overlay) return;
+  dismissAssistantHint(false);
+  document.getElementById('va-fab')?.classList.remove('pulse');
+  document.body.classList.add('va-panel-open');
+  overlay.style.display = 'flex';
+  const msgs = document.getElementById('voice-messages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  setTimeout(() => { overlay.style.transform = 'translateX(0)'; }, 10);
+  saveAssistantState();
+
+  // First open with unread recommendations: lead with them
+  if (!VA.welcomed) {
+    VA.welcomed = true;
+    if ((VA.welcome?.digest_count || 0) > 0 && !VA.messages.length) {
+      fetch('/api/voice/digest')
+        .then(r => r.json())
+        .then(res => {
+          if (!res.ok || !res.count) return;
+          setDigestBadge(0);
+          addMessageBubble("What's new today?", 'user');
+          handleAssistantReply(res);
+        })
+        .catch(err => console.error('Digest on open failed:', err));
+      return;
+    }
+  }
+  scheduleIdleNudge();
+  if (window.matchMedia('(min-width: 769px)').matches) {
+    setTimeout(() => document.getElementById('voice-text-input')?.focus({ preventScroll: true }), 320);
+  }
+}
+
+function closeVoiceAssistant() {
+  stopSpeaking();
+  cancelListening();
+  clearTimeout(VA.nudgeTimer);
+  hideNudge();
+  const overlay = document.getElementById('voice-overlay');
+  if (!overlay) return;
+  overlay.style.transform = 'translateX(100%)';
+  document.body.classList.remove('va-panel-open');
+  setTimeout(() => { overlay.style.display = 'none'; }, 300);
+  saveAssistantState();
+}
+
+function handleAssistantKeys(event) {
+  if (!document.body.classList.contains('va-panel-open')) return;
+  if (event.key === 'Escape') { closeVoiceAssistant(); return; }
+  const tag = (event.target.tagName || '').toLowerCase();
+  const typing = tag === 'input' || tag === 'textarea' || event.target.isContentEditable;
+  if (event.code === 'Space' && !typing && !event.repeat) {
+    event.preventDefault();
+    toggleVoiceListening();
+  }
+}
+
+// ── Nudging the user to talk ──
+function scheduleIdleNudge() {
+  clearTimeout(VA.nudgeTimer);
+  VA.nudgeTimer = setTimeout(() => {
+    if (!document.body.classList.contains('va-panel-open') || VA.listening) return;
+    if (document.getElementById('voice-text-input')?.value) return;
+    const text = document.getElementById('va-nudge-text');
+    const tries = VA.messages.length
+      ? 'Anything else? Tap the mic and just say it.'
+      : "Don't be shy! Tap the mic and ask me anything.";
+    if (text) text.textContent = tries;
+    document.getElementById('va-nudge')?.classList.add('show');
+    document.getElementById('voice-action-mic')?.classList.add('pulse');
+  }, VA.messages.length ? 25000 : 7000);
+}
+
+function hideNudge() {
+  document.getElementById('va-nudge')?.classList.remove('show');
+  document.getElementById('voice-action-mic')?.classList.remove('pulse');
+}
+
+function setAssistantStatus(state, label) {
+  const status = document.getElementById('va-status');
+  const text = document.getElementById('voice-status-text');
+  if (status) status.dataset.state = state;
+  if (text) text.textContent = label || { ready: 'Ready to help', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' }[state] || '';
+}
+
+// ── Listening ──
+function toggleVoiceListening() {
+  hideNudge();
+  if (VA.listening) { stopListening(); return; }
+  if (vaGet('localStorage', 'mic_consent_accepted') !== 'true') {
+    document.getElementById('mic-consent-modal').style.display = 'flex';
+    return;
+  }
+  if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
+  startListening();
+}
+
+function acceptMicConsent() {
+  vaSet('localStorage', 'mic_consent_accepted', 'true');
+  document.getElementById('mic-consent-modal').style.display = 'none';
+  if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
+  startListening();
+}
+
+function closeMicConsent() {
+  document.getElementById('mic-consent-modal').style.display = 'none';
+  document.getElementById('voice-text-input')?.focus();
+}
+
+function startListening() {
+  stopSpeaking();
+  vaSet('localStorage', 'va_used', '1');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  if (VA.serverVoice && canRecord) startRecorder();
+  else if (SpeechRecognition) startBrowserRecognition(SpeechRecognition);
+  else {
+    toast("Voice isn't supported in this browser, but you can type to me!");
+    document.getElementById('voice-text-input')?.focus();
+  }
+}
+
+function setListeningUI(on, autoWave) {
+  VA.listening = on;
+  const mic = document.getElementById('voice-action-mic');
+  mic?.classList.toggle('listening', on);
+  if (mic) mic.title = on ? 'Stop listening' : 'Talk to Sunny';
+  const wave = document.getElementById('voice-visualizer-container');
+  wave?.classList.toggle('show', on);
+  wave?.classList.toggle('auto', on && !!autoWave);
+  const input = document.getElementById('voice-text-input');
+  if (input) input.placeholder = on ? "I'm listening…" : 'Ask me anything, or tap the mic';
+  if (on) setAssistantStatus('listening');
+  else if (document.getElementById('va-status')?.dataset.state === 'listening') setAssistantStatus('ready');
+}
+
+function pickRecorderType() {
+  const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg'];
+  return types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+}
+
+async function startRecorder() {
+  VA.mode = 'server';
+  VA.chunks = [];
+  VA.heardSpeech = false;
+  VA.discardRecording = false;
+  try {
+    VA.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (err) {
+    console.error('Microphone access failed:', err);
+    toast('I need microphone access to hear you. You can allow it in your browser settings, or type instead.');
+    setListeningUI(false);
+    return;
+  }
+  const type = pickRecorderType();
+  try {
+    VA.recorder = type ? new MediaRecorder(VA.stream, { mimeType: type }) : new MediaRecorder(VA.stream);
+  } catch (err) {
+    releaseStream();
+    VA.serverVoice = false;
+    startListening();
+    return;
+  }
+  VA.recorder.ondataavailable = e => { if (e.data && e.data.size > 0) VA.chunks.push(e.data); };
+  VA.recorder.onstop = () => {
+    const blob = new Blob(VA.chunks, { type: VA.recorder?.mimeType || type || 'audio/webm' });
+    releaseStream();
+    if (VA.discardRecording) return;
+    submitRecording(blob);
+  };
+  VA.recorder.start(250);
+  VA.listenStartedAt = performance.now();
+  setListeningUI(true, false);
+  startLevelMeter(VA.stream);
+}
+
+// Live mic level bars, plus auto-stop: ends after ~1.4s of quiet once you've spoken,
+// gives up after 7s of silence, and never records more than 20s.
+function startLevelMeter(stream) {
+  const bars = Array.from(document.querySelectorAll('#voice-visualizer-container i'));
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    VA.audioCtx = new Ctx();
+    const source = VA.audioCtx.createMediaStreamSource(stream);
+    const analyser = VA.audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.fftSize);
+    VA.silenceSince = performance.now();
+    const tick = () => {
+      if (!VA.listening || VA.mode !== 'server') return;
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+      const rms = Math.sqrt(sum / data.length);
+      const now = performance.now();
+      bars.forEach((bar, i) => {
+        const wobble = 0.6 + 0.4 * Math.sin(now / 120 + i);
+        bar.style.height = Math.max(6, Math.min(30, rms * 260 * wobble)) + 'px';
+      });
+      if (rms > 0.035) { VA.heardSpeech = true; VA.silenceSince = now; }
+      const quietFor = now - VA.silenceSince;
+      const elapsed = now - VA.listenStartedAt;
+      if ((VA.heardSpeech && quietFor > 1400) || (!VA.heardSpeech && elapsed > 7000) || elapsed > 20000) {
+        stopListening();
+        return;
+      }
+      VA.meterRaf = requestAnimationFrame(tick);
+    };
+    VA.meterRaf = requestAnimationFrame(tick);
+  } catch (err) {
+    // No Web Audio: fall back to the animated bars and a fixed time limit
+    document.getElementById('voice-visualizer-container')?.classList.add('auto');
+    VA.heardSpeech = true;
+    setTimeout(() => { if (VA.listening && VA.mode === 'server') stopListening(); }, 12000);
+  }
+}
+
+function stopLevelMeter() {
+  cancelAnimationFrame(VA.meterRaf);
+  VA.meterRaf = null;
+  if (VA.audioCtx) { VA.audioCtx.close().catch(() => {}); VA.audioCtx = null; }
+  document.querySelectorAll('#voice-visualizer-container i').forEach(bar => { bar.style.height = ''; });
+}
+
+function releaseStream() {
+  stopLevelMeter();
+  if (VA.stream) { VA.stream.getTracks().forEach(t => t.stop()); VA.stream = null; }
+}
+
+function stopListening() {
+  if (VA.mode === 'server' && VA.recorder && VA.recorder.state !== 'inactive') {
+    VA.recorder.stop();
+  } else if (VA.mode === 'browser' && VA.recognition) {
+    try { VA.recognition.stop(); } catch (e) {}
+  }
+  setListeningUI(false);
+}
+
+function cancelListening() {
+  VA.discardRecording = true;
+  if (VA.recognition) { try { VA.recognition.abort(); } catch (e) {} VA.recognition = null; }
+  if (VA.recorder && VA.recorder.state !== 'inactive') VA.recorder.stop();
+  releaseStream();
+  setListeningUI(false);
+}
+
+async function submitRecording(blob) {
+  if (!VA.heardSpeech || blob.size < 1500) {
+    addAssistantNote("I didn't catch anything that time. Tap the mic and try again?");
+    return;
+  }
+  setAssistantStatus('thinking', 'Transcribing…');
+  const ext = (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm');
+  const form = new FormData();
+  form.append('file', blob, 'recording.' + ext);
+  try {
+    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.ok && data.transcript) {
+      handleUserText(data.transcript, true);
+      return;
+    }
+    if (data.ok) {
+      addAssistantNote("Hmm, I couldn't make that out. Mind saying it again?");
+      return;
+    }
+    if (data.provider_fallback) VA.serverVoice = false;  // use the browser's recognizer from now on
+    addAssistantNote(data.error ? data.error + ' Tap the mic to try again, or type it.' : "I had trouble hearing that. Tap the mic and try once more?");
+  } catch (err) {
+    console.error('Transcription failed:', err);
+    VA.serverVoice = false;
+    addAssistantNote('I had trouble hearing that. Tap the mic and try once more?');
+  }
+}
+
+function startBrowserRecognition(SpeechRecognition) {
+  VA.mode = 'browser';
+  const rec = new SpeechRecognition();
+  VA.recognition = rec;
+  rec.lang = navigator.language || 'en-US';
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
+  let finalText = '';
+  const input = document.getElementById('voice-text-input');
+
+  rec.onstart = () => setListeningUI(true, true);
+  rec.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
+      else interim += event.results[i][0].transcript;
+    }
+    if (input) input.value = (finalText + ' ' + interim).trim();
+  };
+  rec.onerror = (event) => {
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      toast('I need microphone access to hear you. You can allow it in your browser settings, or type instead.');
+    } else if (event.error === 'no-speech') {
+      addAssistantNote("I didn't hear anything. Tap the mic and try again?");
+    } else if (event.error !== 'aborted') {
+      console.error('Speech recognition error:', event.error);
+    }
+  };
+  rec.onend = () => {
+    const wasCurrent = VA.recognition === rec;
+    VA.recognition = null;
+    setListeningUI(false);
+    if (!wasCurrent) return;
+    const text = (finalText || input?.value || '').trim();
+    if (text) {
+      if (input) input.value = '';
+      handleUserText(text, true);
+    }
+  };
+  try { rec.start(); } catch (e) { console.error(e); setListeningUI(false); }
+}
+
+// ── Conversation ──
+function sendSuggestionQuery(text) {
+  text = (text || '').trim();
+  if (!text) return;
+  if (/^yes\b/i.test(text) && VA.pendingToken) { addMessageBubble(text, 'user'); confirmVoiceAction(); return; }
+  if (/^no\b/i.test(text) && VA.pendingToken) { addMessageBubble(text, 'user'); cancelVoiceAction(); return; }
+  handleUserText(text, false);
+}
+
+function handleTextInputKey(event) {
+  if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); sendTextInput(); }
+  else hideNudge();
+}
+
+function sendTextInput() {
+  const input = document.getElementById('voice-text-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) { toggleVoiceListening(); return; }
+  input.value = '';
+  handleUserText(text, false);
+}
+
+function handleUserText(text, spoken) {
+  text = (text || '').trim().slice(0, 500);
+  if (!text) return;
+  hideNudge();
+  clearTimeout(VA.nudgeTimer);
+  VA.lastInputSpoken = spoken;
+  addMessageBubble(text, 'user', spoken);
+
+  if (VA.pendingToken) {
+    const t = text.toLowerCase();
+    if (/\b(yes|yeah|yep|yup|sure|confirm|do it|go ahead|ok|okay|please do|absolutely|sounds good)\b/.test(t)) { confirmVoiceAction(); return; }
+    if (/\b(no|nope|cancel|stop|don't|dont|never ?mind|forget it|wait)\b/.test(t)) { cancelVoiceAction(); return; }
+    // Anything else is a new request; the old question just lapses
+    VA.pendingToken = null;
+    hideConfirmButtons();
+  }
+  sendAssistantQuery(text);
+}
+
+function sendAssistantQuery(text) {
+  setAssistantStatus('thinking');
+  const typing = showTyping();
+  fetch('/api/voice/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript: text, chat_history: VA.history.slice(0, -1), context_job_ids: VA.contextJobIds })
+  })
+  .then(r => r.json().catch(() => ({ ok: false })))
+  .then(res => {
+    typing.remove();
+    if (!res.reply_text) res.reply_text = res.error || 'Sorry, something went wrong. Mind trying that again?';
+    handleAssistantReply(res);
+  })
+  .catch(err => {
+    typing.remove();
+    console.error('Assistant query failed:', err);
+    handleAssistantReply({ reply_text: "I can't reach the server right now. Check your connection and try again?", suggestions: [] });
+  });
+}
+
+function handleAssistantReply(res) {
+  if (res.requires_confirmation && res.action && res.action.token) {
+    VA.pendingToken = res.action.token;
+  }
+  if (res.context_job_ids && res.context_job_ids.length) VA.contextJobIds = res.context_job_ids.slice(0, 10);
+  addMessageBubble(res.reply_text, 'assistant', false, res.reply_cards, !!res.requires_confirmation, res.suggestions);
+
+  // Spoken confirm questions get a hands-free answer: the mic reopens once I finish asking
+  const listenAfter = !!res.requires_confirmation && VA.lastInputSpoken;
+  speakResponse(res.reply_text, () => { if (listenAfter && VA.pendingToken && !VA.listening) startListening(); });
+
+  if (res.action && res.action.type === 'open_quiz' && res.action.job_id) openQuizFor(res.action.job_id);
+  if (res.board_changed) scheduleBoardReload();
+  if (!res.requires_confirmation) scheduleIdleNudge();
+}
+
+function openQuizFor(jobId) {
+  if (typeof openJobModal !== 'function') return;
+  openJobModal(jobId);
+  setTimeout(() => {
+    const modal = document.getElementById('modal-backdrop-' + jobId);
+    modal?.querySelector('button[onclick*="quiz"]')?.click();
+  }, 200);
+}
+
+function confirmVoiceAction() {
+  const token = VA.pendingToken;
+  VA.pendingToken = null;
+  hideConfirmButtons();
+  if (!token) { addAssistantNote('That request has expired. Just ask me again.'); return; }
+  setAssistantStatus('thinking', 'Working on it…');
+  const typing = showTyping();
+  fetch('/api/voice/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token })
+  })
+  .then(r => r.json().catch(() => ({ ok: false })))
+  .then(res => {
+    typing.remove();
+    if (res.ok) {
+      handleAssistantReply({ ...res, suggestions: res.suggestions || [] });
+    } else {
+      handleAssistantReply({ reply_text: res.error || "Sorry, I couldn't do that. Please try again." });
+    }
+  })
+  .catch(err => {
+    typing.remove();
+    console.error(err);
+    handleAssistantReply({ reply_text: "I couldn't reach the server, so nothing changed. Try again?" });
+  });
+}
+
+function cancelVoiceAction() {
+  VA.pendingToken = null;
+  hideConfirmButtons();
+  fetch('/api/voice/cancel', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => handleAssistantReply({ reply_text: res.reply_text || 'No problem, cancelled.' }))
+    .catch(() => handleAssistantReply({ reply_text: 'No problem, cancelled.' }));
+}
+
+function confirmBubbleAction() { addMessageBubble('Yes, go ahead', 'user'); confirmVoiceAction(); }
+function cancelBubbleAction() { addMessageBubble('No, cancel', 'user'); cancelVoiceAction(); }
+
+function hideConfirmButtons() {
+  document.querySelectorAll('#voice-messages .va-confirm, #voice-messages .va-confirm-hint').forEach(el => el.remove());
+  VA.messages.forEach(m => { m.confirm = false; });
+}
+
+// A board change needs a reload; the chat and open panel come back afterwards
+function scheduleBoardReload() {
+  clearTimeout(VA.reloadTimer);
+  const started = Date.now();
+  const go = () => {
+    const speaking = (VA.audioEl && !VA.audioEl.paused) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+    if (speaking && Date.now() - started < 9000) { VA.reloadTimer = setTimeout(go, 300); return; }
+    saveAssistantState(true);
+    location.reload();
+  };
+  VA.reloadTimer = setTimeout(go, 1600);
+}
+
+// ── Speaking ──
+function speakResponse(text, onDone) {
+  const done = () => { if (myToken === VA.speakToken) { setAssistantStatus('ready'); onDone && onDone(); } };
+  stopSpeaking();
+  const myToken = ++VA.speakToken;
+  if (!VA.speechOn || !text) { setAssistantStatus('ready'); onDone && onDone(); return; }
+  setAssistantStatus('speaking');
+  if (!VA.serverVoice) { speakWithBrowser(text, done); return; }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
+  fetch('/api/voice/synthesize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal: controller.signal
+  })
+  .then(r => r.json())
+  .then(data => {
+    clearTimeout(timer);
+    if (myToken !== VA.speakToken) return;
+    if (!data.audio_base64) { speakWithBrowser(text, done); return; }
+    VA.audioEl = new Audio('data:audio/wav;base64,' + data.audio_base64);
+    VA.audioEl.onended = done;
+    VA.audioEl.onerror = () => speakWithBrowser(text, done);
+    VA.audioEl.play().catch(() => speakWithBrowser(text, done));
+  })
+  .catch(() => {
+    clearTimeout(timer);
+    if (myToken === VA.speakToken) speakWithBrowser(text, done);
+  });
+}
+
+function pickBrowserVoice() {
+  const voices = window.speechSynthesis.getVoices() || [];
+  const lang = (navigator.language || 'en-US').slice(0, 2);
+  const preferred = ['Google US English', 'Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Google UK English Female'];
+  for (const name of preferred) {
+    const v = voices.find(v => v.name.includes(name));
+    if (v) return v;
+  }
+  return voices.find(v => /natural|neural/i.test(v.name) && v.lang.startsWith(lang)) || voices.find(v => v.lang.startsWith(lang)) || null;
+}
+
+function speakWithBrowser(text, done) {
+  if (!('speechSynthesis' in window)) { done(); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = pickBrowserVoice();
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang || navigator.language || 'en-US';
+  u.rate = 1.03;
+  u.pitch = 1.05;
+  u.onend = done;
+  u.onerror = done;
+  window.speechSynthesis.speak(u);
+}
+
+function stopSpeaking() {
+  VA.speakToken++;
+  if (VA.audioEl) { VA.audioEl.pause(); VA.audioEl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (document.getElementById('va-status')?.dataset.state === 'speaking') setAssistantStatus('ready');
+}
+
+// ── Rendering ──
+function showTyping() {
   const container = document.getElementById('voice-messages');
+  const el = document.createElement('div');
+  el.className = 'va-msg assistant';
+  el.innerHTML = `<div class="va-avatar" aria-hidden="true">${vaSunIcon()}</div><div class="va-bubble"><span class="va-typing"><span></span><span></span><span></span></span></div>`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+function vaSunIcon() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"></circle><line x1="12" y1="1.5" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22.5"></line><line x1="1.5" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22.5" y2="12"></line><line x1="4.6" y1="4.6" x2="6.3" y2="6.3"></line><line x1="17.7" y1="17.7" x2="19.4" y2="19.4"></line><line x1="4.6" y1="19.4" x2="6.3" y2="17.7"></line><line x1="17.7" y1="6.3" x2="19.4" y2="4.6"></line></svg>`;
+}
+
+function addAssistantNote(text) {
+  addMessageBubble(text, 'assistant');
+  setAssistantStatus('ready');
+  scheduleIdleNudge();
+}
+
+function addMessageBubble(text, sender, isSpoken = false, replyCards = null, requiresConfirmation = false, suggestions = null) {
+  const msg = { text, sender, spoken: !!isSpoken, cards: replyCards || [], confirm: !!requiresConfirmation,
+                suggestions: suggestions || [], time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+  VA.history.push({ role: sender === 'user' ? 'user' : 'model', text });
+  if (VA.history.length > 12) VA.history.shift();
+  VA.messages.push(msg);
+  if (VA.messages.length > VA_MAX_MESSAGES) VA.messages.shift();
+  renderMessage(msg);
+  saveAssistantState();
+}
+
+function renderMessage(msg) {
+  const container = document.getElementById('voice-messages');
+  if (!container) return;
   const starter = document.getElementById('voice-starter-container');
   if (starter) starter.style.display = 'none';
-  
-  const msgDiv = document.createElement('div');
-  msgDiv.className = `message ${sender}`;
-  
-  const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  if (sender === 'user') {
-    msgDiv.style = "align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; animation: logFadeIn 0.3s ease-out;";
-    msgDiv.innerHTML = `
-      <div style="background:var(--yolk); color:#0D0C0A; padding: 10px 14px; border-radius: 16px 16px 0 16px; font-size: 13px; line-height: 1.4; word-break: break-word;">
-        ${esc(text)}
-        ${isSpoken ? '<span style="font-size:10px; margin-left:6px; opacity:0.7;">🎤</span>' : ''}
-      </div>
-      <span style="font-size: 9px; color: var(--hin);">${timestamp}</span>
-    `;
+  // Only the newest answer keeps its follow-up chips
+  container.querySelectorAll('.va-chips.left').forEach(chips => chips.remove());
+  const el = document.createElement('div');
+  el.className = `va-msg ${msg.sender === 'user' ? 'user' : 'assistant'}`;
+
+  if (msg.sender === 'user') {
+    el.innerHTML = `
+      <div class="va-bubble">${esc(msg.text)}</div>
+      <span class="va-meta">${msg.spoken ? '🎤 ' : ''}${esc(msg.time)}</span>`;
   } else {
-    msgDiv.style = "align-self: flex-start; max-width: 85%; display: flex; align-items: flex-start; gap: 8px; animation: logFadeIn 0.3s ease-out;";
-    
-    let cardsHtml = '';
-    if (replyCards && replyCards.length > 0) {
-      replyCards.forEach(card => {
-        if (card.type === 'stats') {
-          cardsHtml += `
-            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: var(--bdr); color: var(--txt);">Total: ${esc(card.total)}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #e0f2fe; color: #0369a1;">Shortlisted: ${esc(card.shortlisted)}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">Applied: ${esc(card.applied)}</span>
-              <span style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #fef9c3; color: #a16207;">Offers: ${esc(card.offers)}</span>
-            </div>
-          `;
-        } else if (card.type === 'job') {
-          const scoreVal = card.score ? parseFloat(card.score).toFixed(1) : 'N/A';
-          let scoreClass = 'sl2';
-          if (card.score >= 8.5) scoreClass = 'sh';
-          else if (card.score >= 7.0) scoreClass = 'sm';
-          
-          cardsHtml += `
-            <div class="jcard" style="border: 1px solid var(--bdr); border-radius: 12px; padding: 12px; margin-top: 8px; background: var(--sur); display: flex; flex-direction: column; gap: 6px; width: 100%;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                <div style="font-weight: 700; font-size: 13px; color: var(--txt);">${esc(card.title)}</div>
-                <span class="score-pill ${scoreClass}" style="flex-shrink:0;">${scoreVal}</span>
-              </div>
-              <div style="font-size: 11px; color: var(--mut);">${esc(card.company)} • ${esc(card.location)}</div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-                <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--bdr); color: var(--txt);">${esc(card.status)}</span>
-                <a href="#" onclick="openJobModal(${esc(JSON.stringify(String(card.job_id)))}); return false;" style="font-size: 11px; font-weight: 600; color: var(--pur); text-decoration: none;">Open Details</a>
-              </div>
-            </div>
-          `;
-        } else if (card.type === 'email') {
-          cardsHtml += `
-            <div style="border: 1px solid var(--bdr); border-radius: 12px; padding: 12px; margin-top: 8px; background: var(--sur); cursor: pointer; text-align: left; width: 100%;" onclick="const b=this.querySelector('.email-body'); b.style.display=b.style.display==='none'?'block':'none';">
-              <div style="font-weight: 700; font-size: 12px; color: var(--txt);">${esc(card.subject)}</div>
-              <div style="font-size: 11px; color: var(--mut); margin-bottom: 4px;">From: ${esc(card.sender)}</div>
-              <div class="email-body" style="font-size: 11px; line-height: 1.4; color: var(--txt); display: none; border-top: 1px solid var(--bdr); padding-top: 6px; margin-top: 6px; white-space: pre-wrap;">${esc(card.body)}</div>
-              <div style="font-size: 9px; color: var(--pur); font-weight: 700; margin-top: 4px;">Tap to expand email</div>
-            </div>
-          `;
-        }
-      });
-    }
-    
-    let confirmHtml = '';
-    if (requiresConfirmation) {
-      confirmHtml = `
-        <div class="confirm-actions-bubble" style="display: flex; gap: 8px; margin-top: 10px;">
-          <button onclick="confirmBubbleAction(this)" class="btn btn-p" style="border:none; padding: 6px 14px; font-size: 11px; font-weight: 700; border-radius: 6px; cursor:pointer;">Confirm</button>
-          <button onclick="cancelBubbleAction(this)" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor:pointer; background:none; border:1px solid var(--bdr); color:var(--txt);">Cancel</button>
-        </div>
-      `;
-    }
-    
-    msgDiv.innerHTML = `
-      <div class="logo-yolk" style="width: 28px; height: 28px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--purl); color: var(--pur); flex-shrink: 0; margin-top: 4px;">SS</div>
-      <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; max-width: 100%;">
-        <div style="background: var(--sur); border: 1px solid var(--bdr); color: var(--txt); padding: 10px 14px; border-radius: 0 16px 16px 16px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); text-align: left;">
-          <div>${esc(text)}</div>
-          ${cardsHtml}
-          ${confirmHtml}
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
-          <span style="font-size: 9px; color: var(--hin);">${timestamp}</span>
-        </div>
+    const cards = (msg.cards || []).map(renderCard).join('');
+    const confirm = msg.confirm ? `
+      <div class="va-confirm">
+        <button class="yes" type="button" onclick="confirmBubbleAction()">Yes, go ahead</button>
+        <button class="no" type="button" onclick="cancelBubbleAction()">Cancel</button>
       </div>
-    `;
+      <div class="va-confirm-hint">Or just say "yes" or "no"</div>` : '';
+    const chips = !msg.confirm && msg.suggestions && msg.suggestions.length
+      ? `<div class="va-chips left">${msg.suggestions.map(s => `<button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">${esc(s)}</button>`).join('')}</div>`
+      : '';
+    el.innerHTML = `
+      <div class="va-avatar" aria-hidden="true">${vaSunIcon()}</div>
+      <div class="va-body">
+        <div class="va-bubble">${esc(msg.text)}</div>
+        ${cards}${confirm}${chips}
+        <span class="va-meta">${esc(msg.time)}</span>
+      </div>`;
   }
-  
-  container.appendChild(msgDiv);
+  container.appendChild(el);
   container.scrollTop = container.scrollHeight;
 }
 
-// Call initVoiceAssistant on DOMContentLoaded
+function renderCard(card) {
+  if (card.type === 'stats') {
+    const stat = (n, label) => `<div class="va-stat"><b>${esc(n ?? 0)}</b><span>${label}</span></div>`;
+    return `<div class="va-stats">${stat(card.total, 'On board')}${stat(card.avg_score, 'Avg score')}${stat(card.shortlisted, 'Shortlisted')}${stat(card.applied, 'Applied')}${stat(card.interviewing, 'Interviewing')}${stat(card.offers, 'Offers')}</div>`;
+  }
+  if (card.type === 'job') {
+    const score = card.score !== null && card.score !== undefined && card.score !== '' ? parseFloat(card.score) : null;
+    const scoreClass = score === null ? 'sl2' : score >= 8 ? 'sh' : score >= 6.5 ? 'sm' : 'sl2';
+    const statusLabel = { whatsapp: 'Self import', scored: 'New', ready: 'New' }[card.status] || card.status || '';
+    return `
+      <div class="va-card">
+        <div class="va-card-top">
+          <div class="va-card-title">${esc(card.title)}</div>
+          <span class="js ${scoreClass}" style="flex-shrink:0;">${score === null ? 'N/A' : score.toFixed(1) + '/10'}</span>
+        </div>
+        <div class="va-card-sub">${esc(card.company)}${card.location ? ' · ' + esc(card.location) : ''}</div>
+        <div class="va-card-foot">
+          <span class="va-tag">${esc(statusLabel)}</span>
+          <button class="va-link" type="button" onclick="openJobModal(${esc(JSON.stringify(String(card.job_id)))})">Open details</button>
+        </div>
+      </div>`;
+  }
+  if (card.type === 'email') {
+    return `
+      <div class="va-card va-email" onclick="this.classList.toggle('open')">
+        <div class="va-card-title">${esc(card.subject)}</div>
+        <div class="va-card-sub">From ${esc(card.sender)}</div>
+        <div class="va-email-body">${esc(card.body)}</div>
+      </div>`;
+  }
+  return '';
+}
+
+// ── Keeping the chat across reloads (per tab, never shared) ──
+function saveAssistantState(forceReopen) {
+  const open = forceReopen || document.body.classList.contains('va-panel-open');
+  vaSet('sessionStorage', VA_STATE_KEY, JSON.stringify({
+    messages: VA.messages.slice(-VA_MAX_MESSAGES).map(m => ({ ...m, confirm: false })),
+    history: VA.history, contextJobIds: VA.contextJobIds, open, welcomed: VA.welcomed,
+  }));
+}
+
+function restoreAssistantState() {
+  let state = null;
+  try { state = JSON.parse(vaGet('sessionStorage', VA_STATE_KEY) || 'null'); } catch (e) { state = null; }
+  if (!state) return;
+  VA.history = Array.isArray(state.history) ? state.history.slice(-12) : [];
+  VA.contextJobIds = Array.isArray(state.contextJobIds) ? state.contextJobIds : [];
+  VA.welcomed = !!state.welcomed;
+  (Array.isArray(state.messages) ? state.messages : []).forEach(m => { VA.messages.push(m); renderMessage(m); });
+  if (state.open) openVoiceAssistant();
+}
+
+function clearAssistantChat() {
+  stopSpeaking();
+  cancelListening();
+  VA.messages = [];
+  VA.history = [];
+  VA.contextJobIds = [];
+  VA.pendingToken = null;
+  fetch('/api/voice/cancel', { method: 'POST' }).catch(() => {});
+  const container = document.getElementById('voice-messages');
+  const starter = document.getElementById('voice-starter-container');
+  if (container && starter) {
+    container.querySelectorAll('.va-msg').forEach(el => el.remove());
+    starter.style.display = '';
+  }
+  saveAssistantState();
+  scheduleIdleNudge();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initVoiceAssistant();
 });
@@ -3923,89 +4255,95 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<!-- Voice Assistant Overlay Panel -->
-<div id="voice-overlay" style="display: none;">
-  <!-- Header Bar -->
-  <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--bdr); background: var(--sur); flex-shrink: 0;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <div id="voice-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--mut); transition: background 0.3s;"></div>
-      <span id="voice-status-text" style="font-size: 13px; font-weight: 700; color: var(--txt); text-transform: uppercase; letter-spacing: 0.05em;">Board Assistant</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <!-- Voice synthesis toggle -->
-      <button id="voice-synthesis-toggle" onclick="toggleVoiceSpeech()" style="background: none; border: none; cursor: pointer; color: var(--pur); padding: 4px; display: flex; align-items: center; justify-content: center; position: relative;" title="Toggle voice feedback">
-        <!-- Speaker Icon (default active) -->
-        <svg id="voice-synthesis-speaker-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-      </button>
-      <button onclick="closeVoiceAssistant()" style="background: none; border: none; cursor: pointer; color: var(--mut); padding: 4px; display: flex; align-items: center; justify-content: center;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-  </div>
+<!-- Board Assistant ("Sunny") -->
+{% if view_mode == 'board' %}
+<button id="va-fab" type="button" onclick="toggleVoiceAssistant()" aria-label="Talk to Sunny, your board assistant" title="Talk to Sunny">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+  <span class="va-fab-badge" id="va-fab-badge"></span>
+</button>
+<div id="va-hint-bubble" role="status" onclick="openAssistantFromHint()">
+  <span id="va-hint-text">Hi, I'm Sunny! Tap the mic and ask me <b>"What are my top matches?"</b></span>
+  <button class="va-hint-x" type="button" aria-label="Don't show this again" onclick="event.stopPropagation(); dismissAssistantHint(true)">&times;</button>
+</div>
 
-  <!-- Messages Scroll Area -->
-  <div id="voice-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth;">
-    <!-- Starter prompts when empty -->
-    <div id="voice-starter-container" style="display: flex; flex-direction: column; gap: 12px; margin: auto 0; text-align: center; padding: 0 10px;">
-      <div style="display: flex; justify-content: center; margin-bottom: 8px;">
-        <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--purl); color: var(--pur); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">SS</div>
+<div id="voice-overlay" style="display: none;" role="dialog" aria-label="Sunny, your board assistant">
+  <div class="va-header">
+    <div class="va-who">
+      <div class="va-avatar" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"></circle><line x1="12" y1="1.5" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22.5"></line><line x1="1.5" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22.5" y2="12"></line><line x1="4.6" y1="4.6" x2="6.3" y2="6.3"></line><line x1="17.7" y1="17.7" x2="19.4" y2="19.4"></line><line x1="4.6" y1="19.4" x2="6.3" y2="17.7"></line><line x1="17.7" y1="6.3" x2="19.4" y2="4.6"></line></svg>
       </div>
-      <div style="font-weight: 700; font-size: 15px; color: var(--txt); margin-bottom: 4px;">Hello! I am your Board Assistant.</div>
-      <div style="font-size: 13px; color: var(--mut); margin-bottom: 16px; line-height: 1.4;">Type or talk to ask about your pipeline stats, matching jobs, Cover Letters, or emails. You can also command me to update status or liked state.</div>
-      
-      <div style="display: flex; flex-direction: column; gap: 8px; max-width: 280px; margin: 0 auto; width: 100%;">
-        <button class="suggestion-chip" onclick="sendSuggestionQuery('What\'s new today?')">What's new today?</button>
-        <button class="suggestion-chip" onclick="sendSuggestionQuery('My pipeline stats')">My pipeline stats</button>
-        <button class="suggestion-chip" onclick="sendSuggestionQuery('Top matches')">Top matches</button>
-        <button class="suggestion-chip" onclick="sendSuggestionQuery('Any new emails?')">Any new emails?</button>
+      <div>
+        <div class="va-name">Sunny</div>
+        <div class="va-status" id="va-status" data-state="ready" aria-live="polite"><span class="va-dot"></span><span id="voice-status-text">Ready to help</span></div>
       </div>
     </div>
-  </div>
-
-  <!-- Thin waveform visualizer just above control row -->
-  <div id="voice-visualizer-container" style="display: none; align-items: center; justify-content: center; gap: 4px; height: 30px; border-top: 1px dashed var(--bdr); background: var(--purl); flex-shrink: 0;">
-    <div class="voice-bar" style="width: 3px; height: 8px; background:var(--yolk); border-radius: 1px;"></div>
-    <div class="voice-bar" style="width: 3px; height: 16px; background:var(--yolk); border-radius: 1px;"></div>
-    <div class="voice-bar" style="width: 3px; height: 25px; background:var(--yolk); border-radius: 1px;"></div>
-    <div class="voice-bar" style="width: 3px; height: 16px; background:var(--yolk); border-radius: 1px;"></div>
-    <div class="voice-bar" style="width: 3px; height: 8px; background:var(--yolk); border-radius: 1px;"></div>
-  </div>
-
-  <!-- Bottom Control Row -->
-  <div style="padding: 12px 16px 20px 16px; border-top: 1px solid var(--bdr); background: var(--sur); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <!-- Microphone Button -->
-      <button id="voice-action-mic" onclick="toggleVoiceListening()" class="btn btn-p" style="border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color:#0D0C0A; background:var(--yolk); box-shadow: 0 4px 10px var(--purl); flex-shrink: 0; transition: background 0.3s;" title="Speak to Board">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <button id="voice-synthesis-toggle" class="va-icon-btn" type="button" onclick="toggleVoiceSpeech()" title="Read replies out loud" aria-label="Read replies out loud">
+        <svg id="voice-synthesis-speaker-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
       </button>
-
-      <!-- Text Input Field -->
-      <input type="text" id="voice-text-input" placeholder="Ask about your pipeline..." style="flex: 1; border: 1px solid var(--bdr); border-radius: 20px; padding: 10px 16px; font-size: 13px; color: var(--txt); background: var(--sur); outline: none; transition: border-color 0.2s;" onkeypress="handleTextInputKey(event)">
-
-      <!-- Send Button -->
-      <button onclick="sendTextInput()" class="btn btn-p" style="border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color:#0D0C0A; background:var(--yolk); box-shadow: 0 4px 10px var(--purl); flex-shrink: 0;" title="Send Message">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      <button class="va-icon-btn" type="button" onclick="clearAssistantChat()" title="Start a new chat" aria-label="Start a new chat">
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+      </button>
+      <button class="va-icon-btn" type="button" onclick="closeVoiceAssistant()" title="Close" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
+  </div>
+
+  <div id="voice-messages" aria-live="polite">
+    <div id="voice-starter-container" class="va-starter">
+      <h3 id="va-greeting">Hi there! I'm Sunny.</h3>
+      <p>Your job-search buddy. Tap the mic and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.</p>
+      <button class="va-big-mic" type="button" onclick="toggleVoiceListening()" aria-label="Start talking">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
+      <div class="va-big-mic-label">Tap to talk</div>
+      <div class="va-chips" id="va-starter-chips">
+        <button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">What's new today?</button>
+        <button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">What are my top matches?</button>
+        <button class="suggestion-chip" type="button" onclick="sendSuggestionQuery(this.textContent)">How's my pipeline looking?</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="va-nudge" id="va-nudge" onclick="toggleVoiceListening()">
+    <span aria-hidden="true">👋</span><span id="va-nudge-text">Go on, tap the mic and ask me anything.</span>
+  </div>
+  <div class="va-wave" id="voice-visualizer-container" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+
+  <div class="va-footer">
+    <div class="va-input-row">
+      <button id="voice-action-mic" class="va-mic" type="button" onclick="toggleVoiceListening()" title="Talk to Sunny" aria-label="Talk to Sunny">
+        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
+      <input type="text" id="voice-text-input" placeholder="Ask me anything, or tap the mic" maxlength="500" autocomplete="off" onkeydown="handleTextInputKey(event)">
+      <button class="va-send" type="button" onclick="sendTextInput()" title="Send" aria-label="Send">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+    <div class="va-hint" id="va-hint">Press space to talk · Esc to close</div>
   </div>
 </div>
 
-<!-- Microphone Consent Modal -->
-<div id="mic-consent-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 12000; align-items: center; justify-content: center; animation: logFadeIn 0.2s ease-out;">
-  <div style="background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 16px; text-align: center;">
-    <div style="display: flex; justify-content: center; color: var(--pur);">
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+<!-- Microphone explainer, shown once before the browser's own permission prompt -->
+<div id="mic-consent-modal" style="display: none; position: fixed; inset: 0; background: rgba(13,12,10,0.4); backdrop-filter: blur(4px); z-index: 12000; align-items: center; justify-content: center; animation: logFadeIn 0.2s ease-out;">
+  <div style="background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; padding: 24px; max-width: 380px; width: 90%; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; text-align: center;">
+    <div style="display: flex; justify-content: center;"><div class="va-avatar lg">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+    </div></div>
+    <div style="font-weight: 700; font-size: 17px; color: var(--txt);">Can I use your microphone?</div>
+    <div style="font-size: 13.5px; color: var(--mut); line-height: 1.5;">
+      I only listen while the mic button is red, and I stop as soon as you finish talking. Your browser will ask you to allow it next.
     </div>
-    <div style="font-weight: 700; font-size: 16px; color: var(--txt);">Enable Microphone Access</div>
-    <div style="font-size: 13px; color: var(--mut); line-height: 1.5;">
-      Board Assistant needs microphone permissions to listen to your voice commands. Your voice is only captured when you explicitly toggle the mic.
-    </div>
-    <div style="display: flex; gap: 12px; margin-top: 8px;">
-      <button onclick="acceptMicConsent()" class="btn btn-p" style="flex: 1; border: none; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; background:var(--yolk); color:#0D0C0A;">Accept & Start</button>
-      <button onclick="closeMicConsent()" class="btn" style="flex: 1; border: 1px solid var(--bdr); padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; background: none; color: var(--txt);">Cancel</button>
+    <div style="display: flex; gap: 10px; margin-top: 4px;">
+      <button type="button" onclick="acceptMicConsent()" style="flex: 1; border: none; padding: 11px; border-radius: 10px; font-weight: 600; cursor: pointer; background: var(--yolk); color: var(--ink);">Sounds good</button>
+      <button type="button" onclick="closeMicConsent()" style="flex: 1; border: 1px solid var(--bdr-strong); padding: 11px; border-radius: 10px; font-weight: 600; cursor: pointer; background: none; color: var(--txt);">I'll type instead</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 </body>
 </html>
