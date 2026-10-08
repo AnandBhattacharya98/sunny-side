@@ -380,3 +380,56 @@ def test_page_from_another_account_is_refused(client):
 def test_dashboard_page_carries_the_signed_in_account(client):
     html = client.get("/").get_data(as_text=True)
     assert 'data-uid="101"' in html
+
+
+# ── Quiz Mode practice feedback ───────────────────────────────────────────
+
+import quiz_coach  # noqa: E402
+
+STAR_ANSWER = ("When I was at my last company our checkout conversion was dropping. I led a small squad, "
+               "I analysed the funnel and I proposed removing two form steps. I launched it in three weeks "
+               "and conversion increased by 12 percent, which added about 2 crore in yearly revenue.")
+
+
+def test_local_grading_rewards_structure_and_numbers():
+    weak = quiz_coach.local_grade("Tell me about a launch", "", "we did a launch and it went fine")
+    strong = quiz_coach.local_grade("Tell me about a launch", "Use STAR", STAR_ANSWER)
+    assert strong["score"] >= 4 > weak["score"]
+    assert weak["improve"] and strong["strengths"]
+    assert quiz_coach.local_grade("q", "", "")["score"] == 1
+
+
+def test_local_grading_speaks_hindi():
+    res = quiz_coach.local_grade("q", "", "मैंने टीम को लीड किया", lang="hi")
+    assert DEVANAGARI.search(res["verdict"])
+
+
+def test_feedback_route(client):
+    res = client.post("/api/job/j1/interview-prep/feedback",
+                      json={"question": "Tell me about a launch", "hints": "Use STAR", "answer": STAR_ANSWER})
+    data = res.get_json()
+    assert res.status_code == 200 and data["ok"] and 1 <= data["score"] <= 5
+    assert data["source"] == "local"
+
+
+def test_feedback_route_is_scoped_to_the_users_jobs(client):
+    res = client.post("/api/job/other1/interview-prep/feedback", json={"question": "q", "answer": "a"})
+    assert res.status_code == 404
+    assert client.post("/api/job/j1/interview-prep/feedback", json={"answer": "a"}).status_code == 400
+
+
+def test_feedback_uses_gemini_and_clamps_its_output(monkeypatch):
+    def fake(api_key, parts, **kw):
+        assert "x-goog" not in str(parts)
+        return {"candidates": [{"content": {"parts": [{"text": '{"score": 9, "verdict": "Nice", "strengths": ["a","b","c"], '
+                                                                '"improve": ["x"], "better_answer": "Better"}'}]}}]}
+    monkeypatch.setattr(ve, "gemini_generate", fake)
+    res = quiz_coach.grade_answer("q", "", "my answer", api_key="k")
+    assert res["score"] == 5 and res["source"] == "ai" and len(res["strengths"]) == 2
+
+
+def test_feedback_falls_back_when_gemini_fails(monkeypatch):
+    def fail(*a, **kw):
+        raise ve.GeminiError("down")
+    monkeypatch.setattr(ve, "gemini_generate", fail)
+    assert quiz_coach.grade_answer("q", "", STAR_ANSWER, api_key="k")["source"] == "local"
