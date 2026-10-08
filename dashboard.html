@@ -2099,7 +2099,12 @@ const VA = {
   welcome: null,
   welcomed: false,
   speechOn: true,
-  audioEl: null,
+  player: null,
+  audioUnlocked: false,
+  utterances: [],
+  keepAlive: null,
+  warnedSound: false,
+  lang: 'en',
   speakToken: 0,
   nudgeTimer: null,
   hintTimer: null,
@@ -2141,6 +2146,7 @@ function initVoiceAssistant() {
 
   restoreAssistantState();
   document.addEventListener('keydown', handleAssistantKeys);
+  ['pointerdown', 'keydown', 'touchend'].forEach(evt => document.addEventListener(evt, vaUnlockAudio, { capture: true, passive: true }));
 }
 
 function setDigestBadge(count) {
@@ -2221,7 +2227,9 @@ function toggleVoiceSpeech() {
   VA.speechOn = !VA.speechOn;
   vaSet('localStorage', 'voice_speech_enabled', VA.speechOn);
   updateVoiceToggleUI();
-  if (!VA.speechOn) stopSpeaking();
+  if (!VA.speechOn) { stopSpeaking(); return; }
+  vaUnlockAudio();
+  speakResponse(VA.lang === 'hi' ? 'नमस्ते! क्या आप मुझे सुन पा रहे हैं?' : "Hi! I'm Sunny. Can you hear me?");
 }
 
 function toggleVoiceAssistant() {
@@ -2698,7 +2706,7 @@ function scheduleBoardReload() {
   clearTimeout(VA.reloadTimer);
   const started = Date.now();
   const go = () => {
-    const speaking = (VA.audioEl && !VA.audioEl.paused) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+    const speaking = (VA.player && !VA.player.paused && !VA.player.ended && VA.player.src !== VA_SILENT_WAV) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
     if (speaking && Date.now() - started < 9000) { VA.reloadTimer = setTimeout(go, 300); return; }
     saveAssistantState(true);
     location.reload();
@@ -2713,61 +2721,152 @@ function speakResponse(text, onDone) {
   const myToken = ++VA.speakToken;
   if (!VA.speechOn || !text) { setAssistantStatus('ready'); onDone && onDone(); return; }
   setAssistantStatus('speaking');
-  if (!VA.serverVoice) { speakWithBrowser(text, done); return; }
+  if (!VA.serverVoice) { speakWithBrowser(text, done, myToken); return; }
 
+  // Gemini's voice sounds nicer but can be slow. If it isn't back quickly, the browser voice
+  // answers instead, so Sunny is never silent while waiting.
+  let settled = false;
+  const fallback = () => {
+    if (settled || myToken !== VA.speakToken) return;
+    settled = true;
+    speakWithBrowser(text, done, myToken);
+  };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  const timer = setTimeout(() => { controller.abort(); fallback(); }, 4500);
   fetch('/api/voice/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, lang: VA.lang }),
     signal: controller.signal
   })
   .then(r => r.json())
   .then(data => {
     clearTimeout(timer);
-    if (myToken !== VA.speakToken) return;
-    if (!data.audio_base64) { speakWithBrowser(text, done); return; }
-    VA.audioEl = new Audio('data:audio/wav;base64,' + data.audio_base64);
-    VA.audioEl.onended = done;
-    VA.audioEl.onerror = () => speakWithBrowser(text, done);
-    VA.audioEl.play().catch(() => speakWithBrowser(text, done));
+    if (settled || myToken !== VA.speakToken) return;
+    if (!data.audio_base64) { fallback(); return; }
+    settled = true;
+    const player = vaPlayer();
+    player.onended = done;
+    player.onerror = () => { settled = false; fallback(); };
+    player.src = 'data:audio/wav;base64,' + data.audio_base64;
+    player.play().catch(() => { settled = false; fallback(); });
   })
-  .catch(() => {
-    clearTimeout(timer);
-    if (myToken === VA.speakToken) speakWithBrowser(text, done);
+  .catch(() => { clearTimeout(timer); fallback(); });
+}
+
+// One reused <audio> element. Safari only lets a page play sound from an element that was
+// first started inside a tap, so vaUnlockAudio() primes it on the first interaction.
+const VA_SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+function vaPlayer() {
+  if (!VA.player) { VA.player = new Audio(); VA.player.preload = 'auto'; }
+  return VA.player;
+}
+
+function vaUnlockAudio() {
+  if (VA.audioUnlocked) return;
+  VA.audioUnlocked = true;
+  try {
+    const player = vaPlayer();
+    player.src = VA_SILENT_WAV;
+    player.play().catch(() => {});
+  } catch (e) {}
+  if ('speechSynthesis' in window) {
+    try {
+      // A silent utterance spoken inside a tap lets later replies speak on iOS and Chrome
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+      window.speechSynthesis.getVoices();
+    } catch (e) {}
+  }
+}
+
+function vaVoicesReady() {
+  return new Promise(resolve => {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length) { resolve(voices); return; }
+    const onChange = () => { window.speechSynthesis.removeEventListener('voiceschanged', onChange); resolve(window.speechSynthesis.getVoices() || []); };
+    window.speechSynthesis.addEventListener('voiceschanged', onChange);
+    setTimeout(() => resolve(window.speechSynthesis.getVoices() || []), 1200);
   });
 }
 
-function pickBrowserVoice() {
-  const voices = window.speechSynthesis.getVoices() || [];
-  const lang = (navigator.language || 'en-US').slice(0, 2);
-  const preferred = ['Google US English', 'Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Google UK English Female'];
+function pickBrowserVoice(voices, lang) {
+  const base = lang.slice(0, 2);
+  const preferred = base === 'hi'
+    ? ['Google हिन्दी', 'Lekha', 'Microsoft Swara', 'Microsoft Kalpana', 'Microsoft Hemant']
+    : ['Google US English', 'Samantha', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Google UK English Female'];
   for (const name of preferred) {
-    const v = voices.find(v => v.name.includes(name));
+    const v = voices.find(v => v.name.includes(name) && v.lang.toLowerCase().startsWith(base));
     if (v) return v;
   }
-  return voices.find(v => /natural|neural/i.test(v.name) && v.lang.startsWith(lang)) || voices.find(v => v.lang.startsWith(lang)) || null;
+  return voices.find(v => /natural|neural|online/i.test(v.name) && v.lang.toLowerCase().startsWith(base))
+    || voices.find(v => v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase())
+    || voices.find(v => v.lang.toLowerCase().startsWith(base)) || null;
 }
 
-function speakWithBrowser(text, done) {
-  if (!('speechSynthesis' in window)) { done(); return; }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const voice = pickBrowserVoice();
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang || navigator.language || 'en-US';
-  u.rate = 1.03;
-  u.pitch = 1.05;
-  u.onend = done;
-  u.onerror = done;
-  window.speechSynthesis.speak(u);
+// Chrome cuts off long utterances and can drop one spoken straight after cancel(),
+// so replies go out as short sentence chunks, with a watchdog in case nothing plays.
+function vaChunks(text) {
+  const parts = String(text).match(/[^.!?।]+[.!?।]*\s*/g) || [String(text)];
+  const chunks = [];
+  let current = '';
+  parts.forEach(p => {
+    if ((current + p).length > 180 && current) { chunks.push(current.trim()); current = ''; }
+    current += p;
+  });
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+async function speakWithBrowser(text, done, token) {
+  if (!('speechSynthesis' in window)) { vaSoundProblem(); done(); return; }
+  const synth = window.speechSynthesis;
+  const lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
+  const voices = await vaVoicesReady();
+  if (token !== undefined && token !== VA.speakToken) return;
+  const voice = pickBrowserVoice(voices, lang);
+  if (synth.speaking || synth.pending) synth.cancel();
+  synth.resume();
+  const chunks = vaChunks(text);
+  let started = false;
+  VA.utterances = chunks.map((chunk, i) => {
+    const u = new SpeechSynthesisUtterance(chunk);
+    if (voice) u.voice = voice;
+    u.lang = voice?.lang || lang;
+    u.rate = 1.02;
+    u.pitch = 1.05;
+    u.onstart = () => { started = true; };
+    if (i === chunks.length - 1) { u.onend = done; }
+    u.onerror = (e) => { if (e.error !== 'interrupted' && e.error !== 'canceled') done(); };
+    return u;
+  });
+  // A short pause after cancel() avoids Chrome swallowing the first utterance
+  setTimeout(() => {
+    if (token !== undefined && token !== VA.speakToken) return;
+    VA.utterances.forEach(u => synth.speak(u));
+    setTimeout(() => {
+      if (!started && !synth.speaking && (token === undefined || token === VA.speakToken)) { vaSoundProblem(); done(); }
+    }, 4000);
+  }, 80);
+  clearInterval(VA.keepAlive);
+  VA.keepAlive = setInterval(() => {
+    if (!synth.speaking) { clearInterval(VA.keepAlive); return; }
+    synth.pause(); synth.resume();
+  }, 10000);
+}
+
+function vaSoundProblem() {
+  if (VA.warnedSound) return;
+  VA.warnedSound = true;
+  toast("I couldn't play my voice. Check your volume and that this tab isn't muted.");
 }
 
 function stopSpeaking() {
   VA.speakToken++;
-  if (VA.audioEl) { VA.audioEl.pause(); VA.audioEl = null; }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  clearInterval(VA.keepAlive);
+  if (VA.player) { VA.player.onended = null; VA.player.onerror = null; VA.player.pause(); }
+  if ('speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   if (document.getElementById('va-status')?.dataset.state === 'speaking') setAssistantStatus('ready');
 }
 
