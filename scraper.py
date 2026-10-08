@@ -2,12 +2,11 @@
 scraper.py — Scrapes PM job listings with zero API keys required.
 
 Sources (all free, no auth):
-  - Naukri.com public pages
   - LinkedIn Jobs public pages
-  - Direct company career pages
-  - Instahyre public search
+  - Company job boards, read from their public Greenhouse / Lever feeds
 
-Falls back to demo seed data if all requests fail (e.g. no internet).
+Naukri and Google search were removed: both block scripted requests and never
+returned a single job.
 """
 
 import requests
@@ -26,38 +25,26 @@ HEADERS = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-# ── Add any company you want crawled ──────────────────────────────────────
-COMPANY_CAREER_PAGES = [
-    {
-        "company": "Razorpay",
-        "url": "https://razorpay.com/jobs/",
-        "selector": "a",
-        "filter_keywords": ["product manager", "product management"],
-    },
-    {
-        "company": "CRED",
-        "url": "https://careers.cred.club/",
-        "selector": "a",
-        "filter_keywords": ["product"],
-    },
-    {
-        "company": "Zepto",
-        "url": "https://www.zepto.team/careers",
-        "selector": "a",
-        "filter_keywords": ["product manager"],
-    },
-    {
-        "company": "Groww",
-        "url": "https://groww.in/careers",
-        "selector": "a",
-        "filter_keywords": ["product manager"],
-    },
-    {
-        "company": "PhonePe",
-        "url": "https://www.phonepe.com/careers/",
-        "selector": "a",
-        "filter_keywords": ["product"],
-    },
+# ── Company job boards ────────────────────────────────────────────────────
+# Most career pages load their openings with JavaScript, so scraping the HTML
+# finds nothing. These companies publish the same openings as JSON through
+# their applicant-tracking system, which is what we read instead.
+#   ats "greenhouse": board token from job-boards.greenhouse.io/<board>
+#   ats "lever":      company slug from jobs.lever.co/<board>
+COMPANY_BOARDS = [
+    {"company": "Razorpay", "ats": "greenhouse", "board": "razorpaysoftwareprivatelimited"},
+    {"company": "Groww",    "ats": "greenhouse", "board": "groww", "region": "eu"},
+    {"company": "InMobi",   "ats": "greenhouse", "board": "inmobi"},
+    {"company": "CRED",     "ats": "lever",      "board": "cred"},
+    {"company": "Meesho",   "ats": "lever",      "board": "meesho"},
+    {"company": "Paytm",    "ats": "lever",      "board": "paytm"},
+]
+
+# A board posting is kept only if its location looks like India (or remote).
+INDIA_LOCATION_HINTS = [
+    "india", "bengaluru", "bangalore", "mumbai", "delhi", "gurgaon", "gurugram",
+    "noida", "pune", "hyderabad", "chennai", "kolkata", "ahmedabad", "jaipur",
+    "remote",
 ]
 
 # -- DEMO_JOBS removed --
@@ -90,57 +77,6 @@ def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     )
     conn.commit()
     return True
-
-
-def scrape_naukri(conn, max_pages: int = 1, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
-    new_jobs = []
-    kw_hyphenated = keywords.lower().replace(" ", "-").replace("/", "-")
-    for page in range(1, max_pages + 1):
-        url = (
-            f"https://www.naukri.com/{kw_hyphenated}-jobs-in-india-{page}"
-            if page > 1 else
-            f"https://www.naukri.com/{kw_hyphenated}-jobs-in-india"
-        )
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=12)
-            soup = BeautifulSoup(resp.text, "html.parser")
-            cards = soup.select("article.jobTuple") or soup.select("div.srp-jobtuple-wrapper")
-            count = 0
-            for card in cards:
-                if count >= 5:
-                    break
-                title_el = card.select_one("a.title") or card.select_one("a.jobTitle")
-                company_el = card.select_one("a.subTitle") or card.select_one("a.companyInfo")
-                loc_el = card.select_one("li.location span") or card.select_one("span.locWdth")
-                if not title_el:
-                    continue
-                title = title_el.get_text(strip=True)
-                
-                # Loose overlap match: job title should contain at least one term of the keyword phrase
-                terms = [t.strip().lower() for t in keywords.replace("-", " ").split() if len(t.strip()) > 2]
-                title_lower = title.lower()
-                if terms and not any(t in title_lower for t in terms):
-                    continue
-                
-                job_url = title_el.get("href", url)
-                job_id = f"naukri_{re.sub(r'[^a-z0-9]', '_', job_url[-40:].lower())}"
-                job = {
-                    "job_id": job_id, "title": title,
-                    "company": company_el.get_text(strip=True) if company_el else "Unknown",
-                    "location": loc_el.get_text(strip=True) if loc_el else "India",
-                    "url": job_url, "source": "naukri",
-                    "description": _fetch_description(job_url),
-                    "posted_at": "",
-                }
-                if _insert_job(conn, job, user_id=user_id):
-                    new_jobs.append(job)
-                    count += 1
-                time.sleep(0.4)
-        except Exception as e:
-            print(f"  [Naukri p{page}] {e}")
-        time.sleep(0.5)
-    print(f"  Naukri: {len(new_jobs)} new jobs")
-    return new_jobs
 
 
 def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
@@ -192,117 +128,98 @@ def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manage
     return new_jobs
 
 
-def scrape_company_pages(conn, user_id: int = 1) -> list[dict]:
+def _title_matches(title: str, keywords: str) -> bool:
+    """Every word of the user's designation (3+ letters) must appear in the title.
+
+    Company boards list every role, so a loose "any word" match would let
+    "Engineering Manager" through for "Product Manager"."""
+    terms = [t.lower() for t in re.split(r"[\s/-]+", keywords) if len(t) > 2]
+    title_lower = title.lower()
+    return all(t in title_lower for t in terms)
+
+
+def _is_india_location(location: str) -> bool:
+    if not location:
+        return True
+    loc = location.lower()
+    return any(h in loc for h in INDIA_LOCATION_HINTS)
+
+
+def _html_to_text(html: str) -> str:
+    return BeautifulSoup(html or "", "html.parser").get_text(separator="\n", strip=True)
+
+
+def _fetch_board_postings(cfg: dict) -> list[dict]:
+    """Returns a company's open roles as dicts with title, url, location, description."""
+    if cfg["ats"] == "greenhouse":
+        host = "boards-api.eu.greenhouse.io" if cfg.get("region") == "eu" else "boards-api.greenhouse.io"
+        resp = requests.get(f"https://{host}/v1/boards/{cfg['board']}/jobs",
+                            params={"content": "true"}, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        postings = []
+        for j in resp.json().get("jobs", []):
+            # Greenhouse returns the description as HTML-escaped HTML.
+            content = BeautifulSoup(j.get("content") or "", "html.parser").get_text()
+            postings.append({
+                "id": str(j.get("id", "")),
+                "title": j.get("title", ""),
+                "url": j.get("absolute_url", ""),
+                "location": (j.get("location") or {}).get("name", ""),
+                "description": _html_to_text(content),
+                "posted_at": j.get("updated_at", ""),
+            })
+        return postings
+
+    if cfg["ats"] == "lever":
+        resp = requests.get(f"https://api.lever.co/v0/postings/{cfg['board']}",
+                            params={"mode": "json"}, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        postings = []
+        for j in resp.json():
+            created = j.get("createdAt")
+            postings.append({
+                "id": str(j.get("id", "")),
+                "title": j.get("text", ""),
+                "url": j.get("hostedUrl", ""),
+                "location": (j.get("categories") or {}).get("location", ""),
+                "description": j.get("descriptionPlain") or _html_to_text(j.get("description", "")),
+                "posted_at": datetime.fromtimestamp(created / 1000).isoformat() if created else "",
+            })
+        return postings
+
+    raise ValueError(f"Unknown ATS {cfg['ats']!r}")
+
+
+def scrape_company_pages(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
     new_jobs = []
-    for cfg in COMPANY_CAREER_PAGES:
+    for cfg in COMPANY_BOARDS:
         try:
-            resp = requests.get(cfg["url"], headers=HEADERS, timeout=12)
-            soup = BeautifulSoup(resp.text, "html.parser")
-            count = 0
-            for link in soup.select(cfg["selector"]):
-                if count >= 3:
-                    break
-                text = link.get_text(strip=True).lower()
-                if not any(k in text for k in cfg["filter_keywords"]):
-                    continue
-                href = link.get("href", "")
-                if not href or href == "#":
-                    continue
-                if href.startswith("/"):
-                    base = "/".join(cfg["url"].split("/")[:3])
-                    href = base + href
-                elif not href.startswith("http"):
-                    continue
-                job_id = f"direct_{cfg['company'].lower()}_{re.sub(r'[^a-z0-9]','_',href[-30:])}"
-                job = {
-                    "job_id": job_id,
-                    "title": link.get_text(strip=True) or "Product Manager",
-                    "company": cfg["company"], "location": "India",
-                    "url": href, "source": "direct", "description": "",
-                    "posted_at": "",
-                }
-                if _insert_job(conn, job, user_id=user_id):
-                    new_jobs.append(job)
-                    count += 1
-            time.sleep(0.5)
+            postings = _fetch_board_postings(cfg)
         except Exception as e:
             print(f"  [{cfg['company']}] {e}")
-    print(f"  Company pages: {len(new_jobs)} new jobs")
-    return new_jobs
-
-
-def seed_demo_jobs(conn, user_id: int = 1) -> list[dict]:
-    return []
-
-
-def scrape_google_search_jobs(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
-    import urllib.parse
-    q = f"{keywords} jobs India"
-    url = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}&num=30"
-    new_jobs = []
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=12)
-        soup = BeautifulSoup(resp.text, "html.parser")
-        
+            continue
         count = 0
-        # Google search results container: a links inside h3 elements
-        for a in soup.select("a"):
+        for p in postings:
             if count >= 5:
                 break
-            href = a.get("href", "")
-            # Google links in simple HTML search look like: /url?q=https://company.com/job...
-            if href.startswith("/url?q="):
-                real_url = href.split("/url?q=")[1].split("&")[0]
-                real_url = urllib.parse.unquote(real_url)
-                
-                # Exclude internal google domains or support pages
-                if "google.com" in real_url or "youtube.com" in real_url:
-                    continue
-                
-                # Extract title from child h3 or the link text
-                title_el = a.select_one("h3")
-                title = title_el.get_text(strip=True) if title_el else a.get_text(strip=True)
-                
-                if not title or len(title) < 10:
-                    continue
-                    
-                # Clean up title
-                for suffix in [" | ", " - "]:
-                    if suffix in title:
-                        title = title.split(suffix)[0].strip()
-                
-                # Generate a unique job_id
-                job_id = f"google_{re.sub(r'[^a-z0-9]', '_', real_url[-40:].lower())}"
-                
-                # Fetch snippet from search description
-                parent = a.find_parent("div")
-                description = ""
-                if parent:
-                    # Look for child span or div with snippet text
-                    for sibling in parent.find_next_siblings():
-                        sib_text = sibling.get_text(strip=True)
-                        if len(sib_text) > 40:
-                            description = sib_text
-                            break
-                            
-                job = {
-                    "job_id": job_id,
-                    "title": title,
-                    "company": "Google Search Match",
-                    "location": "India",
-                    "url": real_url,
-                    "source": "google",
-                    "description": description or f"Job listing found on Google Search for: {keywords}",
-                    "posted_at": "",
-                }
-                
-                if _insert_job(conn, job, user_id=user_id):
-                    new_jobs.append(job)
-                    count += 1
-                    
-    except Exception as e:
-        print(f"  [Google Search] {e}")
-    print(f"  Google Search: {len(new_jobs)} new jobs")
+            if not p["title"] or not p["url"]:
+                continue
+            if not _title_matches(p["title"], keywords) or not _is_india_location(p["location"]):
+                continue
+            job = {
+                "job_id": f"direct_{cfg['company'].lower()}_{re.sub(r'[^a-z0-9]', '_', p['id'].lower())}",
+                "title": p["title"],
+                "company": cfg["company"],
+                "location": p["location"] or "India",
+                "url": p["url"],
+                "source": "direct",
+                "description": p["description"][:3000],
+                "posted_at": p["posted_at"],
+            }
+            if _insert_job(conn, job, user_id=user_id):
+                new_jobs.append(job)
+                count += 1
+    print(f"  Company boards: {len(new_jobs)} new jobs")
     return new_jobs
 
 
@@ -345,13 +262,11 @@ def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
 
     all_new = []
     scrapers = [
-        (scrape_naukri, (1, user_id, keywords)),
         (scrape_linkedin_jobs, (user_id, keywords)),
-        (scrape_google_search_jobs, (user_id, keywords)),
-        (scrape_company_pages, (user_id,))
+        (scrape_company_pages, (user_id, keywords)),
     ]
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
         futures = [executor.submit(run_scraper, func, *args) for func, args in scrapers]
         for future in concurrent.futures.as_completed(futures):
             all_new += future.result()
