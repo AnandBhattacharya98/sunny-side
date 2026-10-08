@@ -196,6 +196,10 @@ class RateLimiter:
                 q.popleft()
             return len(q)
 
+    def reset_key(self, user_id, bucket: str) -> None:
+        with self._lock:
+            self._hits.pop((user_id, bucket), None)
+
     def reset(self):
         with self._lock:
             self._hits.clear()

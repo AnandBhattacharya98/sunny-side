@@ -495,6 +495,14 @@ def init_db(db_path: str = DB_PATH):
             received_at   TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       INTEGER,
+            token_hash    TEXT UNIQUE,
+            expires_at    TEXT,
+            used_at       TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS tailored_resumes (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id        TEXT UNIQUE,

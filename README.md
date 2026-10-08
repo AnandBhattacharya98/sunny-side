@@ -41,7 +41,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `GEMINI_TTS_MODEL` / `GEMINI_TTS_VOICE` | Optional | Gemini text-to-speech model and voice for the assistant (defaults `gemini-2.5-flash-preview-tts` / `Puck`) |
 | `DATABASE_URL` | Optional | Set to a PostgreSQL connection string to use Postgres instead of SQLite |
 | `DB_POOL_MAX` / `DB_POOL_IDLE` | Optional | Postgres connections per worker: the most it opens (default 8) and how many it keeps open between requests (default 4) |
-| `SENDER_EMAIL` | Optional | Gmail address used to send digests. Each user's digest goes to their own sign-in email (or the Gmail they connected); `RECIPIENT_EMAIL` is only used for the admin account |
+| `SENDER_EMAIL` | Optional | Gmail address used to send digests and password-reset links (without it, "Forgot password?" tells users to ask the admin). Each user's digest goes to their own sign-in email (or the Gmail they connected); `RECIPIENT_EMAIL` is only used for the admin account |
 | `SENDER_PASSWORD` | Optional | Gmail App Password matching the sender email |
 | `PROXYCURL_API_KEY` | Optional | Enables live LinkedIn contact lookup for companies |
 | `TELEGRAM_BOT_TOKEN` | Optional | Configures a Telegram bot for mobile push notifications |

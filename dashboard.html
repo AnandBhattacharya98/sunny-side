@@ -1126,7 +1126,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 {% endif %}
 
 
-{% if view_mode == 'login' or view_mode == 'signup' or view_mode == 'mock_auth' %}
+{% if view_mode in ('login', 'signup', 'mock_auth', 'forgot', 'reset') %}
 <div class="auth-shell">
   <nav class="auth-nav">
     <a class="auth-logo" href="/"><span class="auth-logo-dot"></span>Sunny Side</a>
@@ -1176,6 +1176,47 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
       <button type="submit" class="auth-btn auth-btn-p auth-btn-block">Continue</button>
       <a href="/login" class="auth-btn auth-btn-block">Back to log in</a>
     </form>
+    {% elif view_mode == 'forgot' or view_mode == 'reset' %}
+    <div class="auth-head">
+      {% if view_mode == 'forgot' %}
+      <h1>Reset your password</h1>
+      <p>Enter your username or email and we'll send you a link to choose a new password.</p>
+      {% else %}
+      <h1>Choose a new password</h1>
+      <p>Use at least 8 characters.</p>
+      {% endif %}
+    </div>
+
+    {% if error %}
+    <div class="auth-error" role="alert"><span>{{ error }}</span></div>
+    {% endif %}
+
+    {% if notice %}
+    <p class="auth-hint" role="status" style="font-size:14px;">{{ notice }}</p>
+    {% elif view_mode == 'forgot' %}
+    <form method="POST" action="/forgot" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="auth-field">
+        <label class="auth-label" for="forgot-id">Username or email</label>
+        <input type="text" id="forgot-id" name="identifier" required class="auth-input" autocomplete="username">
+      </div>
+      <button type="submit" class="auth-btn auth-btn-p auth-btn-block">Send reset link</button>
+    </form>
+    {% elif reset_ok %}
+    <form method="POST" action="/reset/{{ reset_token }}" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="auth-field">
+        <label class="auth-label" for="reset-password">New password</label>
+        <div class="auth-pw">
+          <input type="password" id="reset-password" name="password" required minlength="8" class="auth-input" autocomplete="new-password" placeholder="••••••••">
+          <button type="button" class="auth-show" onclick="togglePasswordVisibility('reset-password', this)">Show</button>
+        </div>
+      </div>
+      <button type="submit" class="auth-btn auth-btn-p auth-btn-block">Save new password</button>
+    </form>
+    {% endif %}
+
+    <p class="auth-switch">Remembered it? <a href="/login">Log in</a></p>
     {% else %}
     <div class="auth-head">
       {% if view_mode == 'login' %}
@@ -1208,6 +1249,9 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
           <button type="button" class="auth-show" onclick="togglePasswordVisibility('auth-password', this)">Show</button>
         </div>
       </div>
+      {% if view_mode == 'login' %}
+      <p class="auth-switch" style="margin:-6px 0 0; text-align:right; font-size:12.5px;"><a href="/forgot">Forgot password?</a></p>
+      {% endif %}
 
       {% if view_mode == 'signup' %}
       <div class="accordion-wrapper">

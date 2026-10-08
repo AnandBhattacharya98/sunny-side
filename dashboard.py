@@ -6,8 +6,8 @@ from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
 import quiz_coach
-from notifier import send_email_digest, recipient_for_user
-from auth import signup_user, login_user
+from notifier import send_email_digest, recipient_for_user, send_email, email_configured
+from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
 
 app = Flask(__name__, template_folder='.')
@@ -173,7 +173,7 @@ def _check_oauth_state():
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations", "forgot_password", "reset_password"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -485,6 +485,85 @@ def auth_mock_callback():
         return "Missing email or name", 400
         
     return handle_social_login(provider, email, name)
+
+
+# ── Forgot password ───────────────────────────────────────────────────────
+RESET_TOKEN_MINUTES = 60
+FORGOT_SENT = "If that account exists and has an email address, a reset link is on its way. It works for 1 hour."
+
+
+def _reset_token_hash(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _find_reset(conn, token: str):
+    """The live reset row for a token, or None if it's unknown, used or expired."""
+    row = conn.execute("SELECT id, user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?",
+                       (_reset_token_hash(token),)).fetchone()
+    if not row or row[3] or row[2] < datetime.now().isoformat():
+        return None
+    return row
+
+
+@app.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "GET":
+        return render_template("dashboard.html", view_mode="forgot")
+    if not email_configured():
+        return render_template("dashboard.html", view_mode="forgot",
+                               error="Password reset by email isn't set up on this site yet. Ask the site admin to reset it for you.")
+    ident = request.form.get("identifier", "").strip().lower()
+    if not ident or not login_throttle.allow(("ip", _client_ip()), "forgot", 5, 3600) \
+            or not login_throttle.allow(("ident", ident), "forgot", 3, 3600):
+        # Same answer either way, so the form can't be used to probe for accounts
+        return render_template("dashboard.html", view_mode="forgot", notice=FORGOT_SENT)
+    conn = get_conn(DB_PATH)
+    row = conn.execute("SELECT id FROM users WHERE username = ? OR LOWER(email) = ?", (ident, ident)).fetchone()
+    to = recipient_for_user(row[0]) if row else ""
+    if row and to:
+        token = secrets.token_urlsafe(32)
+        expires = (datetime.now() + timedelta(minutes=RESET_TOKEN_MINUTES)).isoformat()
+        conn.execute("INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+                     (row[0], _reset_token_hash(token), expires))
+        conn.commit()
+        local = request.host.split(":")[0] in ("localhost", "127.0.0.1")
+        link = url_for("reset_password", token=token, _external=True, _scheme="http" if local else "https")
+        threading.Thread(target=send_email, daemon=True, args=(to, "Reset your Sunny Side password", f"""
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a18;">
+  <h1 style="font-size:20px;font-weight:600;">Reset your password</h1>
+  <p style="font-size:14px;line-height:1.6;">Someone asked to reset the password for your Sunny Side account. If it was you, choose a new one here. The link works for 1 hour.</p>
+  <p><a href="{link}" style="display:inline-block;padding:10px 18px;background:#534AB7;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;">Choose a new password</a></p>
+  <p style="font-size:12px;color:#5f5e5a;">If you didn't ask for this, ignore this email. Your password stays the same.</p>
+</div>""")).start()
+    conn.close()
+    return render_template("dashboard.html", view_mode="forgot", notice=FORGOT_SENT)
+
+
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    conn = get_conn(DB_PATH)
+    try:
+        row = _find_reset(conn, token)
+        if not row:
+            return render_template("dashboard.html", view_mode="reset",
+                                   error="This reset link has expired or was already used. Ask for a new one from the login page.")
+        if request.method == "GET":
+            return render_template("dashboard.html", view_mode="reset", reset_ok=True, reset_token=token)
+        password = request.form.get("password", "")
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return render_template("dashboard.html", view_mode="reset", reset_ok=True, reset_token=token,
+                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+        now = datetime.now().isoformat()
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(password), row[1]))
+        # One use only; this also retires any other links sent to the same account
+        conn.execute("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL", (now, row[1]))
+        conn.commit()
+        login_throttle.reset_key(("user", conn.execute("SELECT username FROM users WHERE id = ?", (row[1],)).fetchone()[0]), "login_fail")
+    finally:
+        conn.close()
+    session.clear()
+    return render_template("dashboard.html", view_mode="reset", notice="Your password has been changed. You can log in with it now.")
 
 
 @app.route("/logout")
