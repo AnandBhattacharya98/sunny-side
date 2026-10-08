@@ -630,6 +630,57 @@ body[data-sunny="happy"] .sunny .s-body { animation: sunnyHop 0.5s ease-out 2; }
 @keyframes vaRing { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
 @keyframes vaTyping { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
 @keyframes vaBlink { 50% { opacity: 0.35; } }
+
+/* ── Quiz Mode: practice out loud with Sunny ── */
+.qz-practice { margin-bottom: 4px; }
+.qz-intro { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid var(--yolk); border-radius: 14px;
+  background: rgba(255, 167, 0, 0.08); }
+.qz-intro .qz-sunny { width: 52px; height: 52px; flex-shrink: 0; }
+.qz-intro .qz-sunny svg { width: 100%; height: 100%; }
+.qz-intro b { font-size: 14px; display: block; margin-bottom: 2px; color: var(--txt); }
+.qz-intro p { font-size: 12px; color: var(--mut); line-height: 1.45; margin: 0; }
+.qz-btn { border: 1.5px solid var(--bdr); background: var(--sur); color: var(--txt); border-radius: 999px; padding: 8px 14px; font-size: 12px;
+  font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-family: inherit; }
+.qz-btn:hover { border-color: var(--txt); }
+.qz-btn.primary { background: var(--yolk); border-color: var(--yolk); color: #0D0C0A; }
+.qz-btn.primary:hover { filter: brightness(0.96); }
+.qz-btn:disabled { opacity: 0.5; cursor: default; }
+.qz-card { border: 1.5px solid var(--bdr); border-radius: 16px; padding: 16px; background: var(--sur); display: flex; flex-direction: column; gap: 12px; }
+.qz-top { display: flex; align-items: center; gap: 8px; }
+.qz-count { font-family: 'Space Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); }
+.qz-kind { font-family: 'Space Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 167, 0, 0.14); color: var(--txt); }
+.qz-top .qz-space { flex: 1; }
+.qz-icon { border: none; background: none; cursor: pointer; color: var(--mut); padding: 4px; border-radius: 8px; display: inline-flex; }
+.qz-icon:hover { color: var(--txt); background: var(--sur2, rgba(0,0,0,0.05)); }
+.qz-bar { height: 4px; border-radius: 4px; background: var(--bdr); overflow: hidden; }
+.qz-bar i { display: block; height: 100%; background: var(--yolk); transition: width 0.3s; }
+.qz-q { font-size: 16px; font-weight: 600; line-height: 1.4; color: var(--txt); }
+.qz-link { border: none; background: none; padding: 0; color: var(--mut); font-size: 11.5px; cursor: pointer; text-decoration: underline; align-self: flex-start; font-family: inherit; }
+.qz-hint { font-size: 12px; color: var(--mut); line-height: 1.5; background: var(--bg); border-radius: 10px; padding: 10px 12px; white-space: pre-line; }
+.qz-answer { width: 100%; min-height: 96px; resize: vertical; border: 1.5px solid var(--bdr); border-radius: 12px; padding: 10px 12px; font-size: 13px;
+  line-height: 1.5; background: var(--bg); color: var(--txt); font-family: inherit; box-sizing: border-box; outline: none; }
+.qz-answer:focus { border-color: var(--yolk); }
+.qz-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qz-actions .qz-space { flex: 1; }
+.qz-mic.listening { background: #0D0C0A; border-color: #0D0C0A; color: #FFA700; }
+.qz-mic.listening::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #FF5A36; animation: qzBlink 1s infinite; }
+@keyframes qzBlink { 50% { opacity: 0.2; } }
+.qz-timer { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--mut); }
+.qz-feedback { border-top: 1px dashed var(--bdr); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.qz-score { display: flex; align-items: center; gap: 10px; }
+.qz-dots { display: flex; gap: 4px; }
+.qz-dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--yolk); }
+.qz-dots i.on { background: var(--yolk); }
+.qz-verdict { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.qz-list { font-size: 12.5px; line-height: 1.5; color: var(--txt); margin: 0; padding-left: 18px; }
+.qz-label { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); margin-bottom: 4px; }
+.qz-better { font-size: 12.5px; line-height: 1.5; background: var(--bg); border-left: 3px solid var(--yolk); border-radius: 0 10px 10px 0; padding: 10px 12px; white-space: pre-line; }
+.qz-sum-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; padding: 8px 0; border-bottom: 1px solid var(--bdr); }
+.qz-sum-row span:first-child { flex: 1; }
+.qz-big { font-size: 28px; font-weight: 700; color: var(--txt); }
+.qz-thinking { font-size: 12.5px; color: var(--mut); display: flex; align-items: center; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .qz-mic.listening::before { animation: none; } }
+
 @media (prefers-reduced-motion: reduce) {
   .va-big-mic, #va-fab, #va-fab.wave .va-sunny-slot, .va-mascot-btn, .sunny *, #va-fab.pulse::after, .va-mic.pulse::after, .va-mic.listening::after, .va-wave.auto i, .va-typing span { animation: none !important; }
 }
@@ -1857,6 +1908,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             </div>
             
             <div class="quiz-content-{{ job.job_id }}" style="display:none; flex-direction:column; gap:20px; text-align:left;">
+              <div class="qz-practice"></div>
               <div>
                 <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Quick-Fire Flashcards (Tap to Reveal)</span>
                 <div class="flashcard-container-{{ job.job_id }}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:8px;">
@@ -2245,6 +2297,7 @@ const VA = {
   nudgeTimer: null,
   hintTimer: null,
   reloadTimer: null,
+  afterConsent: null,
 };
 // Chat state is kept per tab AND per person, so a different account never sees someone else's chat
 const VA_UID = document.body.dataset.uid || '';
@@ -2562,11 +2615,13 @@ function toggleVoiceListening() {
 function acceptMicConsent() {
   vaSet('localStorage', 'mic_consent_accepted', 'true');
   document.getElementById('mic-consent-modal').style.display = 'none';
+  if (VA.afterConsent) { const next = VA.afterConsent; VA.afterConsent = null; next(); return; }
   if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
   startListening();
 }
 
 function closeMicConsent() {
+  VA.afterConsent = null;
   document.getElementById('mic-consent-modal').style.display = 'none';
   document.getElementById('voice-text-input')?.focus();
 }
@@ -2877,10 +2932,14 @@ function handleAssistantReply(res) {
 
 function openQuizFor(jobId) {
   if (typeof openJobModal !== 'function') return;
+  QZ_AUTOSTART = jobId;  // Sunny asked: go straight into spoken practice
+  closeVoiceAssistant();
   openJobModal(jobId);
   setTimeout(() => {
     const modal = document.getElementById('modal-backdrop-' + jobId);
     modal?.querySelector('button[onclick*="quiz"]')?.click();
+    // Questions already loaded earlier: start right away
+    if (QZ[jobId] && QZ_AUTOSTART === jobId) { QZ_AUTOSTART = null; startPractice(jobId); }
   }, 200);
 }
 
@@ -3394,6 +3453,8 @@ function openJobModal(id) {
 }
 
 function closeJobModal(id) {
+  quizStopMic(id);
+  if (QZ[id]) stopSpeaking();
   document.getElementById('modal-backdrop-' + id).style.display = 'none';
 }
 
@@ -4741,6 +4802,7 @@ function renderQuizData(jobId, data) {
   
   loading.style.display = 'none';
   content.style.display = 'flex';
+  setupPractice(jobId, data);
 }
 
 function toggleDeepQAccordion(jobId, idx) {
@@ -4752,6 +4814,336 @@ function toggleDeepQAccordion(jobId, idx) {
   } else {
     body.style.display = 'none';
     chev.style.transform = 'rotate(0deg)';
+  }
+}
+
+// ── Quiz Mode practice: Sunny asks each question out loud, you answer by talking or typing,
+// and get feedback on what landed and what to sharpen.
+const QZ = {};
+let QZ_AUTOSTART = null;
+
+function qzEl(jobId) { return document.getElementById('panel-quiz-' + jobId)?.querySelector('.qz-practice'); }
+function qzArg(jobId) { return esc(JSON.stringify(String(jobId))); }
+
+function setupPractice(jobId, data) {
+  const qs = [];
+  (data.quick_questions || []).forEach(item => {
+    const q = (item && typeof item === 'object') ? item.q : item;
+    if (q) qs.push({ q, hints: (item && item.a) || '', kind: 'quick' });
+  });
+  (data.deep_questions || []).forEach(item => {
+    if (item && item.q) qs.push({ q: item.q, hints: item.hints || item.answer || '', kind: 'deep' });
+  });
+  quizStopMic(jobId);
+  QZ[jobId] = { qs, order: qs.map((_, i) => i), pos: 0, results: {}, listening: false, rec: null, recorder: null, timer: null };
+  if (QZ_AUTOSTART === jobId) { QZ_AUTOSTART = null; startPractice(jobId); return; }
+  renderPracticeIntro(jobId);
+}
+
+function renderPracticeIntro(jobId) {
+  const el = qzEl(jobId);
+  const st = QZ[jobId];
+  if (!el || !st) return;
+  if (!st.qs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="qz-intro">
+      <div class="qz-sunny" aria-hidden="true">${vaMascot(true)}</div>
+      <div style="flex:1; min-width:0;">
+        <b>${vaT('Practice out loud with Sunny', 'Sunny के साथ बोलकर प्रैक्टिस करें')}</b>
+        <p>${vaT(`I'll ask you ${st.qs.length} questions, one at a time. Answer by talking or typing, and I'll tell you what landed and what to sharpen.`,
+                  `मैं आपसे एक-एक करके ${st.qs.length} सवाल पूछूँगी। बोलकर या टाइप करके जवाब दें, और मैं बताऊँगी क्या अच्छा रहा और क्या सुधारें।`)}</p>
+      </div>
+      <button class="qz-btn primary" type="button" onclick="startPractice(${qzArg(jobId)})">${vaT('Start practice', 'प्रैक्टिस शुरू करें')}</button>
+    </div>`;
+}
+
+function startPractice(jobId, onlyWeak) {
+  const st = QZ[jobId];
+  if (!st) return;
+  vaUnlockAudio();
+  st.order = onlyWeak
+    ? st.order.filter(i => !st.results[i] || st.results[i].score <= 3)
+    : st.qs.map((_, i) => i);
+  if (!st.order.length) st.order = st.qs.map((_, i) => i);
+  if (!onlyWeak) st.results = {};
+  st.pos = 0;
+  renderPracticeQuestion(jobId, true);
+  qzEl(jobId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPracticeQuestion(jobId, speak) {
+  const el = qzEl(jobId);
+  const st = QZ[jobId];
+  if (!el || !st) return;
+  quizStopMic(jobId);
+  const idx = st.order[st.pos];
+  const item = st.qs[idx];
+  const pct = Math.round((st.pos / st.order.length) * 100);
+  const a = qzArg(jobId);
+  el.innerHTML = `
+    <div class="qz-card">
+      <div class="qz-top">
+        <span class="qz-count">${vaT('Question', 'सवाल')} ${st.pos + 1} / ${st.order.length}</span>
+        <span class="qz-kind">${item.kind === 'quick' ? vaT('Quick-fire', 'क्विक-फ़ायर') : vaT('Deep dive', 'गहराई से')}</span>
+        <span class="qz-space"></span>
+        <button class="qz-icon" type="button" title="${vaT('Read the question again', 'सवाल फिर से सुनें')}" aria-label="${vaT('Read the question again', 'सवाल फिर से सुनें')}" onclick="quizSpeakQuestion(${a})">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        </button>
+        <button class="qz-icon" type="button" title="${vaT('End practice', 'प्रैक्टिस खत्म करें')}" aria-label="${vaT('End practice', 'प्रैक्टिस खत्म करें')}" onclick="endPractice(${a})">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="qz-bar"><i style="width:${pct}%"></i></div>
+      <div class="qz-q">${esc(item.q)}</div>
+      ${item.hints ? `<button class="qz-link" type="button" onclick="const h = this.nextElementSibling; h.hidden = !h.hidden;">${vaT('Need a hint?', 'हिंट चाहिए?')}</button>
+      <div class="qz-hint" hidden>${esc(item.hints)}</div>` : ''}
+      <textarea class="qz-answer" maxlength="3000" placeholder="${vaT('Tap “Answer out loud” and talk, or type your answer here…', '“बोलकर जवाब दें” टैप करें और बोलें, या यहाँ टाइप करें…')}"
+        onkeydown="if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') quizSubmit(${a})"></textarea>
+      <div class="qz-actions">
+        <button class="qz-btn qz-mic" type="button" onclick="quizToggleMic(${a})">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+          <span>${vaT('Answer out loud', 'बोलकर जवाब दें')}</span>
+        </button>
+        <span class="qz-timer"></span>
+        <span class="qz-space"></span>
+        <button class="qz-btn" type="button" onclick="quizNext(${a}, true)">${vaT('Skip', 'छोड़ें')}</button>
+        <button class="qz-btn primary qz-submit" type="button" onclick="quizSubmit(${a})">${vaT('Get feedback', 'फ़ीडबैक लें')}</button>
+      </div>
+      <div class="qz-feedback" hidden></div>
+    </div>`;
+  if (speak) quizSpeakQuestion(jobId);
+}
+
+function quizSpeakQuestion(jobId) {
+  const st = QZ[jobId];
+  if (!st || typeof speakResponse !== 'function') return;
+  const item = st.qs[st.order[st.pos]];
+  if (item) speakResponse(item.q);
+}
+
+// Dictation: the browser's own recognizer when it has one, otherwise record and transcribe on the server
+function quizToggleMic(jobId) {
+  const st = QZ[jobId];
+  if (!st) return;
+  if (st.listening) { quizStopMic(jobId); return; }
+  if (vaGet('localStorage', 'mic_consent_accepted') !== 'true') {
+    VA.afterConsent = () => quizToggleMic(jobId);
+    document.getElementById('mic-consent-modal').style.display = 'flex';
+    return;
+  }
+  stopSpeaking();
+  const box = qzEl(jobId)?.querySelector('.qz-answer');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const rec = new SR();
+    const base = box && box.value.trim() ? box.value.trim() + ' ' : '';
+    let finalText = '';
+    rec.lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) finalText += event.results[i][0].transcript + ' ';
+        else interim += event.results[i][0].transcript;
+      }
+      if (box) box.value = (base + finalText + interim).replace(/\s+/g, ' ').trimStart();
+    };
+    rec.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast(vaT('I need microphone access to hear you. You can allow it in your browser settings, or type instead.', 'आपको सुनने के लिए मुझे माइक्रोफ़ोन की अनुमति चाहिए। ब्राउज़र सेटिंग्स में अनुमति दें, या टाइप करें।'));
+      }
+    };
+    rec.onend = () => { if (st.rec === rec) { st.rec = null; quizMicUI(jobId, false); } };
+    st.rec = rec;
+    try { rec.start(); quizMicUI(jobId, true); } catch (e) { st.rec = null; }
+    return;
+  }
+  if (VA.serverVoice && navigator.mediaDevices && window.MediaRecorder) { quizRecord(jobId); return; }
+  toast(vaT("Voice isn't supported in this browser, but you can type your answer!", 'इस ब्राउज़र में आवाज़ काम नहीं करती, पर आप जवाब टाइप कर सकते हैं!'));
+  box?.focus();
+}
+
+async function quizRecord(jobId) {
+  const st = QZ[jobId];
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { toast(vaT('I need microphone access to hear you. You can allow it in your browser settings, or type instead.', 'आपको सुनने के लिए मुझे माइक्रोफ़ोन की अनुमति चाहिए। ब्राउज़र सेटिंग्स में अनुमति दें, या टाइप करें।')); return; }
+  const type = pickRecorderType();
+  const recorder = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+  const chunks = [];
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    if (st.recorder !== recorder) return;
+    st.recorder = null;
+    const blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
+    if (blob.size < 1500) return;
+    const box = qzEl(jobId)?.querySelector('.qz-answer');
+    const timer = qzEl(jobId)?.querySelector('.qz-timer');
+    if (timer) timer.textContent = vaT('Transcribing…', 'समझ रही हूँ…');
+    const form = new FormData();
+    form.append('file', blob, 'answer.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'));
+    form.append('lang', VA.lang);
+    try {
+      const data = await (await vaFetch('/api/voice/transcribe', { method: 'POST', body: form })).json();
+      if (data.ok && data.transcript && box) box.value = (box.value.trim() + ' ' + data.transcript).trim();
+      else if (data.error) toast(data.error);
+    } catch (e) { toast(vaT('I had trouble hearing that. Try again, or type it.', 'मुझे ठीक से सुनाई नहीं दिया। फिर कोशिश करें, या टाइप करें।')); }
+    if (timer) timer.textContent = '';
+  };
+  st.recorder = recorder;
+  recorder.start(250);
+  quizMicUI(jobId, true);
+  setTimeout(() => { if (st.recorder === recorder && recorder.state !== 'inactive') quizStopMic(jobId); }, 120000);
+}
+
+function quizMicUI(jobId, on) {
+  const st = QZ[jobId];
+  if (!st) return;
+  st.listening = on;
+  const el = qzEl(jobId);
+  const mic = el?.querySelector('.qz-mic');
+  const timer = el?.querySelector('.qz-timer');
+  mic?.classList.toggle('listening', on);
+  const label = mic?.querySelector('span');
+  if (label) label.textContent = on ? vaT('Stop', 'रोकें') : vaT('Answer out loud', 'बोलकर जवाब दें');
+  clearInterval(st.timer);
+  if (on) {
+    const started = Date.now();
+    const tick = () => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      if (timer) timer.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+    tick();
+    st.timer = setInterval(tick, 500);
+  } else if (timer && !st.recorder) {
+    timer.textContent = '';
+  }
+}
+
+function quizStopMic(jobId) {
+  const st = QZ[jobId];
+  if (!st) return;
+  if (st.rec) { const rec = st.rec; st.rec = null; try { rec.stop(); } catch (e) {} }
+  if (st.recorder && st.recorder.state !== 'inactive') st.recorder.stop();
+  if (st.listening) quizMicUI(jobId, false);
+}
+
+async function quizSubmit(jobId) {
+  const st = QZ[jobId];
+  const el = qzEl(jobId);
+  if (!st || !el) return;
+  quizStopMic(jobId);
+  const box = el.querySelector('.qz-answer');
+  const answer = (box?.value || '').trim();
+  if (!answer) {
+    toast(vaT('Give it a try first: talk or type your answer.', 'पहले कोशिश कीजिए: बोलकर या टाइप करके जवाब दें।'));
+    box?.focus();
+    return;
+  }
+  const idx = st.order[st.pos];
+  const item = st.qs[idx];
+  const fb = el.querySelector('.qz-feedback');
+  const submit = el.querySelector('.qz-submit');
+  if (submit) submit.disabled = true;
+  fb.hidden = false;
+  fb.innerHTML = `<div class="qz-thinking"><span class="va-typing"><span></span><span></span><span></span></span>${vaT('Sunny is listening back to your answer…', 'Sunny आपका जवाब सुन रही है…')}</div>`;
+  let res;
+  try {
+    res = await (await vaFetch(`/api/job/${encodeURIComponent(jobId)}/interview-prep/feedback`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: item.q, hints: item.hints, answer, lang: VA.lang }),
+    })).json();
+  } catch (e) {
+    res = { ok: false, error: vaT("I couldn't reach the server. Try again?", 'सर्वर से कनेक्ट नहीं हो पाया। फिर कोशिश करें?') };
+  }
+  if (submit) submit.disabled = false;
+  if (!res.ok) { fb.innerHTML = `<div class="qz-thinking">${esc(res.error || vaT('Something went wrong. Try again?', 'कुछ गड़बड़ हो गई। फिर कोशिश करें?'))}</div>`; return; }
+  st.results[idx] = { score: res.score, answer };
+  const a = qzArg(jobId);
+  const last = st.pos >= st.order.length - 1;
+  const list = (items) => `<ul class="qz-list">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  fb.innerHTML = `
+    <div class="qz-score">
+      <div class="qz-dots" aria-label="${res.score} / 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= res.score ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="qz-verdict">${esc(res.verdict)}</div>
+    </div>
+    ${res.strengths && res.strengths.length ? `<div><div class="qz-label">${vaT('What worked', 'क्या अच्छा रहा')}</div>${list(res.strengths)}</div>` : ''}
+    ${res.improve && res.improve.length ? `<div><div class="qz-label">${vaT('To sharpen', 'क्या सुधारें')}</div>${list(res.improve)}</div>` : ''}
+    ${res.better_answer ? `<div><div class="qz-label">${res.source === 'ai' ? vaT('A stronger answer', 'बेहतर जवाब') : vaT('What a strong answer covers', 'एक मज़बूत जवाब में क्या होता है')}</div><div class="qz-better">${esc(res.better_answer)}</div></div>` : ''}
+    <div class="qz-actions">
+      <button class="qz-btn" type="button" onclick="quizRetry(${a})">${vaT('Try again', 'फिर से कोशिश करें')}</button>
+      <span class="qz-space"></span>
+      <button class="qz-btn primary" type="button" onclick="quizNext(${a})">${last ? vaT('See how I did', 'मेरा नतीजा देखें') : vaT('Next question →', 'अगला सवाल →')}</button>
+    </div>`;
+  if (res.score >= 4) celebrateSunny();
+  const tip = res.improve && res.improve[0] ? ' ' + res.improve[0] : '';
+  speakResponse(res.verdict + tip);
+}
+
+function quizRetry(jobId) {
+  const el = qzEl(jobId);
+  const fb = el?.querySelector('.qz-feedback');
+  if (fb) { fb.hidden = true; fb.innerHTML = ''; }
+  const box = el?.querySelector('.qz-answer');
+  if (box) { box.value = ''; box.focus(); }
+}
+
+function quizNext(jobId) {
+  const st = QZ[jobId];
+  if (!st) return;
+  stopSpeaking();
+  if (st.pos >= st.order.length - 1) { renderPracticeSummary(jobId); return; }
+  st.pos++;
+  renderPracticeQuestion(jobId, true);
+}
+
+function endPractice(jobId) {
+  quizStopMic(jobId);
+  stopSpeaking();
+  const st = QZ[jobId];
+  if (st && Object.keys(st.results).length) renderPracticeSummary(jobId);
+  else renderPracticeIntro(jobId);
+}
+
+function renderPracticeSummary(jobId) {
+  const el = qzEl(jobId);
+  const st = QZ[jobId];
+  if (!el || !st) return;
+  quizStopMic(jobId);
+  const done = st.order.filter(i => st.results[i]);
+  const avg = done.length ? done.reduce((sum, i) => sum + st.results[i].score, 0) / done.length : 0;
+  const weak = st.order.filter(i => !st.results[i] || st.results[i].score <= 3);
+  const a = qzArg(jobId);
+  const headline = !done.length
+    ? vaT('No answers yet. Want to give it a go?', 'अभी तक कोई जवाब नहीं। एक बार कोशिश करें?')
+    : done.length < st.order.length / 2 ? vaT(`Nice start! You answered ${done.length} of ${st.order.length}. Want to try the rest?`, `अच्छी शुरुआत! आपने ${st.order.length} में से ${done.length} जवाब दिए। बाकी भी करें?`)
+    : avg >= 4 ? vaT("You're interview-ready on these. Nicely done!", 'इन सवालों के लिए आप इंटरव्यू के लिए तैयार हैं। बहुत बढ़िया!')
+    : avg >= 3 ? vaT('Good session! A little polish on the weaker ones and you are set.', 'अच्छा सेशन! कमज़ोर जवाबों पर थोड़ा काम और आप तैयार हैं।')
+    : vaT('Great practice. Let’s run the tricky ones again.', 'अच्छी प्रैक्टिस। मुश्किल वाले सवाल फिर से करते हैं।');
+  el.innerHTML = `
+    <div class="qz-card">
+      <div class="qz-top"><span class="qz-count">${vaT('Practice summary', 'प्रैक्टिस का सार')}</span></div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div class="qz-sunny" style="width:48px; height:48px;" aria-hidden="true">${vaMascot(true)}</div>
+        <div>
+          <div class="qz-big">${done.length ? avg.toFixed(1) + ' / 5' : '–'}</div>
+          <div class="qz-verdict">${headline}</div>
+        </div>
+      </div>
+      <div>${st.order.map((i, n) => `<div class="qz-sum-row"><span>${n + 1}. ${esc(st.qs[i].q)}</span><span class="qz-dots">${st.results[i]
+        ? [1, 2, 3, 4, 5].map(k => `<i class="${k <= st.results[i].score ? 'on' : ''}"></i>`).join('')
+        : `<span class="qz-count">${vaT('skipped', 'छोड़ा')}</span>`}</span></div>`).join('')}</div>
+      <div class="qz-actions">
+        <button class="qz-btn" type="button" onclick="startPractice(${a})">${vaT('Practice all again', 'सब फिर से करें')}</button>
+        <span class="qz-space"></span>
+        ${weak.length ? `<button class="qz-btn primary" type="button" onclick="startPractice(${a}, true)">${vaT(`Practice the ${weak.length} skipped or tricky one${weak.length === 1 ? '' : 's'}`, `छोड़े या मुश्किल ${weak.length} सवाल प्रैक्टिस करें`)}</button>` : ''}
+      </div>
+    </div>`;
+  if (done.length) {
+    speakResponse(headline);
+    if (avg >= 4) celebrateSunny();
   }
 }
 
