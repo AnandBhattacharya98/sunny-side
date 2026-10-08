@@ -72,6 +72,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 - **Safe changes**: Moves, archives, cover-letter rewrites, emails and refreshes always need a confirmation. A one-time token backs each confirmation, and it expires after two minutes. Job ids from the AI are checked against your own board.
 - **Speech providers**: Uses Gemini for speech-to-text and text-to-speech when a key is available, with your browser's Web Speech API as the fallback. API keys go in request headers and never appear in errors.
 - **Survives reloads**: The chat (kept per tab) and open panel come back after a board change reloads the page. Pronouns like "it" or "the first one" refer to the cards Sunny just showed.
+- **Speaks Hindi**: Tap **हिं** in Sunny's header, or just type or say something in Hindi. Sunny listens with Hindi speech recognition, replies in Hindi and understands Hinglish and company names written in Devanagari (स्विगी → Swiggy). Your choice is remembered in this browser.
 - **Limits**: Per-user rate limits, plus size caps on transcripts, chat history and audio uploads.
 - **Rich cards**: Pipeline stats, job cards and expandable emails inline.
 
