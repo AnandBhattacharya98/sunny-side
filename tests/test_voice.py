@@ -526,3 +526,22 @@ def test_dashboard_scripts_parse(tmp_path):
         path.write_text(js, encoding="utf-8")
         res = subprocess.run([node, "--check", str(path)], capture_output=True, text=True)
         assert res.returncode == 0, res.stderr
+
+
+def test_every_user_can_set_a_gemini_key_without_seeing_it(client):
+    from dashboard import encrypt_secret, SECRET_PLACEHOLDER
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET gemini_api_key = ?, resume_text = 'PM with payments experience' WHERE id = 101",
+                 (encrypt_secret("AIzaSy-test-secret-101"),))
+    conn.commit()
+    try:
+        res = client.get("/")
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '<input type="password" id="settings-gemini-key"' in html  # visible to a non-admin user
+        assert f'value="{SECRET_PLACEHOLDER}"' in html
+        assert "AIzaSy-test-secret-101" not in html
+    finally:
+        conn.execute("UPDATE users SET gemini_api_key = NULL WHERE id = 101")
+        conn.commit()
+        conn.close()

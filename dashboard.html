@@ -2235,17 +2235,15 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         </ol>
       </div>
       
-      {% if session.get('user_id') == 1 %}
+      <!-- Each user's own Gemini key: stored encrypted, shown back only as a mask -->
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API Key (Overrides .env)</label>
+        <label for="settings-gemini-key" style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Gemini API key</label>
         <div style="position:relative; display:flex; align-items:center;">
-          <input type="password" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="AIzaSy...">
+          <input type="password" id="settings-gemini-key" autocomplete="off" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}" style="padding:10px 40px 10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none; width:100%;" placeholder="AIzaSy...">
           <button type="button" onclick="togglePasswordVisibility('settings-gemini-key', this)" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:12px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:4px;">Show</button>
         </div>
+        <span style="font-size:11px; color:var(--mut); line-height:1.4;">Optional. Your own key powers AI scoring, cover letters, Sunny's natural voice and its translations. Get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--txt); text-decoration:underline;">aistudio.google.com/apikey</a>. It's stored encrypted and never shown again; clear the box to remove it.</span>
       </div>
-      {% else %}
-      <input type="hidden" id="settings-gemini-key" value="{{ (settings or {}).get('gemini_api_key', '') or '' }}">
-      {% endif %}
 
       <!-- Daily Recommendations Config -->
       <div style="border:1px solid var(--bdr); border-radius:12px; padding:12px; margin-top:4px;">
