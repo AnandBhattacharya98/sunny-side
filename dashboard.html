@@ -501,6 +501,11 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   display: flex; align-items: center; justify-content: center; }
 .va-icon-btn:hover { background: var(--sur2); color: var(--txt); }
 .va-icon-btn.off { opacity: 0.5; }
+.va-lang-switch, .qz-lang { display: inline-flex; border: 1.5px solid var(--bdr); border-radius: 999px; padding: 2px; gap: 2px; flex-shrink: 0; }
+.va-lang-switch button, .qz-lang button { border: none; background: none; color: var(--mut); font-size: 11px; font-weight: 600; padding: 3px 9px;
+  border-radius: 999px; cursor: pointer; font-family: inherit; line-height: 1.3; }
+.va-lang-switch button:hover, .qz-lang button:hover { color: var(--txt); }
+.va-lang-switch button.on, .qz-lang button.on { background: var(--yolk); color: #0D0C0A; }
 .va-icon-btn.warn { color: #D9480F; background: rgba(217,72,15,0.1); }
 
 .va-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--yolk); color: var(--ink);
@@ -2464,6 +2469,8 @@ const VA_STATE_KEY = 'va_state_v2:' + VA_UID;
 const VA_MAX_MESSAGES = 40;
 
 // Sunny speaks English or Hindi. The choice is per browser; the server answers in whatever we send.
+// The browser's English locale when it has a clean one (en-GB, en-IN…), otherwise en-US
+function vaEnLocale() { return /^en-[A-Za-z]{2}$/.test(navigator.language || '') ? navigator.language : 'en-US'; }
 function vaT(en, hi) { return VA.lang === 'hi' ? hi : en; }
 function vaInitialLang() {
   const saved = vaGet('localStorage', 'va_lang');
@@ -2577,12 +2584,11 @@ function loadAssistantWelcome(first) {
 // Static panel text in the current language
 function applyAssistantLang() {
   const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
-  set('va-lang-toggle', VA.lang === 'hi' ? 'EN' : 'हिं');
-  const toggle = document.getElementById('va-lang-toggle');
-  if (toggle) {
-    toggle.title = vaT('हिंदी में बात करें (Talk in Hindi)', 'Talk in English');
-    toggle.setAttribute('aria-label', toggle.title);
-  }
+  document.querySelectorAll('.va-lang-switch button, .qz-lang button').forEach(b => {
+    const on = b.dataset.lang === VA.lang;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+  });
   set('va-big-mic-label', vaT('Tap me to talk', 'बात करने के लिए मुझे टैप करें'));
   set('va-starter-text', vaT("Your job-search buddy. Tap Sunny above and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.",
                              'मैं आपकी जॉब-सर्च दोस्त हूँ। ऊपर Sunny को टैप करें और दोस्त की तरह पूछें। मैं आपके सबसे अच्छे मैच ढूँढ सकती हूँ, स्कोर समझा सकती हूँ और जॉब्स को आगे बढ़ा सकती हूँ।'));
@@ -2596,15 +2602,24 @@ function applyAssistantLang() {
   document.getElementById('va-hint-bubble')?.setAttribute('lang', VA.lang);
 }
 
-function toggleAssistantLang() {
-  VA.lang = VA.lang === 'hi' ? 'en' : 'hi';
+function toggleAssistantLang() { setAssistantLang(VA.lang === 'hi' ? 'en' : 'hi'); }
+
+// One language for all of Sunny: the chat, the quiz and what Sunny listens for.
+// quiet: switch without Sunny announcing it in the chat (used by Quiz Mode's own switch).
+function setAssistantLang(lang, quiet) {
+  if (lang !== 'en' && lang !== 'hi') return;
+  if (lang === VA.lang) { applyAssistantLang(); return; }
+  VA.lang = lang;
   vaSet('localStorage', 'va_lang', VA.lang);
   stopSpeaking();
   cancelListening();
   applyAssistantLang();
   loadAssistantWelcome(false);
-  addAssistantNote(vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।'));
-  speakResponse(vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।'));
+  if (typeof quizRefreshLang === 'function') Object.keys(QZ).forEach(quizRefreshLang);
+  const note = vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।');
+  if (quiet) { toast(note); return; }
+  addAssistantNote(note);
+  speakResponse(note);
 }
 
 function setDigestBadge(count) {
@@ -2991,7 +3006,7 @@ function startBrowserRecognition(SpeechRecognition) {
   VA.mode = 'browser';
   const rec = new SpeechRecognition();
   VA.recognition = rec;
-  rec.lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
+  rec.lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
   rec.interimResults = true;
   rec.continuous = false;
   rec.maxAlternatives = 1;
@@ -3364,7 +3379,7 @@ function vaChunks(text) {
 async function speakWithBrowser(text, done, token, avoid) {
   if (!('speechSynthesis' in window)) { vaSoundProblem(); done(); return; }
   const synth = window.speechSynthesis;
-  const lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
+  const lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
   const voices = await vaVoicesReady();
   if (token !== undefined && token !== VA.speakToken) return;
   const voice = pickBrowserVoice(voices, lang, avoid);
@@ -5087,6 +5102,8 @@ function renderPracticeIntro(jobId) {
   const st = QZ[jobId];
   if (!el || !st) return;
   if (!st.qs.length) { el.innerHTML = ''; return; }
+  st.view = 'intro';
+  const a = qzArg(jobId);
   el.innerHTML = `
     <div class="qz-intro">
       <div class="qz-sunny" aria-hidden="true">${vaMascot(true)}</div>
@@ -5095,8 +5112,33 @@ function renderPracticeIntro(jobId) {
         <p>${vaT(`I'll ask you ${st.qs.length} questions, one at a time. Answer by talking or typing, and I'll tell you what landed and what to sharpen.`,
                   `मैं आपसे एक-एक करके ${st.qs.length} सवाल पूछूँगी। बोलकर या टाइप करके जवाब दें, और मैं बताऊँगी क्या अच्छा रहा और क्या सुधारें।`)}</p>
       </div>
-      <button class="qz-btn primary" type="button" onclick="startPractice(${qzArg(jobId)})">${vaT('Start practice', 'प्रैक्टिस शुरू करें')}</button>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+        <div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div>
+        <button class="qz-btn primary" type="button" onclick="startPractice(${a})">${vaT('Start practice', 'प्रैक्टिस शुरू करें')}</button>
+      </div>
     </div>`;
+}
+
+// The quiz's own EN | हिं switch. It changes Sunny's language everywhere, then redraws the
+// current step in place: your typed answer stays, and the mic restarts in the new language.
+function quizSetLang(jobId, lang) {
+  if (lang === VA.lang) return;
+  setAssistantLang(lang, true);
+}
+
+function quizRefreshLang(jobId) {
+  const st = QZ[jobId];
+  const el = qzEl(jobId);
+  if (!st || !el || !el.innerHTML) return;
+  if (st.view === 'intro') { renderPracticeIntro(jobId); return; }
+  if (st.view === 'summary') { renderPracticeSummary(jobId); return; }
+  if (st.view !== 'question') return;
+  const wasListening = st.listening && st.mode === 'answer';
+  const draft = el.querySelector('.qz-answer')?.value || '';
+  renderPracticeQuestion(jobId, false);
+  const box = qzEl(jobId)?.querySelector('.qz-answer');
+  if (box) box.value = draft;
+  if (wasListening) quizListen(jobId, 'answer', false);
 }
 
 function startPractice(jobId, onlyWeak) {
@@ -5122,12 +5164,14 @@ function renderPracticeQuestion(jobId, speak) {
   const item = st.qs[idx];
   const pct = Math.round((st.pos / st.order.length) * 100);
   const a = qzArg(jobId);
+  st.view = 'question';
   el.innerHTML = `
     <div class="qz-card">
       <div class="qz-top">
         <span class="qz-count">${vaT('Question', 'सवाल')} ${st.pos + 1} / ${st.order.length}</span>
         <span class="qz-kind">${item.kind === 'quick' ? vaT('Quick-fire', 'क्विक-फ़ायर') : vaT('Deep dive', 'गहराई से')}</span>
         <span class="qz-space"></span>
+        <div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div>
         ${QZ_SR ? `<button class="qz-hf${quizHandsFree() ? ' on' : ''}" type="button" aria-pressed="${quizHandsFree()}" onclick="quizToggleHandsFree(${a})"
           title="${vaT('Hands-free: the mic opens after each question, and you can say next, repeat, try again or stop', 'हैंड्स-फ़्री: हर सवाल के बाद माइक खुद खुलेगा')}">${vaT('Hands-free', 'हैंड्स-फ़्री')}</button>` : ''}
         <button class="qz-icon" type="button" title="${vaT('Read the question again', 'सवाल फिर से सुनें')}" aria-label="${vaT('Read the question again', 'सवाल फिर से सुनें')}" onclick="quizSpeakQuestion(${a})">
@@ -5228,7 +5272,7 @@ function quizListen(jobId, mode, auto) {
   let finalText = '';
   let pauseTimer = null;
   const finish = (fn) => { clearTimeout(pauseTimer); quizStopMic(jobId); fn && fn(); };
-  rec.lang = VA.lang === 'hi' ? 'hi-IN' : (navigator.language && navigator.language.startsWith('en') ? navigator.language : 'en-US');
+  rec.lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
   rec.continuous = true;
   rec.interimResults = true;
   rec.onresult = (event) => {
@@ -5428,6 +5472,7 @@ function renderPracticeSummary(jobId) {
   const el = qzEl(jobId);
   const st = QZ[jobId];
   if (!el || !st) return;
+  st.view = 'summary';
   quizStopMic(jobId);
   const done = st.order.filter(i => st.results[i]);
   const avg = done.length ? done.reduce((sum, i) => sum + st.results[i].score, 0) / done.length : 0;
@@ -5441,7 +5486,7 @@ function renderPracticeSummary(jobId) {
     : vaT('Great practice. Let’s run the tricky ones again.', 'अच्छी प्रैक्टिस। मुश्किल वाले सवाल फिर से करते हैं।');
   el.innerHTML = `
     <div class="qz-card">
-      <div class="qz-top"><span class="qz-count">${vaT('Practice summary', 'प्रैक्टिस का सार')}</span></div>
+      <div class="qz-top"><span class="qz-count">${vaT('Practice summary', 'प्रैक्टिस का सार')}</span><span class="qz-space"></span><div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div></div>
       <div style="display:flex; align-items:center; gap:14px;">
         <div class="qz-sunny" style="width:48px; height:48px;" aria-hidden="true">${vaMascot(true)}</div>
         <div>
@@ -5701,7 +5746,10 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 4px;">
-      <button id="va-lang-toggle" class="va-icon-btn va-lang" type="button" onclick="toggleAssistantLang()" title="हिंदी में बात करें (Talk in Hindi)" aria-label="हिंदी में बात करें (Talk in Hindi)">हिं</button>
+      <div class="va-lang-switch" role="group" aria-label="Language / भाषा">
+        <button type="button" data-lang="en" onclick="setAssistantLang('en')" title="Talk in English">EN</button>
+        <button type="button" data-lang="hi" onclick="setAssistantLang('hi')" title="हिंदी में बात करें">हिं</button>
+      </div>
       <button id="voice-synthesis-toggle" class="va-icon-btn" type="button" onclick="toggleVoiceSpeech()" title="Read replies out loud" aria-label="Read replies out loud">
         <svg id="voice-synthesis-speaker-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
       </button>
