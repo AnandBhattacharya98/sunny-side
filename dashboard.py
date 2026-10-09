@@ -1,5 +1,6 @@
 import os, re, json, sqlite3, hmac, secrets, threading, time, base64
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
 from werkzeug.middleware.proxy_fix import ProxyFix
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
@@ -62,6 +63,37 @@ def csrf_token() -> str:
         tok = secrets.token_urlsafe(32)
         session["csrf_token"] = tok
     return tok
+
+
+def _server_dt(value):
+    """Parse a stored timestamp. They are written with datetime.now(), so a naive value is server-local time."""
+    if not value:
+        return None
+    try:
+        dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return dt.astimezone() if dt.tzinfo is None else dt
+
+
+def utc_iso(value):
+    """A stored timestamp as UTC ISO ("...Z"), so the browser can show it in the viewer's own timezone."""
+    dt = _server_dt(value)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if dt else ""
+
+
+app.jinja_env.filters["utc_iso"] = utc_iso
+
+
+def _viewer_tz():
+    """The viewer's IANA timezone, sent by the dashboard as X-Timezone. None if missing or unknown."""
+    name = (request.headers.get("X-Timezone") or "").strip()
+    if not name:
+        return None
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
 
 
 @app.context_processor
@@ -866,6 +898,7 @@ def _stats(conn):
     return {"total": total, "by_status": by_status,
             "avg_score": round(avg, 1) if avg else 0,
             "last_updated": last_updated_str,
+            "last_updated_iso": utc_iso(last_updated),
             "email_count": email_count}
 
 
@@ -1996,7 +2029,7 @@ def _answer_voice_intent(conn, uid, settings, res, snapshot):
 
     if intent == "last_sync":
         row = conn.execute("SELECT last_scraped_at FROM users WHERE id = ?", (uid,)).fetchone()
-        when = _spoken_time(row[0], lang) if row and row[0] else None
+        when = _spoken_time(row[0], lang, _viewer_tz()) if row and row[0] else None
         text = (_t(f"I last refreshed your board {when}.", f"आपका बोर्ड आखिरी बार {when} रिफ्रेश हुआ था।") if when
                 else _t("Your board hasn't been refreshed yet. Want me to do it now?", "आपका बोर्ड अभी तक रिफ्रेश नहीं हुआ है। अभी कर दूँ?"))
         return _voice_reply(intent, text, suggestions=follow)
@@ -2332,12 +2365,13 @@ def _voice_card(job):
             "score": job["score"], "status": job["status"], "location": job["location"]}
 
 
-def _spoken_time(value, lang="en"):
-    try:
-        dt = datetime.fromisoformat(str(value).split(".")[0])
-    except ValueError:
+def _spoken_time(value, lang="en", tz=None):
+    """Say when a stored timestamp happened, in the viewer's timezone (tz) or the server's if unknown."""
+    dt = _server_dt(value)
+    if dt is None:
         return None
-    days = (datetime.now().date() - dt.date()).days
+    dt = dt.astimezone(tz)
+    days = (datetime.now(dt.tzinfo).date() - dt.date()).days
     clock = dt.strftime("%I:%M %p").lstrip("0")
     if lang == "hi":
         day = "आज" if days == 0 else "कल" if days == 1 else dt.strftime("%d %b")

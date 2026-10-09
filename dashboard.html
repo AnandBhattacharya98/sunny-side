@@ -5,18 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <script>
-// Send the CSRF token with every same-origin request that changes data.
+// Send the CSRF token with every same-origin request that changes data, and the viewer's timezone with all of them.
 (function(){
   var token = document.querySelector('meta[name="csrf-token"]').content;
+  var viewerTz = '';
+  try { viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
   var origFetch = window.fetch;
   window.fetch = function(input, init){
     init = init || {};
     var method = (init.method || (input && input.method) || 'GET').toUpperCase();
     var url = typeof input === 'string' ? input : (input && input.url) || '';
     var sameOrigin = url.indexOf('://') === -1 || url.indexOf(location.origin + '/') === 0;
-    if (sameOrigin && ['GET','HEAD','OPTIONS'].indexOf(method) === -1) {
+    if (sameOrigin) {
       var headers = new Headers(init.headers || (input && input.headers) || {});
-      headers.set('X-CSRF-Token', token);
+      // Lets the server phrase times (e.g. Sunny's "last refreshed") in the viewer's timezone.
+      if (viewerTz) headers.set('X-Timezone', viewerTz);
+      if (['GET','HEAD','OPTIONS'].indexOf(method) === -1) headers.set('X-CSRF-Token', token);
       init.headers = headers;
     }
     return origFetch.call(this, input, init);
@@ -1497,7 +1501,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 
   <div class="sidebar-footer" style="padding: 16px;">
     <div style="margin-bottom:12px;font-size:12px;color:var(--txt)">
-      Last Scraped:<br><strong>{{ stats.last_updated }}</strong>
+      Last Scraped:<br><strong><time class="local-time" data-fmt="datetime" datetime="{{ stats.last_updated_iso }}">{{ stats.last_updated }}</time></strong>
     </div>
     <button class="btn btn-p" style="width:100%;margin-bottom:12px;color:#0D0C0A;border:none;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;" onclick="openWhatsappModal()">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg> Self Import
@@ -1714,7 +1718,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;">
               <span class="jc" style="font-size:10px;line-height:1.2;">{{ job.location }}</span>
               <span class="jc" style="font-size:9px;color:var(--hin);margin-top:2px;">
-                {{ (job.posted_at or job.scraped_at[:10]) if (job.posted_at or job.scraped_at) else '' }}
+                {% if job.posted_at %}{{ job.posted_at }}{% elif job.scraped_at %}<time class="local-time" data-fmt="ymd" datetime="{{ job.scraped_at|utc_iso }}">{{ job.scraped_at[:10] }}</time>{% endif %}
               </span>
             </div>
           </div>
@@ -1763,7 +1767,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
             <span class="mcard-time" style="font-size:11px;white-space:nowrap;color:var(--hin);">
-              {{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}
+              <time class="local-time" data-fmt="ymd-hm" datetime="{{ mail.received_at|utc_iso }}">{{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}</time>
             </span>
             <span class="toggle-icon" style="font-size:10px;color:var(--hin);">▼</span>
           </div>
@@ -1834,7 +1838,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
                 {% endif %}
               </td>
               <td style="padding:10px 4px; color:var(--mut);">
-                {{ u.created_at[:10] if u.created_at else 'Legacy' }}
+                {% if u.created_at %}<time class="local-time" data-fmt="ymd" datetime="{{ u.created_at|utc_iso }}">{{ u.created_at[:10] }}</time>{% else %}Legacy{% endif %}
               </td>
               <td style="padding:10px 4px; text-align:center; font-weight:600; color:var(--pur);">
                 {{ u.job_count }}
@@ -1966,7 +1970,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
                     <div class="mcard-subject">Subject: {{ mail.subject }}</div>
                   </div>
                   <div class="mcard-time">
-                    {{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}
+                    <time class="local-time" data-fmt="ymd-hm" datetime="{{ mail.received_at|utc_iso }}">{{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}</time>
                   </div>
                 </div>
                 <div class="mcard-body">{{ mail.body }}</div>
@@ -2014,7 +2018,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             <span class="lbl">Timeline</span>
             {% if job.timeline %}
               {% for t in job.timeline %}
-              <div class="tl-item">{{ t.event }} <span style="opacity:.6">— {{ t.created_at[:10] }}</span></div>
+              <div class="tl-item">{{ t.event }} <span style="opacity:.6">— <time class="local-time" data-fmt="ymd" datetime="{{ t.created_at|utc_iso }}">{{ t.created_at[:10] }}</time></span></div>
               {% endfor %}
             {% else %}
               <div style="font-size:12px;color:var(--mut)">No events logged.</div>
@@ -3595,6 +3599,22 @@ function clearAssistantChat() {
 document.addEventListener('DOMContentLoaded', () => {
   initVoiceAssistant();
 });
+
+// Timestamps are rendered by the server as UTC (<time datetime="...Z">); show them in the viewer's own timezone.
+function formatLocalTimes(root) {
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  (root || document).querySelectorAll('time.local-time[datetime]').forEach(el => {
+    const d = new Date(el.getAttribute('datetime'));
+    if (isNaN(d)) return;
+    const fmt = el.dataset.fmt;
+    if (fmt === 'ymd') el.textContent = ymd(d);
+    else if (fmt === 'ymd-hm') el.textContent = `${ymd(d)} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    else el.textContent = d.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    el.title = d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  });
+}
+document.addEventListener('DOMContentLoaded', () => formatLocalTimes());
 
 // WhatsApp Modal Controls
 function openWhatsappModal() {
