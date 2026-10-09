@@ -1854,9 +1854,13 @@ def voice_query():
         settings = get_user_settings(conn, uid)
         snapshot = _voice_jobs_snapshot(conn, uid)
         context_ids = ve.sanitize_job_ids(d.get("context_job_ids"), snapshot)
-        res = ve.classify_intent_and_slot(transcript, snapshot, chat_history=history,
+        # Languages without hand-written rules are read through an English translation
+        understood = transcript
+        if g.voice_lang not in ve.HAND_WRITTEN_LANGS:
+            understood = ve.translate_texts([transcript], "en", _voice_api_key(conn, uid))[0] or transcript
+        res = ve.classify_intent_and_slot(understood, snapshot, chat_history=history,
                                           api_key=settings.get("gemini_api_key"), context_job_ids=context_ids)
-        res = _merge_voice_followup(res, session.pop("voice_awaiting", None), transcript, snapshot)
+        res = _merge_voice_followup(res, session.pop("voice_awaiting", None), understood, snapshot)
         return jsonify(_answer_voice_intent(conn, uid, settings, res, snapshot))
     except Exception:
         app.logger.exception("Voice query failed for user %s", uid)
@@ -2277,7 +2281,7 @@ def voice_welcome():
     """Everything the assistant panel needs when it opens: a greeting, starter chips from the
     user's own board, the unread digest count, and whether server-side speech is available."""
     uid = get_user_id()
-    lang = ve.reply_lang(request.args.get("lang"))
+    lang = g.voice_lang = ve.reply_lang(request.args.get("lang"))
     conn = get_conn(DB_PATH)
     try:
         settings = get_user_settings(conn, uid)
@@ -2381,6 +2385,71 @@ def _spoken_time(value, lang="en", tz=None):
     if days == 1:
         return f"yesterday at {clock}"
     return f"on {dt.strftime('%b %d')} at {clock}"
+
+
+# Replies are written in English and Hindi. For any other language Sunny supports, the JSON
+# a voice or quiz route returns is translated on its way out, in one Gemini call.
+_TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer")
+_TRANSLATED_LISTS = ("suggestions", "strengths", "improve")
+
+
+@app.after_request
+def _translate_voice_reply(response):
+    lang = getattr(g, "voice_lang", "en")
+    if lang in ve.HAND_WRITTEN_LANGS or not response.is_json:
+        return response
+    if not (request.path.startswith("/api/voice/") or request.path.endswith("/interview-prep/feedback")):
+        return response
+    data = response.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("source") == "ai":  # Gemini already wrote feedback in that language
+        return response
+    slots = []
+    for key in _TRANSLATED_FIELDS:
+        if isinstance(data.get(key), str) and data[key].strip():
+            slots.append((key, None))
+    for key in _TRANSLATED_LISTS:
+        if isinstance(data.get(key), list):
+            slots.extend((key, i) for i, v in enumerate(data[key]) if isinstance(v, str) and v.strip())
+    if not slots:
+        return response
+    uid = session.get("user_id")
+    conn = get_conn(DB_PATH)
+    try:
+        api_key = _voice_api_key(conn, uid) if uid else None
+    finally:
+        conn.close()
+    texts = [data[k] if i is None else data[k][i] for k, i in slots]
+    translated = ve.translate_texts(texts, lang, api_key)
+    for (k, i), text in zip(slots, translated):
+        if i is None:
+            data[k] = text
+        else:
+            data[k][i] = text
+    data["translated"] = translated != texts
+    response.set_data(json.dumps(data, ensure_ascii=False))
+    return response
+
+
+@app.route("/api/voice/translate", methods=["POST"])
+def voice_translate():
+    """Translates Sunny's on-screen wording (and quiz questions) for languages without hand-written text."""
+    uid = get_user_id()
+    limited = _voice_rate_limited(uid, "translate", 20)
+    if limited:
+        return limited
+    d = request.get_json(silent=True) or {}
+    lang = d.get("lang")
+    texts = d.get("texts")
+    if lang not in ve.LANGS or not isinstance(texts, list):
+        return jsonify({"ok": False, "error": "Unsupported language"}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        api_key = _voice_api_key(conn, uid)
+    finally:
+        conn.close()
+    out = ve.translate_texts(texts, lang, api_key)
+    # Not g.voice_lang: this route's own output must not be translated again on the way out
+    return jsonify({"ok": True, "lang": lang, "texts": out, "translated": bool(api_key)})
 
 
 def _t(en, hi):

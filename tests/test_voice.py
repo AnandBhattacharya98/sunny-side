@@ -342,7 +342,10 @@ def test_reply_language_follows_the_user():
     assert ve.reply_lang("hi", "hello") == "hi"
     assert ve.reply_lang(None, "स्विगी के बारे में बताओ") == "hi"
     assert ve.reply_lang("en", "hello") == "en"
-    assert ve.reply_lang("fr", "hello") == "en"
+    assert ve.reply_lang("fr", "hello") == "fr"
+    assert ve.reply_lang("xx", "hello") == "en"
+    assert ve.reply_lang("en", "ஸ்விகி வேலை") == "ta"
+    assert ve.reply_lang("mr", "मला स्विगी") == "mr"
 
 
 def test_hindi_welcome_and_replies(client):
@@ -449,3 +452,77 @@ def test_tts_quota_backs_off(monkeypatch):
         ve.synthesize_speech("second line", "quota-key")
     assert len(calls) == 1  # the second reply doesn't wait on Gemini
     ve._tts_cooldown.clear()
+
+
+# ── More languages, translated with Gemini ────────────────────────────────
+
+def _fake_translator(calls):
+    def fake(api_key, parts, **kw):
+        prompt = parts[0]["text"]
+        calls.append(prompt)
+        src = json.loads(prompt[prompt.index("["):])
+        return {"candidates": [{"content": {"parts": [{"text": json.dumps(["«" + s + "»" for s in src])}]}}]}
+    return fake
+
+
+import json  # noqa: E402
+
+
+def test_translate_texts_caches_and_keeps_markup_safe(monkeypatch):
+    calls = []
+    monkeypatch.setattr(ve, "gemini_generate", _fake_translator(calls))
+    ve._translate_cache.clear()
+    assert ve.translate_texts(["Hello", ""], "ta", "k") == ["«Hello»", ""]
+    assert ve.translate_texts(["Hello"], "ta", "k") == ["«Hello»"] and len(calls) == 1
+    assert ve.translate_texts(["Hi"], "ta", None) == ["Hi"]  # no key: original text
+    assert ve.translate_texts(["Hi"], "xx", "k") == ["Hi"]
+
+    def adds_markup(api_key, parts, **kw):
+        return {"candidates": [{"content": {"parts": [{"text": '["<img src=x onerror=alert(1)>Hola"]'}]}}]}
+    monkeypatch.setattr(ve, "gemini_generate", adds_markup)
+    assert ve.translate_texts(["Bye"], "es", "k") == ["Bye"]
+    ve._translate_cache.clear()
+
+
+def test_replies_are_translated_for_other_languages(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(ve, "gemini_generate", _fake_translator(calls))
+    monkeypatch.setattr(dashboard, "_voice_api_key", lambda conn, uid: "k")
+    ve._translate_cache.clear()
+    data = ask(client, "«how's my pipeline»", lang="es")
+    assert data["lang"] == "es" and data["translated"]
+    assert data["reply_text"].startswith("«") and all(s.startswith("«") for s in data["suggestions"])
+    assert data["reply_cards"][0]["total"] == 4  # the request was understood through its English version
+    welcome = client.get("/api/voice/welcome?lang=ta").get_json()
+    assert welcome["greeting"].startswith("«")
+    ve._translate_cache.clear()
+
+
+def test_translate_route(client, monkeypatch):
+    monkeypatch.setattr(ve, "gemini_generate", _fake_translator([]))
+    monkeypatch.setattr(dashboard, "_voice_api_key", lambda conn, uid: "k")
+    ve._translate_cache.clear()
+    res = client.post("/api/voice/translate", json={"lang": "de", "texts": ["Start practice"]}).get_json()
+    assert res["texts"] == ["«Start practice»"]
+    assert client.post("/api/voice/translate", json={"lang": "zz", "texts": ["x"]}).status_code == 400
+    ve._translate_cache.clear()
+
+
+def test_dashboard_scripts_parse(tmp_path):
+    """A single syntax error in the page's inline JavaScript silently disables Sunny and the whole board."""
+    import pathlib
+    import re
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    html = (pathlib.Path(__file__).resolve().parent.parent / "dashboard.html").read_text(encoding="utf-8")
+    scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
+    assert scripts
+    for i, js in enumerate(scripts):
+        js = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", "0", js)  # Jinja placeholders
+        path = tmp_path / f"script{i}.js"
+        path.write_text(js, encoding="utf-8")
+        res = subprocess.run([node, "--check", str(path)], capture_output=True, text=True)
+        assert res.returncode == 0, res.stderr

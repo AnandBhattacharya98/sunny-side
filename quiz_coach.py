@@ -36,7 +36,7 @@ def grade_answer(question: str, hints: str, answer: str, title: str = "", compan
 
 
 def _gemini_grade(question, hints, answer, title, company, api_key, lang) -> dict:
-    language = "Hindi (Devanagari script)" if lang == "hi" else "English"
+    language = "Hindi (Devanagari script)" if lang == "hi" else ve.LANG_NAMES.get(lang, "English")
     prompt = f"""You are a warm, honest interview coach. A candidate is practising for a {title or 'job'} interview at {company or 'a company'}.
 Grade their answer to the question below on a 1-5 scale (1 = off-topic or empty, 3 = decent but generic, 5 = specific, structured, with measurable results).
 Be encouraging but concrete. Write everything in {language}, speaking to the candidate as "you".

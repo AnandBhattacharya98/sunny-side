@@ -501,11 +501,12 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   display: flex; align-items: center; justify-content: center; }
 .va-icon-btn:hover { background: var(--sur2); color: var(--txt); }
 .va-icon-btn.off { opacity: 0.5; }
-.va-lang-switch, .qz-lang { display: inline-flex; border: 1.5px solid var(--bdr); border-radius: 999px; padding: 2px; gap: 2px; flex-shrink: 0; }
-.va-lang-switch button, .qz-lang button { border: none; background: none; color: var(--mut); font-size: 11px; font-weight: 600; padding: 3px 9px;
-  border-radius: 999px; cursor: pointer; font-family: inherit; line-height: 1.3; }
-.va-lang-switch button:hover, .qz-lang button:hover { color: var(--txt); }
-.va-lang-switch button.on, .qz-lang button.on { background: var(--yolk); color: #0D0C0A; }
+.va-lang-select { appearance: none; -webkit-appearance: none; border: 1.5px solid var(--bdr); border-radius: 999px; background-color: var(--sur);
+  color: var(--txt); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 4px 24px 4px 10px; cursor: pointer; max-width: 128px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; flex-shrink: 0; }
+.va-lang-select:hover, .va-lang-select:focus { border-color: var(--yolk); outline: none; }
+[dir="rtl"] .va-lang-select { padding: 4px 10px 4px 24px; background-position: left 8px center; }
 .va-icon-btn.warn { color: #D9480F; background: rgba(217,72,15,0.1); }
 
 .va-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--yolk); color: var(--ink);
@@ -2468,14 +2469,107 @@ const VA_UID = document.body.dataset.uid || '';
 const VA_STATE_KEY = 'va_state_v2:' + VA_UID;
 const VA_MAX_MESSAGES = 40;
 
-// Sunny speaks English or Hindi. The choice is per browser; the server answers in whatever we send.
+// The languages Sunny speaks. English and Hindi wording is written by hand; the rest is
+// translated from the English by the server (Gemini) and cached in this browser. Adding a
+// language means one line here and one in voice_engine.LANG_NAMES.
+const VA_LANGS = [
+  { code: 'en', name: 'English', short: 'EN', locale: '' },
+  { code: 'hi', en: 'Hindi', name: 'हिन्दी', short: 'हिं', locale: 'hi-IN' },
+  { code: 'ta', en: 'Tamil', name: 'தமிழ்', short: 'த', locale: 'ta-IN' },
+  { code: 'te', en: 'Telugu', name: 'తెలుగు', short: 'తె', locale: 'te-IN' },
+  { code: 'bn', en: 'Bengali', name: 'বাংলা', short: 'বা', locale: 'bn-IN' },
+  { code: 'mr', en: 'Marathi', name: 'मराठी', short: 'म', locale: 'mr-IN' },
+  { code: 'kn', en: 'Kannada', name: 'ಕನ್ನಡ', short: 'ಕ', locale: 'kn-IN' },
+  { code: 'es', en: 'Spanish', name: 'Español', short: 'ES', locale: 'es-ES' },
+  { code: 'fr', en: 'French', name: 'Français', short: 'FR', locale: 'fr-FR' },
+  { code: 'de', en: 'German', name: 'Deutsch', short: 'DE', locale: 'de-DE' },
+  { code: 'ar', en: 'Arabic', name: 'العربية', short: 'ع', locale: 'ar-SA', rtl: true },
+];
+function vaLangInfo(code) { return VA_LANGS.find(l => l.code === (code || VA.lang)) || VA_LANGS[0]; }
 // The browser's English locale when it has a clean one (en-GB, en-IN…), otherwise en-US
 function vaEnLocale() { return /^en-[A-Za-z]{2}$/.test(navigator.language || '') ? navigator.language : 'en-US'; }
-function vaT(en, hi) { return VA.lang === 'hi' ? hi : en; }
+function vaLocale() { return VA.lang === 'en' ? vaEnLocale() : vaLangInfo().locale; }
 function vaInitialLang() {
   const saved = vaGet('localStorage', 'va_lang');
-  if (saved === 'hi' || saved === 'en') return saved;
-  return (navigator.language || '').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+  if (VA_LANGS.some(l => l.code === saved)) return saved;
+  const base = (navigator.language || '').toLowerCase().slice(0, 2);
+  return VA_LANGS.some(l => l.code === base) ? base : 'en';
+}
+
+// Wording in the current language: hand-written for English and Hindi, translated for the rest.
+function vaT(en, hi) {
+  if (VA.lang === 'en') return en;
+  if (VA.lang === 'hi') return hi;
+  return vaTr(en);
+}
+
+// Translations arrive in the background. Until then the English shows, and the panel and quiz
+// redraw once they land. Each string is asked for once per language and remembered locally.
+const VA_TR = {};
+const VA_TR_ASKED = new Set();
+const VA_TR_QUEUE = new Set();
+let VA_TR_TIMER = null;
+function vaTrDict(lang) {
+  if (!VA_TR[lang]) {
+    try { VA_TR[lang] = JSON.parse(vaGet('localStorage', 'va_tr_' + lang) || '{}') || {}; } catch (e) { VA_TR[lang] = {}; }
+  }
+  return VA_TR[lang];
+}
+function vaTr(text) {
+  if (!text || VA.lang === 'en') return text;
+  const dict = vaTrDict(VA.lang);
+  if (Object.prototype.hasOwnProperty.call(dict, text)) return dict[text];
+  const key = VA.lang + '|' + text;
+  if (!VA_TR_ASKED.has(key) && VA_TR_ASKED.size < 3000) {
+    VA_TR_ASKED.add(key);
+    VA_TR_QUEUE.add(text);
+    clearTimeout(VA_TR_TIMER);
+    VA_TR_TIMER = setTimeout(vaFlushTranslations, 80);
+  }
+  return text;
+}
+function vaSaveTr(lang) {
+  const json = JSON.stringify(vaTrDict(lang));
+  if (json.length > 300000) { VA_TR[lang] = {}; vaRemove('localStorage', 'va_tr_' + lang); return; }
+  vaSet('localStorage', 'va_tr_' + lang, json);
+}
+async function vaTranslate(texts, lang) {
+  lang = lang || VA.lang;
+  if (lang === 'en' || !texts.length) return texts;
+  const dict = vaTrDict(lang);
+  const missing = [...new Set(texts.filter(t => t && !Object.prototype.hasOwnProperty.call(dict, t)))].slice(0, 60);
+  if (missing.length) {
+    try {
+      const res = await (await vaFetch('/api/voice/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lang, texts: missing }) })).json();
+      if (res.ok && res.translated && Array.isArray(res.texts)) {
+        missing.forEach((src, i) => { if (res.texts[i] && res.texts[i] !== src) dict[src] = res.texts[i]; });
+        vaSaveTr(lang);
+      }
+    } catch (e) { /* keep the English */ }
+  }
+  return texts.map(t => (t && Object.prototype.hasOwnProperty.call(dict, t)) ? dict[t] : t);
+}
+async function vaFlushTranslations() {
+  const lang = VA.lang;
+  const batch = [...VA_TR_QUEUE].slice(0, 60);
+  batch.forEach(t => VA_TR_QUEUE.delete(t));
+  if (VA_TR_QUEUE.size) VA_TR_TIMER = setTimeout(vaFlushTranslations, 400);
+  if (lang === 'en' || lang === 'hi' || !batch.length) return;
+  const before = Object.keys(vaTrDict(lang)).length;
+  await vaTranslate(batch, lang);
+  if (lang === VA.lang && Object.keys(vaTrDict(lang)).length > before) vaRedrawTexts();
+}
+function vaRedrawTexts() {
+  applyAssistantLang();
+  updateVoiceToggleUI();
+  if (typeof quizRefreshLang === 'function') Object.keys(QZ).forEach(id => quizRefreshLang(id, true));
+}
+
+// The language picker used in Sunny's header and in Quiz Mode
+function vaLangSelect(onchange, extraClass) {
+  return `<select class="va-lang-select ${extraClass || ''}" aria-label="Language" title="Language" onchange="${onchange}">${
+    VA_LANGS.map(l => `<option value="${l.code}"${l.code === VA.lang ? ' selected' : ''}>${l.short} · ${l.name}</option>`).join('')}</select>`;
 }
 
 // Every Sunny request says which account this page belongs to. If that account signed out, or
@@ -2584,11 +2678,9 @@ function loadAssistantWelcome(first) {
 // Static panel text in the current language
 function applyAssistantLang() {
   const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
-  document.querySelectorAll('.va-lang-switch button, .qz-lang button').forEach(b => {
-    const on = b.dataset.lang === VA.lang;
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', on);
-  });
+  const slot = document.getElementById('va-lang-slot');
+  if (slot && !slot.firstChild) slot.innerHTML = vaLangSelect('setAssistantLang(this.value)');
+  document.querySelectorAll('.va-lang-select').forEach(sel => { sel.value = VA.lang; });
   set('va-big-mic-label', vaT('Tap me to talk', 'बात करने के लिए मुझे टैप करें'));
   set('va-starter-text', vaT("Your job-search buddy. Tap Sunny above and just ask, like you would a friend. I can find your best matches, explain scores and move jobs around for you.",
                              'मैं आपकी जॉब-सर्च दोस्त हूँ। ऊपर Sunny को टैप करें और दोस्त की तरह पूछें। मैं आपके सबसे अच्छे मैच ढूँढ सकती हूँ, स्कोर समझा सकती हूँ और जॉब्स को आगे बढ़ा सकती हूँ।'));
@@ -2598,8 +2690,8 @@ function applyAssistantLang() {
   if (input && !VA.listening) input.placeholder = vaT('Ask me anything, or tap the mic', 'कुछ भी पूछें, या माइक टैप करें');
   const status = document.getElementById('va-status');
   if (status && !VA.listening) setAssistantStatus(status.dataset.state || 'ready');
-  document.getElementById('voice-overlay')?.setAttribute('lang', VA.lang);
-  document.getElementById('va-hint-bubble')?.setAttribute('lang', VA.lang);
+  const dir = vaLangInfo().rtl ? 'rtl' : 'ltr';
+  document.querySelectorAll('#voice-overlay, #va-hint-bubble, .qz-practice').forEach(el => { el.setAttribute('lang', VA.lang); el.setAttribute('dir', dir); });
 }
 
 function toggleAssistantLang() { setAssistantLang(VA.lang === 'hi' ? 'en' : 'hi'); }
@@ -2607,7 +2699,7 @@ function toggleAssistantLang() { setAssistantLang(VA.lang === 'hi' ? 'en' : 'hi'
 // One language for all of Sunny: the chat, the quiz and what Sunny listens for.
 // quiet: switch without Sunny announcing it in the chat (used by Quiz Mode's own switch).
 function setAssistantLang(lang, quiet) {
-  if (lang !== 'en' && lang !== 'hi') return;
+  if (!VA_LANGS.some(l => l.code === lang)) return;
   if (lang === VA.lang) { applyAssistantLang(); return; }
   VA.lang = lang;
   vaSet('localStorage', 'va_lang', VA.lang);
@@ -2615,11 +2707,15 @@ function setAssistantLang(lang, quiet) {
   cancelListening();
   applyAssistantLang();
   loadAssistantWelcome(false);
-  if (typeof quizRefreshLang === 'function') Object.keys(QZ).forEach(quizRefreshLang);
-  const note = vaT("Okay, I'll talk in English now.", 'ठीक है, अब मैं हिंदी में बात करूँगी।');
-  if (quiet) { toast(note); return; }
-  addAssistantNote(note);
-  speakResponse(note);
+  if (typeof quizRefreshLang === 'function') Object.keys(QZ).forEach(id => quizRefreshLang(id));
+  const en = VA.lang === 'en' ? "Okay, I'll talk in English now." : `Okay, I'll talk in ${vaLangInfo().en} now.`;
+  const say = (note) => {
+    if (quiet) { toast(note); return; }
+    addAssistantNote(note);
+    speakResponse(note);
+  };
+  if (VA.lang === 'en' || VA.lang === 'hi') { say(vaT(en, 'ठीक है, अब मैं हिंदी में बात करूँगी।')); return; }
+  vaTranslate([en], lang).then(([note]) => { if (VA.lang === lang) say(note); });
 }
 
 function setDigestBadge(count) {
@@ -2704,7 +2800,7 @@ function toggleVoiceSpeech() {
   updateVoiceToggleUI();
   if (!VA.speechOn) { stopSpeaking(); return; }
   vaUnlockAudio();
-  speakResponse(VA.lang === 'hi' ? 'नमस्ते! क्या आप मुझे सुन पा रहे हैं?' : "Hi! I'm Sunny. Can you hear me?");
+  speakResponse(vaT("Hi! I'm Sunny. Can you hear me?", 'नमस्ते! क्या आप मुझे सुन पा रहे हैं?'));
 }
 
 function toggleVoiceAssistant() {
@@ -2802,9 +2898,8 @@ function setAssistantStatus(state, label) {
   const text = document.getElementById('voice-status-text');
   if (status) status.dataset.state = state;
   document.body.dataset.sunny = state === 'ready' ? 'idle' : state;
-  const labels = VA.lang === 'hi'
-    ? { ready: 'मदद के लिए तैयार', listening: 'सुन रही हूँ…', thinking: 'सोच रही हूँ…', speaking: 'बोल रही हूँ…' }
-    : { ready: 'Ready to help', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' };
+  const labels = { ready: vaT('Ready to help', 'मदद के लिए तैयार'), listening: vaT('Listening…', 'सुन रही हूँ…'),
+                   thinking: vaT('Thinking…', 'सोच रही हूँ…'), speaking: vaT('Speaking…', 'बोल रही हूँ…') };
   if (text) text.textContent = label || labels[state] || '';
 }
 
@@ -3006,7 +3101,7 @@ function startBrowserRecognition(SpeechRecognition) {
   VA.mode = 'browser';
   const rec = new SpeechRecognition();
   VA.recognition = rec;
-  rec.lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
+  rec.lang = vaLocale();
   rec.interimResults = true;
   rec.continuous = false;
   rec.maxAlternatives = 1;
@@ -3087,8 +3182,8 @@ function handleUserText(text, spoken) {
 
 // Yes/no answers to a confirm question, in English, Hindi or Hinglish.
 // "No" is checked first so "mat karo" / "नहीं करो" never reads as a yes.
-const VA_NO_RE = /(^|[^a-z\u0900-\u097F])(no|nope|nah|cancel|stop|don't|dont|never ?mind|forget it|wait|nahi|nahin|mat|ruko|rehne do|रहने दो|नहीं|नही|ना|मत|रद्द|रुको|कैंसल)(?=$|[^a-z\u0900-\u097F])/;
-const VA_YES_RE = /(^|[^a-z\u0900-\u097F])(yes|yeah|yep|yup|sure|confirm|do it|go ahead|ok|okay|please do|absolutely|sounds good|haan|han|ha|ji|theek hai|thik hai|kar do|karo|हाँ|हां|हा|जी|ठीक है|कर दो|करो|बिल्कुल|ओके)(?=$|[^a-z\u0900-\u097F])/;
+const VA_NO_RE = /(^|[^\p{L}\p{M}])(no|nope|nah|cancel|stop|don't|dont|never ?mind|forget it|wait|nahi|nahin|mat|ruko|rehne do|रहने दो|नहीं|नही|ना|मत|रद्द|रुको|कैंसल|नाही|नको|இல்லை|வேண்டாம்|వద్దు|కాదు|না|ಬೇಡ|ಇಲ್ಲ|non|nein|لا|cancela|annule|abbrechen)(?=$|[^\p{L}\p{M}])/u;
+const VA_YES_RE = /(^|[^\p{L}\p{M}])(yes|yeah|yep|yup|sure|confirm|do it|go ahead|ok|okay|please do|absolutely|sounds good|haan|han|ha|ji|theek hai|thik hai|kar do|karo|हाँ|हां|हा|जी|ठीक है|कर दो|करो|बिल्कुल|ओके|हो|होय|ஆம்|சரி|అవును|సరే|হ্যাঁ|ঠিক আছে|ಹೌದು|ಸರಿ|sí|si|vale|claro|oui|d'accord|ja|genau|نعم|أجل|حسنا)(?=$|[^\p{L}\p{M}])/u;
 function vaIsNo(t) { return VA_NO_RE.test(t); }
 function vaIsYes(t) { return VA_YES_RE.test(t); }
 
@@ -3114,8 +3209,8 @@ function sendAssistantQuery(text) {
 }
 
 function handleAssistantReply(res) {
-  if ((res.lang === 'hi' || res.lang === 'en') && res.lang !== VA.lang) {
-    // You spoke Hindi to me (or switched back): follow you
+  if (res.lang && res.lang !== VA.lang && VA_LANGS.some(l => l.code === res.lang)) {
+    // You wrote to me in another language: follow you
     VA.lang = res.lang;
     vaSet('localStorage', 'va_lang', VA.lang);
     applyAssistantLang();
@@ -3379,7 +3474,7 @@ function vaChunks(text) {
 async function speakWithBrowser(text, done, token, avoid) {
   if (!('speechSynthesis' in window)) { vaSoundProblem(); done(); return; }
   const synth = window.speechSynthesis;
-  const lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
+  const lang = vaLocale();
   const voices = await vaVoicesReady();
   if (token !== undefined && token !== VA.speakToken) return;
   const voice = pickBrowserVoice(voices, lang, avoid);
@@ -5113,7 +5208,7 @@ function renderPracticeIntro(jobId) {
                   `मैं आपसे एक-एक करके ${st.qs.length} सवाल पूछूँगी। बोलकर या टाइप करके जवाब दें, और मैं बताऊँगी क्या अच्छा रहा और क्या सुधारें।`)}</p>
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-        <div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div>
+        ${vaLangSelect(`quizSetLang(${a}, this.value)`, 'qz-lang')}
         <button class="qz-btn primary" type="button" onclick="startPractice(${a})">${vaT('Start practice', 'प्रैक्टिस शुरू करें')}</button>
       </div>
     </div>`;
@@ -5126,10 +5221,20 @@ function quizSetLang(jobId, lang) {
   setAssistantLang(lang, true);
 }
 
-function quizRefreshLang(jobId) {
+function quizRefreshLang(jobId, fromTranslation) {
   const st = QZ[jobId];
   const el = qzEl(jobId);
   if (!st || !el || !el.innerHTML) return;
+  const fb = el.querySelector('.qz-feedback');
+  const busy = st.listening || (fb && !fb.hidden) || document.activeElement === el.querySelector('.qz-answer');
+  if (fromTranslation && st.view === 'question' && busy) {
+    // Translations arrived mid-answer: swap the question text in place so the mic, cursor and feedback stay put
+    const item = st.qs[st.order[st.pos]];
+    const q = el.querySelector('.qz-q'), h = el.querySelector('.qz-hint');
+    if (item && q) q.textContent = vaTr(item.q);
+    if (item && h) h.textContent = vaTr(item.hints);
+    return;
+  }
   if (st.view === 'intro') { renderPracticeIntro(jobId); return; }
   if (st.view === 'summary') { renderPracticeSummary(jobId); return; }
   if (st.view !== 'question') return;
@@ -5171,7 +5276,7 @@ function renderPracticeQuestion(jobId, speak) {
         <span class="qz-count">${vaT('Question', 'सवाल')} ${st.pos + 1} / ${st.order.length}</span>
         <span class="qz-kind">${item.kind === 'quick' ? vaT('Quick-fire', 'क्विक-फ़ायर') : vaT('Deep dive', 'गहराई से')}</span>
         <span class="qz-space"></span>
-        <div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div>
+        ${vaLangSelect(`quizSetLang(${a}, this.value)`, 'qz-lang')}
         ${QZ_SR ? `<button class="qz-hf${quizHandsFree() ? ' on' : ''}" type="button" aria-pressed="${quizHandsFree()}" onclick="quizToggleHandsFree(${a})"
           title="${vaT('Hands-free: the mic opens after each question, and you can say next, repeat, try again or stop', 'हैंड्स-फ़्री: हर सवाल के बाद माइक खुद खुलेगा')}">${vaT('Hands-free', 'हैंड्स-फ़्री')}</button>` : ''}
         <button class="qz-icon" type="button" title="${vaT('Read the question again', 'सवाल फिर से सुनें')}" aria-label="${vaT('Read the question again', 'सवाल फिर से सुनें')}" onclick="quizSpeakQuestion(${a})">
@@ -5182,9 +5287,9 @@ function renderPracticeQuestion(jobId, speak) {
         </button>
       </div>
       <div class="qz-bar"><i style="width:${pct}%"></i></div>
-      <div class="qz-q">${esc(item.q)}</div>
+      <div class="qz-q">${esc(vaTr(item.q))}</div>
       ${item.hints ? `<button class="qz-link" type="button" onclick="const h = this.nextElementSibling; h.hidden = !h.hidden;">${vaT('Need a hint?', 'हिंट चाहिए?')}</button>
-      <div class="qz-hint" hidden>${esc(item.hints)}</div>` : ''}
+      <div class="qz-hint" hidden>${esc(vaTr(item.hints))}</div>` : ''}
       <textarea class="qz-answer" maxlength="3000" placeholder="${vaT('Tap “Answer out loud” and talk, or type your answer here…', '“बोलकर जवाब दें” टैप करें और बोलें, या यहाँ टाइप करें…')}"
         onkeydown="if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') quizSubmit(${a})"></textarea>
       <div class="qz-actions">
@@ -5203,14 +5308,16 @@ function renderPracticeQuestion(jobId, speak) {
   if (speak) quizSpeakQuestion(jobId);
 }
 
-function quizSpeakQuestion(jobId) {
+async function quizSpeakQuestion(jobId) {
   const st = QZ[jobId];
   if (!st || typeof speakResponse !== 'function') return;
   const item = st.qs[st.order[st.pos]];
   if (!item) return;
   quizStopMic(jobId);
   const token = st.token = (st.token || 0) + 1;
-  speakResponse(item.q, () => {
+  const [question] = await vaTranslate([item.q]);
+  if (token !== st.token) return;
+  speakResponse(question || item.q, () => {
     const box = qzEl(jobId)?.querySelector('.qz-answer');
     if (token === st.token && quizHandsFree() && box && !box.value.trim()) quizListen(jobId, 'answer', true);
   });
@@ -5220,13 +5327,15 @@ function quizSpeakQuestion(jobId) {
 // Hands-free practice: after each question the mic opens on its own, a pause sends the answer,
 // and you can say "next", "repeat", "try again" or "stop". Needs the browser's speech recognizer.
 const QZ_SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const QZ_NEXT = /^(next|next one|next question|skip|skip it|pass|move on|अगला|अगला सवाल|छोड़ो|छोड़ें|आगे)$/;
-const QZ_REPEAT = /^(repeat|repeat that|repeat the question|say (it|that) again|again please|what was the question|दोबारा|दोबारा बोलो|फिर से बोलो)$/;
-const QZ_STOP = /^(stop|stop practice|end practice|exit|quit|बंद करो|रुको|खत्म करो)$/;
-const QZ_RETRY = /^(try again|again|retry|let me try again|redo|फिर से कोशिश|दोबारा कोशिश)$/;
+const QZ_NEXT = /^(next|next one|next question|skip|skip it|pass|move on|अगला|अगला सवाल|छोड़ो|छोड़ें|आगे|அடுத்தது|அடுத்த கேள்வி|తరువాత|తర్వాతి ప్రశ్న|পরের|পরেরটা|পরের প্রশ্ন|पुढे|पुढचा|पुढचा प्रश्न|ಮುಂದೆ|ಮುಂದಿನದು|ಮುಂದಿನ ಪ್ರಶ್ನೆ|siguiente|la siguiente|pasar|suivant|suivante|question suivante|passer|weiter|nächste|nächste frage|التالي|السؤال التالي)$/u;
+const QZ_REPEAT = /^(repeat|repeat that|repeat the question|say (it|that) again|again please|what was the question|दोबारा|दोबारा बोलो|फिर से बोलो|மீண்டும் சொல்லு|మళ్ళీ చెప్పు|আবার বলো|पुन्हा सांग|ಮತ್ತೆ ಹೇಳಿ|repite|repítelo|repite la pregunta|répète|répétez|répète la question|wiederholen|wiederhole die frage|كرر|أعد السؤال)$/u;
+const QZ_STOP = /^(stop|stop practice|end practice|exit|quit|बंद करो|रुको|खत्म करो|நிறுத்து|ఆపు|থামো|থামাও|थांबा|ನಿಲ್ಲಿಸು|parar|detener|salir|arrête|arrêter|stopp|beenden|aufhören|توقف)$/u;
+const QZ_RETRY = /^(try again|again|retry|let me try again|redo|फिर से कोशिश|दोबारा कोशिश|மீண்டும் முயற்சி|మళ్ళీ ప్రయత్నిస్తా|আবার চেষ্টা|पुन्हा प्रयत्न|ಮತ್ತೆ ಪ್ರಯತ್ನಿಸು|otra vez|intentar de nuevo|réessayer|encore|nochmal|noch einmal|حاول مرة أخرى)$/u;
 // "done" alone, or a clear sign-off at the end ("...and that's my answer"), sends the answer
-const QZ_DONE = /(^(done|submit|send it|बस|हो गया)$)|((that's my answer|that is my answer|i'm done|i am done|i'm finished|बस इतना ही|मेरा जवाब हो गया)$)/;
-const QZ_DONE_STRIP = /[\s.,!?।]*(that's my answer|that is my answer|i'm done|i am done|i'm finished|बस इतना ही|मेरा जवाब हो गया|done|submit|send it|बस|हो गया)[\s.!?।]*$/i;
+const QZ_DONE_LONG = "that's my answer|that is my answer|i'm done|i am done|i'm finished|बस इतना ही|मेरा जवाब हो गया|இதுதான் என் பதில்|ఇదే నా సమాధానం|এটাই আমার উত্তর|हेच माझं उत्तर|ಇದೇ ನನ್ನ ಉತ್ತರ|esa es mi respuesta|he terminado|c'est ma réponse|j'ai fini|das ist meine antwort|ich bin fertig|هذه إجابتي";
+const QZ_DONE_SHORT = 'done|submit|send it|बस|हो गया|முடிந்தது|అయిపోయింది|হয়ে গেছে|শেষ|झालं|झाले|ಮುಗಿಯಿತು|listo|terminé|fini|fertig|انتهيت';
+const QZ_DONE = new RegExp(`(^(${QZ_DONE_SHORT})$)|((${QZ_DONE_LONG})$)`, 'u');
+const QZ_DONE_STRIP = new RegExp(`[\\s.,!?।،؟]*(${QZ_DONE_LONG}|${QZ_DONE_SHORT})[\\s.!?।؟]*$`, 'iu');
 
 function quizHandsFree() { return !!QZ_SR && vaGet('localStorage', 'qz_handsfree') !== 'false'; }
 
@@ -5245,7 +5354,7 @@ function quizToggleMic(jobId) {
 }
 
 function quizCommandText(text) {
-  return String(text || '').toLowerCase().replace(/[.,!?।]/g, '').replace(/\s+/g, ' ').trim();
+  return String(text || '').toLowerCase().replace(/[.,!?।¿¡،؟]/g, '').replace(/’/g, "'").replace(/\s+/g, ' ').trim();
 }
 
 function quizListen(jobId, mode, auto) {
@@ -5272,7 +5381,7 @@ function quizListen(jobId, mode, auto) {
   let finalText = '';
   let pauseTimer = null;
   const finish = (fn) => { clearTimeout(pauseTimer); quizStopMic(jobId); fn && fn(); };
-  rec.lang = VA.lang === 'hi' ? 'hi-IN' : vaEnLocale();
+  rec.lang = vaLocale();
   rec.continuous = true;
   rec.interimResults = true;
   rec.onresult = (event) => {
@@ -5486,7 +5595,7 @@ function renderPracticeSummary(jobId) {
     : vaT('Great practice. Let’s run the tricky ones again.', 'अच्छी प्रैक्टिस। मुश्किल वाले सवाल फिर से करते हैं।');
   el.innerHTML = `
     <div class="qz-card">
-      <div class="qz-top"><span class="qz-count">${vaT('Practice summary', 'प्रैक्टिस का सार')}</span><span class="qz-space"></span><div class="qz-lang" role="group" aria-label="Language / भाषा"><button type="button" data-lang="en" class="${VA.lang === 'en' ? 'on' : ''}" aria-pressed="${VA.lang === 'en'}" onclick="quizSetLang(${a}, 'en')" title="Practice in English">EN</button><button type="button" data-lang="hi" class="${VA.lang === 'hi' ? 'on' : ''}" aria-pressed="${VA.lang === 'hi'}" onclick="quizSetLang(${a}, 'hi')" title="हिंदी में प्रैक्टिस करें">हिं</button></div></div>
+      <div class="qz-top"><span class="qz-count">${vaT('Practice summary', 'प्रैक्टिस का सार')}</span><span class="qz-space"></span>${vaLangSelect(`quizSetLang(${a}, this.value)`, 'qz-lang')}</div>
       <div style="display:flex; align-items:center; gap:14px;">
         <div class="qz-sunny" style="width:48px; height:48px;" aria-hidden="true">${vaMascot(true)}</div>
         <div>
@@ -5746,10 +5855,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 4px;">
-      <div class="va-lang-switch" role="group" aria-label="Language / भाषा">
-        <button type="button" data-lang="en" onclick="setAssistantLang('en')" title="Talk in English">EN</button>
-        <button type="button" data-lang="hi" onclick="setAssistantLang('hi')" title="हिंदी में बात करें">हिं</button>
-      </div>
+      <span id="va-lang-slot"></span>
       <button id="voice-synthesis-toggle" class="va-icon-btn" type="button" onclick="toggleVoiceSpeech()" title="Read replies out loud" aria-label="Read replies out loud">
         <svg id="voice-synthesis-speaker-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
       </button>

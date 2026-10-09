@@ -255,9 +255,14 @@ def _first_part(res_data: dict) -> dict:
 
 
 def transcribe_audio(audio_bytes: bytes, mime_type: str, api_key: str, lang: str = "en") -> str:
-    language = ("The speaker will most likely use Hindi or Hinglish. Write Hindi words in Devanagari and keep "
-                "English words and company names in Latin letters." if lang == "hi"
-                else "The speaker will most likely use English, possibly mixed with Hindi.")
+    if lang == "hi":
+        language = ("The speaker will most likely use Hindi or Hinglish. Write Hindi words in Devanagari and keep "
+                    "English words and company names in Latin letters.")
+    elif lang in LANG_NAMES and lang != "en":
+        language = (f"The speaker will most likely use {LANG_NAMES[lang]}, possibly mixed with English. Write it in "
+                    f"its usual script and keep English words and company names in Latin letters.")
+    else:
+        language = "The speaker will most likely use English, possibly mixed with Hindi."
     parts = [
         {"inlineData": {"mimeType": mime_type, "data": base64.b64encode(audio_bytes).decode("ascii")}},
         {"text": "Transcribe this audio clip exactly as spoken. " + language + " Respond only with the transcription, "
@@ -716,14 +721,88 @@ def _resolve_job_locally(transcript: str, jobs_snapshot: list[dict]) -> dict | N
 
 # ── Friendly wording (English and Hindi) ──────────────────────────────────
 
-LANGS = ("en", "hi")
+# English and Hindi wording is written by hand below. The other languages are translated from
+# the English wording with Gemini (see translate_texts), so adding one is a single line here.
+LANG_NAMES = {
+    "en": "English", "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "bn": "Bengali", "mr": "Marathi",
+    "kn": "Kannada", "es": "Spanish", "fr": "French", "de": "German", "ar": "Arabic",
+}
+LANGS = tuple(LANG_NAMES)
+HAND_WRITTEN_LANGS = ("en", "hi")
+
+# Scripts that only one supported language uses, to follow someone who types in it
+_SCRIPT_LANGS = [
+    (re.compile("[\u0B80-\u0BFF]"), "ta"), (re.compile("[\u0C00-\u0C7F]"), "te"),
+    (re.compile("[\u0980-\u09FF]"), "bn"), (re.compile("[\u0C80-\u0CFF]"), "kn"),
+    (re.compile("[\u0600-\u06FF]"), "ar"),
+]
 
 
 def reply_lang(requested, transcript: str = "") -> str:
-    """Hindi when the user asked for it or wrote in Devanagari, English otherwise."""
-    if is_hindi(transcript):
+    """The language the user picked. Typing in another script switches to it (Devanagari means
+    Hindi, unless Marathi was picked, since both use it)."""
+    for pattern, lang in _SCRIPT_LANGS:
+        if pattern.search(transcript or ""):
+            return lang
+    if is_hindi(transcript) and requested not in ("hi", "mr"):
         return "hi"
     return requested if requested in LANGS else "en"
+
+
+_translate_cache = OrderedDict()
+_TRANSLATE_CACHE_MAX = 2000
+MAX_TRANSLATE_TEXTS = 60
+MAX_TRANSLATE_CHARS = 600
+
+
+def translate_texts(texts: list, lang: str, api_key: str) -> list:
+    """Translates short UI and reply strings into `lang` with Gemini, keeping company names,
+    numbers and any HTML tags as they are. Returns the originals for anything it can't translate."""
+    texts = [str(t or "")[:MAX_TRANSLATE_CHARS] for t in (texts or [])][:MAX_TRANSLATE_TEXTS]
+    if lang not in LANG_NAMES or lang == "en" and not any(re.search(r"[^\x00-\x7F]", t) for t in texts):
+        return texts
+    out = list(texts)
+    todo = []
+    for i, t in enumerate(texts):
+        if not t.strip():
+            continue
+        hit = _translate_cache.get((lang, t))
+        if hit is not None:
+            out[i] = hit
+        else:
+            todo.append(i)
+    if not todo or not api_key:
+        return out
+    source = [texts[i] for i in todo]
+    prompt = (f"Translate each string in this JSON array into {LANG_NAMES[lang]} for a friendly job-search "
+              "assistant app. Keep company names, job titles, numbers, emoji and any HTML tags exactly as they are. "
+              "Use natural, warm, everyday wording. Return only a JSON array of the same length.\n"
+              + json.dumps(source, ensure_ascii=False))
+    try:
+        res = gemini_generate(api_key, [{"text": prompt}],
+                              generation_config={"responseMimeType": "application/json", "temperature": 0.2}, timeout=15)
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", _first_part(res).get("text", "").strip())
+        translated = json.loads(text)
+    except (GeminiError, ValueError, KeyError, TypeError) as e:
+        log.warning("Translation to %s failed: %s", lang, e)
+        return out
+    if not isinstance(translated, list) or len(translated) != len(source):
+        return out
+    for i, src, tr in zip(todo, source, translated):
+        tr = str(tr or "").strip()
+        if not tr or not _same_tags(src, tr):
+            continue
+        out[i] = tr
+        _translate_cache[(lang, src)] = tr
+        if len(_translate_cache) > _TRANSLATE_CACHE_MAX:
+            _translate_cache.popitem(last=False)
+    return out
+
+
+def _same_tags(src: str, tr: str) -> bool:
+    """A translation may only carry the HTML tags its source had, so it can never add markup."""
+    tags = lambda s: sorted(re.findall(r"<[^>]*>", s))
+    return tags(src) == tags(tr) and tr.count("<") == src.count("<") and tr.count(">") == src.count(">")
 
 
 HELP_TEXT = {
