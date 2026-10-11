@@ -1971,20 +1971,109 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     .cs-step b { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); margin-right: 4px; }
     .cs-results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .cs-results-head .wr-query { white-space: normal; }
+
+    /* ── Motion ── */
+    @property --cs-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    .cs-hero { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+    .cs-hero .cs-intro { flex: 1 1 320px; animation: csRise .6s cubic-bezier(.2,.8,.2,1) both; }
+    .cs-track { flex: 0 1 340px; width: 340px; max-width: 100%; height: auto; overflow: visible; animation: csRise .6s .1s cubic-bezier(.2,.8,.2,1) both; }
+    .cs-track .old { stroke: var(--bdr-strong); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 7; fill: none; }
+    .cs-track .new { stroke: var(--yolk); stroke-width: 3.5; stroke-linecap: round; fill: none; stroke-dasharray: 1; stroke-dashoffset: 1; animation: csDraw 1.3s .35s cubic-bezier(.65,0,.35,1) forwards; }
+    .cs-track .halo { stroke: var(--yolk); stroke-width: 12; stroke-linecap: round; fill: none; opacity: .14; stroke-dasharray: 1; stroke-dashoffset: 1; animation: csDraw 1.3s .35s cubic-bezier(.65,0,.35,1) forwards; }
+    .cs-track .stop { fill: var(--sur); stroke: var(--yolk); stroke-width: 2.5; transform-box: fill-box; transform-origin: center; transform: scale(0); animation: csPop .45s cubic-bezier(.3,1.6,.5,1) forwards; }
+    .cs-track .stop.s1 { animation-delay: .9s; } .cs-track .stop.s2 { animation-delay: 1.25s; } .cs-track .stop.s3 { animation-delay: 1.55s; }
+    .cs-track .runner { fill: var(--yolk); filter: drop-shadow(0 0 6px rgba(255,167,0,.8)); }
+    .cs-track .spark { fill: var(--yolk); transform-box: fill-box; transform-origin: center; opacity: 0; animation: csTwinkle 2.4s ease-in-out infinite; }
+    .cs-track .spark.k2 { animation-delay: .8s; } .cs-track .spark.k3 { animation-delay: 1.6s; }
+    .cs-track text { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; }
+    .cs-track .lbl-old { fill: var(--hin); }
+    .cs-track .lbl-new { fill: var(--txt); font-weight: 700; opacity: 0; animation: csFade .5s 1.5s forwards; }
+
+    .cs-paths { perspective: 1000px; }
+    .cs-path { position: relative; isolation: isolate; overflow: hidden; transform-style: preserve-3d;
+      transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--lift, 0px));
+      transition: border-color .2s, box-shadow .25s, transform .25s cubic-bezier(.2,.8,.2,1);
+      animation: csDeal .65s calc(var(--i, 0) * 90ms) cubic-bezier(.2,.9,.25,1.15) backwards; }
+    .cs-path:hover, .cs-path:focus-visible { --lift: -4px; border-color: var(--bdr-strong); box-shadow: 0 18px 40px -18px rgba(42,35,21,.35); }
+    .cs-path::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
+      background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgba(255,167,0,.16), transparent 65%); }
+    .cs-path:hover::after { opacity: 1; }
+    .cs-path.on { border-color: transparent; box-shadow: 0 16px 40px -18px rgba(255,167,0,.55); }
+    .cs-path.on::before { content: ""; position: absolute; inset: 0; z-index: -2; border-radius: inherit; padding: 2px; pointer-events: none;
+      background: conic-gradient(from var(--cs-angle), var(--yolk), transparent 30%, var(--yolk) 50%, transparent 80%, var(--yolk));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+      animation: csSpin 3.2s linear infinite; }
+    .cs-path .cs-role { display: flex; align-items: center; gap: 8px; }
+    .cs-path .cs-role::after { content: "→"; margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--hin); transition: transform .25s, color .25s; }
+    .cs-path:hover .cs-role::after, .cs-path.on .cs-role::after { transform: translateX(4px); color: var(--yolk); }
+    .cs-path .cs-tag { animation: csPop .4s calc(var(--i, 0) * 90ms + 280ms + var(--j, 0) * 45ms) cubic-bezier(.3,1.6,.5,1) backwards; }
+    .cs-path.leaving { animation: csLeave .3s calc(var(--i, 0) * 50ms) cubic-bezier(.5,0,.75,0) forwards; pointer-events: none; }
+    .cs-btn .cs-ico { display: inline-block; margin-right: 6px; transition: transform .4s; }
+    .cs-btn:hover .cs-ico { transform: rotate(90deg); }
+    .cs-btn.busy .cs-ico { animation: csSpinIco .8s linear infinite; }
+    .cs-btn { transition: transform .15s, box-shadow .2s; }
+    .cs-btn:not([disabled]):hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(255,167,0,.8); }
+    .cs-btn:not([disabled]):active { transform: scale(.96); }
+    #cs-results:not([hidden]) { animation: csRise .45s cubic-bezier(.2,.8,.2,1) both; }
+    .cs-burst { position: fixed; width: 7px; height: 7px; border-radius: 2px; pointer-events: none; z-index: 9999;
+      animation: csBurst .75s cubic-bezier(.15,.7,.3,1) forwards; }
+
+    @keyframes csRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes csFade { to { opacity: 1; } }
+    @keyframes csDraw { to { stroke-dashoffset: 0; } }
+    @keyframes csPop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes csTwinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+    @keyframes csDeal { from { opacity: 0; transform: perspective(900px) translateY(26px) rotateX(18deg) rotateZ(-2deg) scale(.94); filter: blur(4px); }
+                        to { opacity: 1; transform: perspective(900px); filter: none; } }
+    @keyframes csLeave { to { opacity: 0; transform: perspective(900px) translateY(-14px) rotateX(-12deg) scale(.95); filter: blur(3px); } }
+    @keyframes csSpin { to { --cs-angle: 360deg; } }
+    @keyframes csSpinIco { to { transform: rotate(360deg); } }
+    @keyframes csBurst { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+                         100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.4); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cs-hero .cs-intro, .cs-track, .cs-path, .cs-path .cs-tag, .cs-path.leaving, .cs-path.on::before, #cs-results:not([hidden]),
+      .cs-track .stop, .cs-track .spark, .cs-track .lbl-new, .cs-btn.busy .cs-ico { animation: none !important; }
+      .cs-track .new, .cs-track .halo { animation: none; stroke-dashoffset: 0; }
+      .cs-track .stop { transform: none; }
+      .cs-track .lbl-new { opacity: 1; }
+      .cs-path, .cs-btn, .cs-path .cs-role::after, .cs-btn .cs-ico { transition: none; }
+      .cs-path { transform: none !important; }
+    }
+    @media (max-width: 768px) { .cs-track { flex-basis: 100%; width: 100%; } }
   </style>
   <div class="board-header">
     <h2 class="board-title">Career Switch</h2>
   </div>
   <div class="cs-wrap">
-    <p class="cs-intro">
-      Thinking about a change? These are roles <b>outside</b> what your board is built around{% if current_role %} (<b>{{ current_role }}</b>){% endif %},
-      picked for the skills you already have. Open a path to see live openings for it.
-    </p>
+    <div class="cs-hero">
+      <p class="cs-intro">
+        Thinking about a change? These are roles <b>outside</b> what your board is built around{% if current_role %} (<b>{{ current_role }}</b>){% endif %},
+        picked for the skills you already have. Open a path to see live openings for it.
+      </p>
+      <svg class="cs-track" id="cs-track" viewBox="0 0 340 120" role="img" aria-label="A dot leaving your current track for a new path">
+        <path class="old" d="M12 92 H328"></path>
+        <text class="lbl-old" x="328" y="112" text-anchor="end">{{ (current_role or 'Today')[:28] }}</text>
+        <path id="cs-route" class="halo" pathLength="1" d="M96 92 C150 92 160 30 224 30 H316"></path>
+        <path class="new" pathLength="1" d="M96 92 C150 92 160 30 224 30 H316"></path>
+        <circle class="stop s1" cx="150" cy="70" r="5"></circle>
+        <circle class="stop s2" cx="224" cy="30" r="5"></circle>
+        <circle class="stop s3" cx="316" cy="30" r="7"></circle>
+        <path class="spark k1" d="M316 6 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5z"></path>
+        <path class="spark k2" d="M296 12 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z"></path>
+        <path class="spark k3" d="M334 44 l1.4 3.4 3.4 1.4 -3.4 1.4 -1.4 3.4 -1.4 -3.4 -3.4 -1.4 3.4 -1.4z"></path>
+        <text class="lbl-new" x="316" y="56" text-anchor="end">Your next move</text>
+        <circle class="runner" r="6">
+          <animateMotion id="cs-run" dur="4.2s" begin="0s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;0.08;0.8;1" calcMode="spline"
+            keySplines="0 0 1 1;0.45 0 0.25 1;0 0 1 1" path="M12 92 H96 C150 92 160 30 224 30 H316"></animateMotion>
+        </circle>
+      </svg>
+    </div>
 
     <section aria-labelledby="cs-paths-h">
       <div class="cs-results-head" style="margin-bottom:12px;">
         <div class="cs-kicker" id="cs-paths-h">Paths for you</div>
-        <button type="button" class="cs-btn ghost" id="cs-refresh" onclick="loadCareerPaths(true)">New ideas</button>
+        <button type="button" class="cs-btn ghost" id="cs-refresh" onclick="loadCareerPaths(true)"><span class="cs-ico" aria-hidden="true">↻</span>New ideas</button>
       </div>
       <p class="cs-mode" id="cs-mode"></p>
       <div class="cs-paths" id="cs-paths" aria-live="polite">
@@ -6165,25 +6254,36 @@ function csAge(iso) {
   return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
+const CS_CALM = window.matchMedia('(prefers-reduced-motion: reduce)');
+const csSleep = ms => new Promise(r => setTimeout(r, CS_CALM.matches ? 0 : ms));
+
 async function loadCareerPaths(refresh) {
   const box = document.getElementById('cs-paths');
   const btn = document.getElementById('cs-refresh');
   btn.disabled = true;
-  if (refresh) box.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
+  btn.classList.add('busy');
+  let leaving = Promise.resolve();
+  if (refresh) {
+    const cards = box.querySelectorAll('.cs-path');
+    cards.forEach(c => c.classList.add('leaving'));
+    leaving = csSleep(cards.length ? 300 + cards.length * 50 : 0);
+  }
   try {
-    const res = await fetch('/api/career-switch/paths' + (refresh ? '?refresh=1' : ''));
+    const [res] = await Promise.all([fetch('/api/career-switch/paths' + (refresh ? '?refresh=1' : '')), leaving]);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Could not load ideas.');
     CAREER.paths = data.paths || [];
+    CAREER.active = null;
     document.getElementById('cs-mode').textContent = data.mode === 'ai'
       ? 'Based on your resume.'
       : 'Common moves from your role. Add a Gemini key in Profile Settings to get ideas based on your resume.';
     renderCareerPaths();
   } catch (e) {
     if (!CAREER.paths.length) box.innerHTML = `<div class="wr-empty">${esc(e.message || 'Could not load ideas.')} Try again in a moment.</div>`;
-    else toast(e.message || 'Could not load ideas.');
+    else { renderCareerPaths(); toast(e.message || 'Could not load ideas.'); }
   } finally {
     btn.disabled = false;
+    btn.classList.remove('busy');
   }
 }
 
@@ -6193,21 +6293,80 @@ function renderCareerPaths() {
     box.innerHTML = '<div class="wr-empty">No ideas yet. Try the box below to explore a field you have in mind.</div>';
     return;
   }
+  const tags = (list, cls) => list.map((t, j) => `<span class="cs-tag${cls}" style="--j:${j}">${esc(t)}</span>`).join('');
   box.innerHTML = CAREER.paths.map((p, i) => `
-    <button type="button" class="cs-path${CAREER.active === i ? ' on' : ''}" data-i="${i}" onclick="openCareerPath(${i})" aria-pressed="${CAREER.active === i}">
+    <button type="button" class="cs-path${CAREER.active === i ? ' on' : ''}" style="--i:${i}" data-i="${i}" onclick="openCareerPath(${i})" aria-pressed="${CAREER.active === i}">
       <span class="cs-role">${esc(p.role)}</span>
       ${p.why ? `<span class="cs-why">${esc(p.why)}</span>` : ''}
-      ${(p.carry || []).length ? `<span class="cs-label">You bring</span><span class="cs-tags">${p.carry.map(t => `<span class="cs-tag">${esc(t)}</span>`).join('')}</span>` : ''}
-      ${(p.gaps || []).length ? `<span class="cs-label">To build</span><span class="cs-tags">${p.gaps.map(t => `<span class="cs-tag gap">${esc(t)}</span>`).join('')}</span>` : ''}
+      ${(p.carry || []).length ? `<span class="cs-label">You bring</span><span class="cs-tags">${tags(p.carry, '')}</span>` : ''}
+      ${(p.gaps || []).length ? `<span class="cs-label">To build</span><span class="cs-tags">${tags(p.gaps, ' gap')}</span>` : ''}
       ${p.first_step ? `<span class="cs-step"><b>This week</b>${esc(p.first_step)}</span>` : ''}
     </button>`).join('');
+}
+
+// Marks the open path without re-rendering, so the cards don't replay their entrance
+function markCareerPath() {
+  document.querySelectorAll('#cs-paths .cs-path').forEach(card => {
+    const on = +card.dataset.i === CAREER.active;
+    card.classList.toggle('on', on);
+    card.setAttribute('aria-pressed', on);
+  });
+}
+
+// Cards tilt toward the pointer and a soft yolk light follows it
+(function careerTilt() {
+  const box = document.getElementById('cs-paths');
+  box.addEventListener('pointermove', e => {
+    const card = e.target.closest('.cs-path');
+    if (!card || CS_CALM.matches || e.pointerType !== 'mouse') return;
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    card.style.setProperty('--mx', `${x * 100}%`);
+    card.style.setProperty('--my', `${y * 100}%`);
+    card.style.setProperty('--ry', `${(x - 0.5) * 8}deg`);
+    card.style.setProperty('--rx', `${(0.5 - y) * 8}deg`);
+  });
+  box.addEventListener('pointerout', e => {
+    const card = e.target.closest('.cs-path');
+    if (card && !card.contains(e.relatedTarget)) { card.style.removeProperty('--rx'); card.style.removeProperty('--ry'); }
+  });
+})();
+
+// The illustration holds its finished state for people who prefer less motion
+function careerTrackMotion() {
+  const svg = document.getElementById('cs-track');
+  if (!svg || !svg.pauseAnimations) return;
+  if (CS_CALM.matches) { svg.setCurrentTime(3.4); svg.pauseAnimations(); }
+  else svg.unpauseAnimations();
+}
+careerTrackMotion();
+if (CS_CALM.addEventListener) CS_CALM.addEventListener('change', careerTrackMotion);
+
+function careerBurst(el) {
+  if (CS_CALM.matches) return;
+  const r = el.getBoundingClientRect();
+  const colors = ['#FFA700', '#FFC94D', '#F5E6C8', '#2A2315'];
+  for (let k = 0; k < 14; k++) {
+    const dot = document.createElement('span');
+    const angle = (Math.PI * 2 * k) / 14 + Math.random() * 0.4;
+    const dist = 28 + Math.random() * 34;
+    dot.className = 'cs-burst';
+    dot.style.left = `${r.left + r.width / 2 - 3}px`;
+    dot.style.top = `${r.top + r.height / 2 - 3}px`;
+    dot.style.background = colors[k % colors.length];
+    dot.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    dot.style.setProperty('--dy', `${Math.sin(angle) * dist - 10}px`);
+    dot.style.setProperty('--rot', `${Math.random() * 360}deg`);
+    document.body.appendChild(dot);
+    dot.addEventListener('animationend', () => dot.remove());
+  }
 }
 
 function openCareerPath(i) {
   const p = CAREER.paths[i];
   if (!p) return;
   CAREER.active = i;
-  renderCareerPaths();
+  markCareerPath();
   searchCareerJobs(p.query, document.getElementById('cs-location').value.trim(), p.role);
 }
 
@@ -6219,7 +6378,7 @@ function exploreCareerField() {
     return;
   }
   CAREER.active = null;
-  renderCareerPaths();
+  markCareerPath();
   searchCareerJobs(q, document.getElementById('cs-location').value.trim(), q);
 }
 
@@ -6232,7 +6391,7 @@ async function searchCareerJobs(q, loc, label) {
   foot.textContent = 'Searching LinkedIn and company career pages…';
   list.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
   panel.hidden = false;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  panel.scrollIntoView({ behavior: CS_CALM.matches ? 'auto' : 'smooth', block: 'start' });
   try {
     const res = await fetch(`/api/career-switch/jobs?q=${encodeURIComponent(q)}&location=${encodeURIComponent(loc)}`);
     const data = await res.json();
@@ -6288,6 +6447,7 @@ async function addCareerResult(btn) {
     btn.textContent = data.already ? 'On board' : 'Added ✓';
     btn.classList.toggle('done', !data.already);
     if (!data.already) {
+      careerBurst(btn);
       CAREER.added++;
       const link = document.getElementById('cs-reload');
       link.textContent = `See ${CAREER.added} on board`;
@@ -6304,7 +6464,7 @@ async function addCareerResult(btn) {
 function closeCareerResults() {
   CAREER.seq++;
   CAREER.active = null;
-  renderCareerPaths();
+  markCareerPath();
   document.getElementById('cs-results').hidden = true;
 }
 
