@@ -1127,6 +1127,16 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 #toast { background: var(--ink); color: var(--paper); font-family: var(--font-mono); font-size: 12px; border-radius: 999px; padding: 10px 18px; }
 [data-theme="dark"] #toast { background: var(--paper); color: var(--ink); }
 
+.jtags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.jtag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; color: var(--txt); border: 1px solid var(--bdr); border-radius: 999px; padding: 1px 7px; }
+.jtag-pay { background: var(--purl); border-color: transparent; }
+
+/* Card "Move" menu: a native select so it works with touch and screen readers */
+.jmove { position: relative; display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--mut); border: 1px solid var(--bdr); border-radius: 999px; padding: 2px 8px; cursor: pointer; }
+.jmove::after { content: "▾"; font-size: 9px; }
+.jmove:hover, .jmove:focus-within { color: var(--txt); border-color: var(--bdr-strong); }
+.jmove select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+
 /* Find Jobs tab */
 .fj-intro { font-size: 13.5px; color: var(--mut); max-width: 640px; margin: -4px 0 16px; line-height: 1.5; }
 .fj-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -1596,6 +1606,15 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         <option value="gmail">Gmail</option>
         <option value="direct">Startups</option>
       </select>
+      <select id="work-filter" onchange="filterBoard()" aria-label="Filter by remote or on-site" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
+        <option value="all">Work: Any</option>
+        <option value="remote">Remote</option>
+        <option value="onsite">On-site / hybrid</option>
+      </select>
+      <select id="pay-filter" onchange="filterBoard()" aria-label="Filter by whether pay is listed" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
+        <option value="all">Pay: Any</option>
+        <option value="listed">Pay listed</option>
+      </select>
       <select id="board-sort" onchange="sortAllColumns(this.value)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="score">Sort: Score</option>
         <option value="date">Sort: Date</option>
@@ -1715,7 +1734,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         {% elif job.source %}
           {% set source_type = job.source %}
         {% endif %}
-        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
+        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" data-remote="{{ 1 if job.is_remote else 0 }}" data-salary="{{ 1 if job.salary_text else 0 }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
           <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;display:flex;align-items:center;justify-content:center;">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           </button>
@@ -1724,6 +1743,12 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             <img src="https://www.google.com/s2/favicons?sz=32&domain={{ source_domain }}" alt="" style="width:12px;height:12px;object-fit:contain;border-radius:2px;flex-shrink:0;">
             <span>{{ job.company }}</span>
           </div>
+          {% if job.salary_text or job.is_remote %}
+          <div class="jtags">
+            {% if job.is_remote %}<span class="jtag">Remote</span>{% endif %}
+            {% if job.salary_text %}<span class="jtag jtag-pay" title="Pay stated in the posting">{{ job.salary_text }}</span>{% endif %}
+          </div>
+          {% endif %}
           <div class="jdetails" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="js {% if score>=8 %}sh{% elif score>=6.5 %}sm{% else %}sl2{% endif %}">
@@ -1738,6 +1763,15 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>
                 </button>
               </div>
+              <label class="jmove" onclick="event.stopPropagation();" title="Move to another column">
+                <span aria-hidden="true">Move</span>
+                <select aria-label="Move {{ job.title }} to" onchange="moveJob('{{ job.job_id }}', this.value); this.selectedIndex = 0;">
+                  <option value="" selected disabled>Move to…</option>
+                  {% for target, label in [('new', 'Inbox'), ('shortlisted', 'Shortlist'), ('interviewing', 'Interviewing'), ('applied', 'Applied'), ('offer', 'Offer'), ('rejected', 'Rejected')] if target != col %}
+                  <option value="{{ target }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
             </div>
             <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;">
               <span class="jc" style="font-size:10px;line-height:1.2;">{{ job.location }}</span>
@@ -1978,242 +2012,8 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 </main>
 </div>
 
-<!-- Render job details modals (hidden by default) -->
-{% for col in cols %}
-  {% for job in board[col] %}
-  <div class="modal-backdrop" id="modal-backdrop-{{ job.job_id }}" onclick="closeJobModal('{{ job.job_id }}')">
-    <div class="modal" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">{{ job.title }}</h3>
-          <p class="jc" style="font-size:12px">{{ job.company }} &middot; {{ job.location }} &middot; <a href="{{ job.url }}" target="_blank" style="color:var(--pur);text-decoration:none">View Posting ↗</a></p>
-        </div>
-        <button class="modal-close" onclick="closeJobModal('{{ job.job_id }}')">&times;</button>
-      </div>
-      <div class="modal-content">
-        <div class="modal-tabs">
-          <button class="tab-btn active" onclick="switchTab(this, '{{ job.job_id }}', 'fit')">Fit Analysis</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'cl')">Cover Letter</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'resume')">Resume</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
-          <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">Quiz Mode</button>
-        </div>
-        <div class="modal-body">
-          
-          <!-- Fit Analysis Panel -->
-          <div class="tab-panel active" id="panel-fit-{{ job.job_id }}">
-            <span class="lbl">Fit analysis</span>
-            <div class="fit">{{ job.ai_summary or 'No summary yet — click Regenerate.' }}</div>
-            
-            {% if job.status == 'interviewing' %}
-            <div style="margin-top:14px; margin-bottom:14px; padding:12px; background:var(--purl); border:1px dashed var(--pur); border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:12px; font-weight:600; color:var(--pur);">Prepping for an interview? Try Quiz Mode &rarr;</span>
-              <button class="btn btn-p" style="font-size:11px; padding:4px 10px; border:none; background:var(--yolk); color:#0D0C0A; border-radius:12px; cursor:pointer;" onclick="const t = this.closest('.modal-content').querySelector('.modal-tabs button[onclick*=\'quiz\']'); if(t) t.click();">Open Prep</button>
-            </div>
-            {% endif %}
-            
-            {% if job.key_reqs_list %}
-            <div class="reqs">
-              {% for r in job.key_reqs_list %}<span class="rtag">{{ r }}</span>{% endfor %}
-            </div>
-            {% endif %}
-
-            {% if job.matched_skills_list or job.missing_skills_list %}
-            <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
-              {% if job.matched_skills_list %}
-              <div>
-                <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Matched Skills</span>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  {% for s in job.matched_skills_list %}
-                  <span style="font-size:11px; background-color:rgba(46, 204, 113, 0.15); color:#2ecc71; border:1px solid rgba(46, 204, 113, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">✓ {{ s }}</span>
-                  {% endfor %}
-                </div>
-              </div>
-              {% endif %}
-              
-              {% if job.missing_skills_list %}
-              <div>
-                <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Skill Gaps (Missing)</span>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  {% for s in job.missing_skills_list %}
-                  <span style="font-size:11px; background-color:rgba(231, 76, 60, 0.15); color:#e74c3c; border:1px solid rgba(231, 76, 60, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">⚠ {{ s }}</span>
-                  {% endfor %}
-                </div>
-              </div>
-              {% endif %}
-            </div>
-            {% endif %}
-            
-            {% if job.description %}
-            <span class="lbl" style="margin-top:16px;display:block">Job Description Preview</span>
-            <div style="font-size:12px;color:var(--mut);max-height:220px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;line-height:1.5">{{ job.description }}</div>
-            {% endif %}
-          </div>
-          
-          <!-- Cover Letter Panel -->
-          <div class="tab-panel" id="panel-cl-{{ job.job_id }}">
-            <span class="lbl">Cover letter</span>
-            {% if job.cover_letter %}
-            <input class="subj" id="subj-{{ job.job_id }}" value="{{ job.cover_letter.subject }}" placeholder="Subject line">
-            <textarea class="body" id="body-{{ job.job_id }}">{{ job.cover_letter.body }}</textarea>
-            
-            {% if job.cover_letter.linkedin_note %}
-            <span class="lbl" style="display:block;margin-top:14px">LinkedIn connection note</span>
-            <div class="note-box">{{ job.cover_letter.linkedin_note }}</div>
-            {% endif %}
-            
-            <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
-              <button class="btn btn-p" onclick="saveCL('{{ job.job_id }}')">Save Changes</button>
-              <button class="btn" onclick="regen('{{ job.job_id }}')">↺ Regenerate with AI</button>
-              <button class="btn btn-g" onclick="sendEmail('{{ job.job_id }}')">✉ Send email</button>
-            </div>
-            {% else %}
-            <div style="color:var(--mut);font-size:13px;margin-bottom:8px">No cover letter generated yet.</div>
-            <button class="btn btn-p" onclick="regen('{{ job.job_id }}')">Generate with Gemini</button>
-            {% endif %}
-          </div>
-          
-          <!-- Emails Panel -->
-          <div class="tab-panel" id="panel-emails-{{ job.job_id }}">
-            <span class="lbl">Received Emails</span>
-            {% if job.emails %}
-              {% for mail in job.emails %}
-              <div class="mcard">
-                <div class="mcard-header">
-                  <div>
-                    <div class="mcard-sender">From: {{ mail.sender }}</div>
-                    <div class="mcard-subject">Subject: {{ mail.subject }}</div>
-                  </div>
-                  <div class="mcard-time">
-                    <time class="local-time" data-fmt="ymd-hm" datetime="{{ mail.received_at|utc_iso }}">{{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}</time>
-                  </div>
-                </div>
-                <div class="mcard-body">{{ mail.body }}</div>
-              </div>
-              {% endfor %}
-            {% else %}
-              <div style="text-align:center;padding:40px 10px;color:var(--hin)">
-                <div style="font-size:24px;margin-bottom:8px">✉</div>
-                <div style="font-size:12px">No updates matched for this job yet from your Gmail.</div>
-                <div style="font-size:10px;color:var(--hin);margin-top:4px">Make sure IMAP is configured in your .env and click Refresh.</div>
-              </div>
-            {% endif %}
-          </div>
-          
-          <!-- Notes & Contacts Panel -->
-          <div class="tab-panel" id="panel-notes-{{ job.job_id }}">
-            <span class="lbl">Hiring Contacts</span>
-            {% if job.contacts %}
-              {% for c in job.contacts %}
-              <div class="contact">
-                <div class="cn">{{ c.name }}</div>
-                <div class="ct2">{{ c.title }}</div>
-                <div class="cl2">
-                  {% if c.linkedin_url %}
-                    <a href="{{ c.linkedin_url }}" target="_blank">LinkedIn ↗</a>
-                  {% endif %}
-                  {% if c.email %}
-                    <a href="mailto:{{ c.email }}">{{ c.email }}</a>
-                  {% endif %}
-                </div>
-              </div>
-              {% endfor %}
-            {% else %}
-            <div style="font-size:12px;color:var(--mut);margin-bottom:10px">No contacts found.</div>
-            {% endif %}
-            
-            <span class="lbl" style="display:block;margin-top:14px">Your application notes</span>
-            <textarea class="notes" id="note-{{ job.job_id }}"
-                      placeholder="Interview details, referral notes, salary targets…"
-                      onblur="saveNote('{{ job.job_id }}')">{{ job.notes.note if job.notes else '' }}</textarea>
-          </div>
-          
-          <!-- Timeline Panel -->
-          <div class="tab-panel" id="panel-timeline-{{ job.job_id }}">
-            <span class="lbl">Timeline</span>
-            {% if job.timeline %}
-              {% for t in job.timeline %}
-              <div class="tl-item">{{ t.event }} <span style="opacity:.6">— <time class="local-time" data-fmt="ymd" datetime="{{ t.created_at|utc_iso }}">{{ t.created_at[:10] }}</time></span></div>
-              {% endfor %}
-            {% else %}
-              <div style="font-size:12px;color:var(--mut)">No events logged.</div>
-            {% endif %}
-          </div>
-
-          <!-- Tailored Resume Panel -->
-          <div class="tab-panel" id="panel-resume-{{ job.job_id }}">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <span class="lbl">Tailored Resume</span>
-              <a href="/resume/{{ job.job_id }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
-                Save / Download as PDF
-              </a>
-            </div>
-            
-            <div class="resume-loading-{{ job.job_id }}" style="text-align:center;padding:40px;color:var(--mut);">
-              Tailoring your resume for this JD...
-            </div>
-            
-            <div class="resume-content-box-{{ job.job_id }}" style="display:none;background:var(--bg);padding:16px;border-radius:8px;font-size:12px;color:var(--txt);line-height:1.6;overflow-y:auto;max-height:380px;white-space:pre-wrap;font-family:monospace;border:1px solid var(--bdr);text-align:left;">
-            </div>
-          </div>
-          
-          <!-- Quiz Mode Panel -->
-          <div class="tab-panel quiz-theme" id="panel-quiz-{{ job.job_id }}" style="position:relative;">
-            <style>
-              #panel-quiz-{{ job.job_id }} {
-                --pur: #6C5CE7;
-                --purl: rgba(108, 92, 231, 0.08);
-              }
-            </style>
-            
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-              <span class="lbl" style="color:var(--pur); font-weight:700;">Interview Prep Quiz</span>
-              <button class="btn btn-p" style="background:var(--yolk); border:none; color:#0D0C0A; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">Regenerate Questions</button>
-            </div>
-            
-            <div class="quiz-loading-{{ job.job_id }}" style="text-align:center; padding:40px; color:var(--mut);">
-              Generating tailored interview questions...
-            </div>
-            
-            <div class="quiz-content-{{ job.job_id }}" style="display:none; flex-direction:column; gap:20px; text-align:left;">
-              <div class="qz-practice"></div>
-              <div>
-                <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Quick-Fire Flashcards (Tap to Reveal)</span>
-                <div class="flashcard-container-{{ job.job_id }}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:8px;">
-                  <!-- JS populated cards -->
-                </div>
-              </div>
-              
-              <div style="border-top: 1px solid var(--bdr); padding-top:16px;">
-                <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Deeper Prep Questions</span>
-                
-                <!-- STAR Method Guideline -->
-                <div style="background: var(--purl); border: 1px solid var(--pur); border-radius: 12px; padding: 12px; font-size: 11.5px; color: var(--txt); line-height: 1.5; margin-bottom: 12px;">
-                  <strong style="color: var(--purt); display: block; margin-bottom: 4px;">STAR Framework Guideline</strong>
-                  Use the STAR method to structure your answers:
-                  <ul style="margin-left: 16px; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
-                    <li><strong>Situation:</strong> Set the scene (context, company, background).</li>
-                    <li><strong>Task:</strong> Describe the specific challenge or goal you needed to address.</li>
-                    <li><strong>Action:</strong> Explain the exact steps you took (focus on your individual contribution).</li>
-                    <li><strong>Result:</strong> Share the quantitative/qualitative outcomes of your actions.</li>
-                  </ul>
-                </div>
-
-                <div class="deep-questions-list-{{ job.job_id }}" style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
-                  <!-- JS populated deep questions -->
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-{% endfor %}
+<!-- Job details popups are fetched when a card is opened (see openJobModal) -->
+<div id="job-modals"></div>
 <!-- Self Import Modal -->
 <div class="modal-backdrop" id="modal-whatsapp" style="display: none; align-items: center; justify-content: center; z-index: 10000;">
   <div class="modal-window" style="max-width: 500px; padding: 24px;">
@@ -3346,13 +3146,12 @@ function openQuizFor(jobId) {
   if (typeof openJobModal !== 'function') return;
   QZ_AUTOSTART = jobId;  // Sunny asked: go straight into spoken practice
   closeVoiceAssistant();
-  openJobModal(jobId);
-  setTimeout(() => {
+  openJobModal(jobId).then(ok => ok && setTimeout(() => {
     const modal = document.getElementById('modal-backdrop-' + jobId);
     modal?.querySelector('button[onclick*="quiz"]')?.click();
     // Questions already loaded earlier: start right away
     if (QZ[jobId] && QZ_AUTOSTART === jobId) { QZ_AUTOSTART = null; startPractice(jobId); }
-  }, 200);
+  }, 200));
 }
 
 function confirmVoiceAction() {
@@ -3905,15 +3704,44 @@ async function quickImportWhatsapp() {
 }
 
 // Modal Controls
-function openJobModal(id) {
-  document.getElementById('modal-backdrop-' + id).style.display = 'flex';
+const JOB_MODAL_LOADS = {};
+
+function loadJobModal(id) {
+  if (document.getElementById('modal-backdrop-' + id)) return Promise.resolve(true);
+  if (!JOB_MODAL_LOADS[id]) {
+    JOB_MODAL_LOADS[id] = fetch('/job/' + encodeURIComponent(id) + '/modal')
+      .then(res => { if (!res.ok) throw new Error(res.status === 404 ? 'That job is no longer on your board.' : 'Could not open that job.'); return res.text(); })
+      .then(html => {
+        const holder = document.getElementById('job-modals') || document.body;
+        holder.insertAdjacentHTML('beforeend', html);
+        const modal = document.getElementById('modal-backdrop-' + id);
+        if (modal && typeof formatLocalTimes === 'function') formatLocalTimes(modal);
+        return !!modal;
+      })
+      .finally(() => { delete JOB_MODAL_LOADS[id]; });
+  }
+  return JOB_MODAL_LOADS[id];
+}
+
+async function openJobModal(id) {
+  try {
+    await loadJobModal(id);
+  } catch (e) {
+    toast(e.message || 'Could not open that job.');
+    return false;
+  }
+  const modal = document.getElementById('modal-backdrop-' + id);
+  if (!modal) return false;
+  modal.style.display = 'flex';
   if (typeof sunnyAct === 'function') sunnyAct('peek');
+  return true;
 }
 
 function closeJobModal(id) {
   quizStopMic(id);
   if (QZ[id]) stopSpeaking();
-  document.getElementById('modal-backdrop-' + id).style.display = 'none';
+  const modal = document.getElementById('modal-backdrop-' + id);
+  if (modal) modal.style.display = 'none';
   if (typeof sunnyAct === 'function') sunnyAct('wave');
 }
 
@@ -3997,24 +3825,31 @@ async function dropCard(e, col) {
   e.preventDefault();
   e.currentTarget.classList.remove('over');
   if (!draggingId) return;
-  
+  moveJob(draggingId, col);
+}
+
+const COL_LABELS = { new: 'Inbox', shortlisted: 'Shortlist', interviewing: 'Interviewing', applied: 'Applied', offer: 'Offer', rejected: 'Rejected', whatsapp: 'Self-import' };
+
+// Used by drag and drop and by the "Move" menu on each card (drag doesn't work on touch screens).
+async function moveJob(jobId, col) {
+  if (!jobId || !col) return;
   // Map column name to DB status
   let status = col;
   if (col === 'new') status = 'ready';
-  
+
   if (status === 'interviewing') {
-    openRoundModal(draggingId);
+    openRoundModal(jobId);
     return;
   }
-  
-  const r = await fetch('/api/job/' + draggingId + '/status', {
+
+  const r = await fetch('/api/job/' + jobId + '/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
   });
   
   if ((await r.json()).ok) {
-    toast('Moved to ' + col);
+    toast('Moved to ' + (COL_LABELS[col] || col));
     sunnyReactToMove(status);
     setTimeout(() => location.reload(), 1200);  // long enough to see Sunny react
   }
@@ -4383,6 +4218,8 @@ function filterBoard() {
   const sourceValue = document.getElementById('source-filter') ? document.getElementById('source-filter').value : 'all';
   const minScore = document.getElementById('score-filter') ? parseFloat(document.getElementById('score-filter').value) : 0;
   const locQuery = document.getElementById('location-search') ? document.getElementById('location-search').value.toLowerCase().trim() : '';
+  const work = (document.getElementById('work-filter') || {}).value || 'all';
+  const pay = (document.getElementById('pay-filter') || {}).value || 'all';
   
   const cards = document.querySelectorAll('.jcard');
   let visible = 0;
@@ -4397,8 +4234,11 @@ function filterBoard() {
     const matchesSource = sourceValue === 'all' || cardSource === sourceValue;
     const matchesScore = cardScore >= minScore;
     const matchesLocation = !locQuery || cardLocation.includes(locQuery);
-    
-    if (matchesSearch && matchesSource && matchesScore && matchesLocation) {
+    const remote = card.dataset.remote === '1';
+    const matchesWork = work === 'all' || (work === 'remote' ? remote : !remote);
+    const matchesPay = pay === 'all' || card.dataset.salary === '1';
+
+    if (matchesSearch && matchesSource && matchesScore && matchesLocation && matchesWork && matchesPay) {
       card.style.display = '';
       visible++;
     } else {
@@ -4407,7 +4247,7 @@ function filterBoard() {
   });
   
   updateColumnCounts();
-  updateBoardSearchUI(visible, cards.length, !!(query || locQuery || sourceValue !== 'all' || minScore > 0));
+  updateBoardSearchUI(visible, cards.length, !!(query || locQuery || sourceValue !== 'all' || minScore > 0 || work !== 'all' || pay !== 'all'));
 }
 
 function sortAllColumns(sortBy) {
