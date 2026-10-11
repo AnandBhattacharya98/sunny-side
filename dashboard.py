@@ -8,6 +8,7 @@ from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, 
 import voice_engine as ve
 import quiz_coach
 import followups
+from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
@@ -1049,6 +1050,19 @@ def view_emails():
     return render_template("dashboard.html", view_mode="emails", emails=emails, stats=stats)
 
 
+@app.route("/find")
+def find_jobs():
+    """Search the web for any role, separate from the resume-based board."""
+    conn = get_conn(DB_PATH)
+    uid = get_user_id()
+    settings = get_user_settings(conn, uid, mask_secrets=True)
+    stats = _stats(conn)
+    conn.close()
+    return render_template("dashboard.html", view_mode="find", settings=settings, stats=stats,
+                           find_q=(request.args.get("q") or "")[:80], find_loc=(request.args.get("location") or "")[:60],
+                           find_remote=request.args.get("remote") in ("1", "true", "on"))
+
+
 @app.route("/pipeline")
 def pipeline():
     return redirect("/")
@@ -1651,7 +1665,11 @@ def search_web_jobs_api():
     if not ve.rate_limiter.allow(uid, "web_search", 10):
         return jsonify({"ok": False, "error": "That's a lot of searches. Give it a minute and try again."}), 429
 
-    found = search_web_jobs(query, location)
+    remote_only = request.args.get("remote") in ("1", "true", "on")
+    found = search_web_jobs(query, location, remote_only=remote_only)
+    _remember_search_results(uid, found["results"])
+    for r in found["results"]:
+        r["snippet"] = _snippet_text(r.pop("description", "") or "")
     conn = get_conn(DB_PATH)
     rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
     conn.close()
@@ -1659,7 +1677,45 @@ def search_web_jobs_api():
     on_board_pairs = {(r[1], r[2]) for r in rows}
     for r in found["results"]:
         r["on_board"] = r["url"] in on_board_urls or (r["title"].lower(), r["company"].lower()) in on_board_pairs
-    return jsonify({"ok": True, "query": query, "location": location, **found})
+    return jsonify({"ok": True, "query": query, "location": location, "remote": remote_only, **found})
+
+
+# Remote-board results are kept for a while so "Add to board" saves the full
+# description the server fetched, not text sent back by the browser.
+_SEARCH_RESULTS: dict[tuple[int, str], tuple[float, dict]] = {}
+_SEARCH_RESULTS_TTL = 1800
+_search_results_lock = threading.Lock()
+
+
+def _remember_search_results(uid, results):
+    now = time.monotonic()
+    with _search_results_lock:
+        for k in [k for k, (t, _) in _SEARCH_RESULTS.items() if now - t > _SEARCH_RESULTS_TTL]:
+            del _SEARCH_RESULTS[k]
+        for r in results:
+            if r.get("source") in SEARCH_REMOTE_SOURCES:
+                _SEARCH_RESULTS[(uid, r["ref"])] = (now, dict(r))
+
+
+def _recall_search_result(uid, ref):
+    with _search_results_lock:
+        hit = _SEARCH_RESULTS.get((uid, ref))
+    return hit[1] if hit else None
+
+
+def _snippet_text(text, n=220):
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + "…"
+
+
+def _url_on_host(url, hosts):
+    from urllib.parse import urlparse
+    try:
+        u = urlparse(url)
+    except ValueError:
+        return False
+    host = (u.hostname or "").lower()
+    return u.scheme == "https" and any(host == h or host.endswith("." + h) for h in hosts)
 
 
 def _score_added_job(uid, job_id):
@@ -1707,6 +1763,27 @@ def add_web_search_result():
             "location": str(data.get("location", "")).strip()[:120] or "India",
             "url": url, "source": "linkedin", "description": _fetch_description(url),
             "posted_at": str(data.get("posted_at", ""))[:40],
+        }
+    elif source in SEARCH_REMOTE_SOURCES:
+        from scraper import SOURCE_HOSTS
+        ref = str(data.get("ref", ""))[:200]
+        cached = _recall_search_result(uid, ref)
+        if cached:
+            r = cached
+        else:
+            # Another worker ran the search: fall back to what the browser sent, checked.
+            r = {"title": str(data.get("title", "")).strip()[:200], "company": str(data.get("company", "")).strip()[:120],
+                 "location": str(data.get("location", "")).strip()[:120] or "Remote",
+                 "url": str(data.get("url", "")).strip()[:500], "posted_at": str(data.get("posted_at", ""))[:40],
+                 "description": ""}
+            if not r["title"] or not r["company"]:
+                return jsonify({"ok": False, "error": "Missing title or company."}), 400
+        if not _url_on_host(r["url"], SOURCE_HOSTS[source]):
+            return jsonify({"ok": False, "error": "That link doesn't match where the job came from."}), 400
+        job = {
+            "job_id": f"{source}_{re.sub(r'[^a-z0-9]', '_', ref.partition(':')[2].lower())[:80]}",
+            "title": r["title"], "company": r["company"], "location": r["location"], "url": r["url"],
+            "source": source, "description": (r.get("description") or "")[:3000], "posted_at": r.get("posted_at", ""),
         }
     else:
         return jsonify({"ok": False, "error": "Unknown source."}), 400
@@ -1782,6 +1859,9 @@ def career_switch_jobs():
     rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
     conn.close()
     found = search_web_jobs(query, location)
+    _remember_search_results(uid, found["results"])
+    for r in found["results"]:
+        r["snippet"] = _snippet_text(r.pop("description", "") or "")
     on_board_urls = {r[0] for r in rows if r[0]}
     on_board_pairs = {(r[1], r[2]) for r in rows}
     results = []

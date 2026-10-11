@@ -4,6 +4,7 @@ scraper.py — Scrapes PM job listings with zero API keys required.
 Sources (all free, no auth):
   - LinkedIn Jobs public pages
   - Company job boards, read from their public Greenhouse / Lever feeds
+  - Remote-job boards with open APIs (Remotive, Jobicy, Arbeitnow), for search only
 
 Naukri and Google search were removed: both block scripted requests and never
 returned a single job.
@@ -268,15 +269,20 @@ def linkedin_job_id(url: str) -> str:
     return f"li_{re.sub(r'[^0-9]', '', url[-20:])}"
 
 
-def search_linkedin(query: str, location: str = "", limit: int = 15) -> list[dict]:
+def search_linkedin(query: str, location: str = "", limit: int = 15, remote: bool = False) -> list[dict]:
     import urllib.parse
-    url = ("https://www.linkedin.com/jobs/search?"
-           f"keywords={urllib.parse.quote_plus(query)}"
-           f"&location={urllib.parse.quote_plus(location or 'India')}&f_TPR=r2592000")
-    resp = requests.get(url, headers=HEADERS, timeout=12)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    params = (f"keywords={urllib.parse.quote_plus(query)}"
+              f"&location={urllib.parse.quote_plus(location or 'India')}&f_TPR=r2592000"
+              + ("&f_WT=2" if remote else ""))
+    resp = requests.get(f"https://www.linkedin.com/jobs/search?{params}", headers=HEADERS, timeout=12)
+    cards = BeautifulSoup(resp.text, "html.parser").select("div.base-card")
+    if not cards:
+        # The full page is sometimes served without listings; the guest feed has the same cards.
+        resp = requests.get(f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?{params}&start=0",
+                            headers=HEADERS, timeout=12)
+        cards = BeautifulSoup(resp.text, "html.parser").select("div.base-card")
     results = []
-    for card in soup.select("div.base-card"):
+    for card in cards:
         title_el = card.select_one("h3.base-search-card__title")
         company_el = card.select_one("h4.base-search-card__subtitle")
         loc_el = card.select_one("span.job-search-card__location")
@@ -345,26 +351,147 @@ def search_company_boards(query: str, location: str = "", limit: int = 15) -> li
     return results
 
 
-def search_web_jobs(query: str, location: str = "") -> dict:
-    """Searches LinkedIn and the company feeds at once. Returns results plus the sources that failed."""
+# Remote-job boards with open JSON APIs. They cover roles worldwide, so a
+# result is kept only if people in the searched place (India by default) can apply.
+OPEN_GEO_HINTS = ["worldwide", "anywhere", "global", "asia", "apac", "emea", "international"]
+
+
+def _remote_geo_ok(geo: str, location: str) -> bool:
+    g = (geo or "").lower()
+    if not g:
+        return True
+    if any(h in g for h in OPEN_GEO_HINTS):
+        return True
+    wanted = (location or "").lower().strip()
+    if wanted and wanted != "remote":
+        return _location_matches(g, wanted)
+    return any(h in g for h in INDIA_LOCATION_HINTS if h != "remote")
+
+
+def _snippet(text: str, n: int = 220) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip()
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + "…"
+
+
+def _remote_result(source, ref, title, company, geo, url, posted_at, description, salary=""):
+    return {
+        "source": source, "ref": ref, "title": title.strip(), "company": (company or "Unknown").strip(),
+        "location": f"Remote · {geo}" if geo else "Remote", "url": url, "posted_at": posted_at or "",
+        "remote": True, "salary": salary or "", "description": (description or "")[:3000],
+    }
+
+
+def search_remotive(query: str, location: str = "", limit: int = 15) -> list[dict]:
+    resp = requests.get("https://remotive.com/api/remote-jobs", params={"search": query, "limit": 50},
+                        headers=HEADERS, timeout=12)
+    resp.raise_for_status()
+    out = []
+    for j in resp.json().get("jobs", []):
+        geo = j.get("candidate_required_location", "")
+        if not j.get("title") or not j.get("url") or not _remote_geo_ok(geo, location):
+            continue
+        out.append(_remote_result("remotive", f"remotive:{j.get('id')}", j["title"], j.get("company_name"), geo,
+                                  j["url"], j.get("publication_date", ""), _html_to_text(j.get("description", "")),
+                                  j.get("salary", "")))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def search_jobicy(query: str, location: str = "", limit: int = 15) -> list[dict]:
+    resp = requests.get("https://jobicy.com/api/v2/remote-jobs", params={"count": 50, "tag": query},
+                        headers=HEADERS, timeout=12)
+    resp.raise_for_status()
+    out = []
+    for j in resp.json().get("jobs", []) or []:
+        geo = j.get("jobGeo", "")
+        if not j.get("jobTitle") or not j.get("url") or not _remote_geo_ok(geo, location):
+            continue
+        salary = ""
+        if j.get("annualSalaryMin") and j.get("annualSalaryMax"):
+            salary = f"{j.get('salaryCurrency', '')} {j['annualSalaryMin']:,}–{j['annualSalaryMax']:,}".strip()
+        out.append(_remote_result("jobicy", f"jobicy:{j.get('id')}", j["jobTitle"], j.get("companyName"), geo,
+                                  j["url"], j.get("pubDate", ""),
+                                  _html_to_text(j.get("jobDescription") or j.get("jobExcerpt", "")), salary))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def search_arbeitnow(query: str, location: str = "", limit: int = 15) -> list[dict]:
+    """Arbeitnow has no search parameter, so its latest listings are matched here."""
+    resp = requests.get("https://www.arbeitnow.com/api/job-board-api", headers=HEADERS, timeout=12)
+    resp.raise_for_status()
+    out = []
+    for j in resp.json().get("data", []):
+        title = j.get("title", "")
+        if not title or not j.get("url") or not j.get("remote"):
+            continue
+        if not _title_matches(title, query) and query.lower() not in (j.get("company_name") or "").lower():
+            continue
+        geo = j.get("location", "")
+        if location and location.lower() != "remote" and not _location_matches(geo, location):
+            continue
+        created = j.get("created_at")
+        posted = datetime.utcfromtimestamp(created).isoformat() if isinstance(created, (int, float)) else ""
+        out.append(_remote_result("arbeitnow", f"arbeitnow:{j.get('slug')}", title, j.get("company_name"), geo,
+                                  j["url"], posted, _html_to_text(j.get("description", ""))))
+        if len(out) >= limit:
+            break
+    return out
+
+
+SEARCH_SOURCES = ["linkedin", "direct", "remotive", "jobicy", "arbeitnow"]
+REMOTE_SOURCES = {"remotive", "jobicy", "arbeitnow"}
+# Where a saved result's link may point, per source.
+SOURCE_HOSTS = {"remotive": ("remotive.com",), "jobicy": ("jobicy.com",), "arbeitnow": ("arbeitnow.com",)}
+
+
+def search_web_jobs(query: str, location: str = "", remote_only: bool = False) -> dict:
+    """Searches LinkedIn, company feeds and remote-job boards at once.
+
+    Returns results plus the sources that failed. Remote boards only list remote
+    roles, so they're skipped when someone asks for a specific city."""
     import concurrent.futures
-    sources = {"linkedin": search_linkedin, "direct": search_company_boards}
+    loc = (location or "").strip()
+    city_only = loc and loc.lower() != "remote" and not remote_only
+    names = [n for n in SEARCH_SOURCES if not (city_only and n in REMOTE_SOURCES)]
     results, failed = [], []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-        futures = {name: ex.submit(fn, query, location) for name, fn in sources.items()}
+    where = "" if loc.lower() == "remote" else loc
+    remote = remote_only or loc.lower() == "remote"
+    fns = {"linkedin": lambda: search_linkedin(query, where, remote=remote),
+           "direct": lambda: search_company_boards(query, where),
+           "remotive": lambda: search_remotive(query, where),
+           "jobicy": lambda: search_jobicy(query, where),
+           "arbeitnow": lambda: search_arbeitnow(query, where)}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(names)) as ex:
+        futures = {n: ex.submit(fns[n]) for n in names}
         for name, fut in futures.items():
             try:
                 results += fut.result()
             except Exception as e:
                 print(f"  [search {name}] {e}")
                 failed.append(name)
+    if remote:
+        # LinkedIn's remote filter is trusted; company feeds must say "remote" themselves.
+        results = [r for r in results if r["source"] == "linkedin" or r.get("remote")
+                   or "remote" in (r.get("location") or "").lower()]
     seen, unique = set(), []
     for r in results:
         k = (r["title"].lower(), r["company"].lower())
         if k not in seen:
             seen.add(k)
             unique.append(r)
-    return {"results": unique, "failed": failed}
+    # Take turns between sources so one busy source doesn't bury the others.
+    by_source: dict[str, list] = {}
+    for r in unique:
+        by_source.setdefault(r["source"], []).append(r)
+    mixed = []
+    while any(by_source.values()):
+        for group in by_source.values():
+            if group:
+                mixed.append(group.pop(0))
+    return {"results": mixed, "failed": failed}
 
 
 def find_board_posting(ref: str) -> dict | None:
