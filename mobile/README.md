@@ -26,12 +26,13 @@ Safari use **Share → Add to Home Screen**. That uses the manifest and service 
 
 ## 1. Point the apps at your site
 
-The apps open the address in `SUNNY_SERVER_URL`. It must be `https://`.
+The apps open https://pm-job-hunter-qfva.onrender.com. To build them for a different copy of the site, set
+`SUNNY_SERVER_URL` (it must be `https://`):
 
 ```bash
 cd mobile
 npm install
-export SUNNY_SERVER_URL=https://your-sunny-side-site.com
+export SUNNY_SERVER_URL=https://another-copy-of-the-site.com
 npx cap sync
 ```
 
@@ -49,8 +50,8 @@ Every push to `main` that touches `mobile/` builds a debug APK in GitHub Actions
 (**Actions → Android app → latest run → Artifacts → sunny-side-debug-apk**). You can also start
 it by hand with **Run workflow**.
 
-First set the repository variable `SUNNY_SERVER_URL` (**Settings → Secrets and variables →
-Actions → Variables → New repository variable**), or the APK will open a placeholder address.
+To build it for a different address, set the repository variable `SUNNY_SERVER_URL` (**Settings →
+Secrets and variables → Actions → Variables → New repository variable**).
 
 Unzip the artifact, copy `app-debug.apk` to an Android phone and open it (allow "install unknown
 apps" when asked).
@@ -82,7 +83,7 @@ iOS apps can only be built on a Mac with Xcode.
 ```bash
 cd mobile
 npm install
-SUNNY_SERVER_URL=https://your-sunny-side-site.com npm run ios   # opens Xcode
+npm run ios   # opens Xcode
 ```
 
 In Xcode, select the **App** target → **Signing & Capabilities**, choose your team, and press

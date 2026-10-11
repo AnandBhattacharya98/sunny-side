@@ -4,12 +4,9 @@ import { join } from 'path';
 
 // The apps are a native shell around the Sunny Side website: every page, sign-in and
 // update comes from the site, so a deploy reaches app users without a store release.
-// Set SUNNY_SERVER_URL to your site's https address before `npx cap sync`.
-const PLACEHOLDER_URL = 'https://sunny-side.example.com';
-const serverUrl = (process.env.SUNNY_SERVER_URL || PLACEHOLDER_URL).replace(/\/+$/, '');
-if (serverUrl === PLACEHOLDER_URL) {
-  console.warn(`[sunny-side] SUNNY_SERVER_URL is not set; the app will open ${PLACEHOLDER_URL}.`);
-}
+// SUNNY_SERVER_URL points a build at another copy of the site (e.g. a staging deploy).
+const DEFAULT_URL = 'https://pm-job-hunter-qfva.onrender.com';
+const serverUrl = (process.env.SUNNY_SERVER_URL || DEFAULT_URL).replace(/\/+$/, '');
 
 // The offline page is a local file, so it needs the site's address for "Try again".
 // Capacitor reads this config before copying www/ into the apps, so the file is current.
