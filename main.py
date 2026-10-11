@@ -17,6 +17,7 @@ Optional .env keys (all features work without them):
   ANTHROPIC_API_KEY   Better scoring + AI-written cover letters
   SENDER_EMAIL        Email digest delivery (Gmail)
   SENDER_PASSWORD     Gmail app password
+  BREVO_API_KEY       Send email over Brevo's HTTPS API instead (for hosts that block SMTP)
   PROXYCURL_API_KEY   Live LinkedIn contact lookup
   TELEGRAM_BOT_TOKEN  Telegram phone notifications
 """
