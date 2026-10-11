@@ -537,6 +537,23 @@ def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
     ).fetchone())
 
 
+def delete_user_data(conn, user_id: int) -> None:
+    """Removes a user and everything stored for them. Rows keyed by job are matched through the user's jobs too,
+    since some older rows carry the default user_id."""
+    job_ids = [r[0] for r in conn.execute("SELECT job_id FROM jobs WHERE user_id = ?", (user_id,)).fetchall()]
+    for table in ("application_timeline", "cover_letters", "application_notes", "tailored_resumes", "interview_prep",
+                  "contacts", "received_emails"):
+        conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        for i in range(0, len(job_ids), 500):
+            chunk = job_ids[i:i + 500]
+            conn.execute(f"DELETE FROM {table} WHERE job_id IN ({','.join('?' * len(chunk))})", chunk)
+    conn.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM user_company_boards WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+
+
 def add_timeline(conn: sqlite3.Connection, job_id: str, event: str) -> None:
     from datetime import datetime
     row = conn.execute("SELECT user_id FROM jobs WHERE job_id = ?", (job_id,)).fetchone()

@@ -1,9 +1,9 @@
-import os, re, json, sqlite3, hmac, secrets, threading, time, base64
+import os, re, json, sqlite3, hmac, secrets, threading, time, base64, logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
 from werkzeug.middleware.proxy_fix import ProxyFix
-from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets
+from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets, delete_user_data
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
 import quiz_coach
@@ -14,6 +14,9 @@ from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
+                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__, template_folder='.')
 app.secret_key = get_app_secret()
@@ -209,7 +212,7 @@ def _check_oauth_state():
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations", "forgot_password", "reset_password"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -973,7 +976,6 @@ def _batch_full_jobs(conn, raw_jobs, uid):
 def index():
     conn = get_conn(DB_PATH)
     uid = session.get("user_id")
-    print(f"DEBUG: index route called. session user_id = {uid}")
     if not uid:
         # Fetch consenting seekers for landing page wall (excluding admin)
         users = conn.execute(
@@ -1139,17 +1141,111 @@ def delete_user(user_id):
         return jsonify({"error": "cannot delete admin"}), 400
         
     conn = get_conn(DB_PATH)
-    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    conn.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM contacts WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM cover_letters WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM application_notes WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM application_timeline WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM received_emails WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM tailored_resumes WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM interview_prep WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    try:
+        delete_user_data(conn, user_id)
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+# ── Your data: export and account deletion ────────────────────────────────
+
+EXPORT_JOB_FIELDS = ["title", "company", "location", "url", "status", "ai_score", "source", "posted_at", "scraped_at",
+                     "interview_round", "interview_at", "closed_at"]
+
+
+def _export_rows(conn, uid):
+    jobs = [dict(r) for r in conn.execute(
+        f"SELECT job_id, {', '.join(EXPORT_JOB_FIELDS)} FROM jobs WHERE user_id = ? ORDER BY scraped_at", (uid,)).fetchall()]
+    notes = {r[0]: r[1] for r in conn.execute("SELECT job_id, note FROM application_notes WHERE user_id = ?", (uid,)).fetchall()}
+    for j in jobs:
+        j["note"] = notes.get(j["job_id"]) or ""
+    return jobs
+
+
+@app.route("/api/account/export")
+def export_account():
+    """Download your own data: jobs as CSV, or everything (minus secrets) as JSON."""
+    import csv
+    import io
+    uid = get_user_id()
+    fmt = request.args.get("format", "csv")
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    conn = get_conn(DB_PATH)
+    try:
+        jobs = _export_rows(conn, uid)
+        if fmt == "json":
+            profile = conn.execute("SELECT username, name, designation, linkedin_profile, resume_text, created_at FROM users WHERE id = ?",
+                                   (uid,)).fetchone()
+            job_ids = {j["job_id"] for j in jobs}
+
+            def for_jobs(sql):
+                return [dict(r) for r in conn.execute(sql, (uid,)).fetchall() if r["job_id"] in job_ids]
+            data = {
+                "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "profile": dict(profile) if profile else {},
+                "jobs": jobs,
+                "cover_letters": for_jobs("SELECT job_id, subject, body, linkedin_note, created_at FROM cover_letters WHERE user_id = ?"),
+                "timeline": for_jobs("SELECT job_id, event, created_at FROM application_timeline WHERE user_id = ?"),
+                "contacts": for_jobs("SELECT job_id, name, title, linkedin_url, email FROM contacts WHERE user_id = ?"),
+                "followed_companies": [dict(r) for r in conn.execute(
+                    "SELECT company, ats, board FROM user_company_boards WHERE user_id = ?", (uid,)).fetchall()],
+            }
+            body, mimetype, ext = json.dumps(data, indent=2, default=str), "application/json", "json"
+        else:
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=EXPORT_JOB_FIELDS + ["note"], extrasaction="ignore")
+            writer.writeheader()
+            for j in jobs:
+                # Spreadsheet apps run cells starting with = + - @ as formulas.
+                writer.writerow({k: ("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for k, v in j.items()})
+            body, mimetype, ext = buf.getvalue(), "text/csv", "csv"
+    finally:
+        conn.close()
+    return app.response_class(body, mimetype=mimetype,
+                              headers={"Content-Disposition": f'attachment; filename="sunny-side-{stamp}.{ext}"'})
+
+
+@app.route("/api/account/delete", methods=["POST"])
+def delete_own_account():
+    uid = get_user_id()
+    if uid == 1:
+        return jsonify({"ok": False, "error": "The admin account can't be deleted."}), 400
+    data = request.get_json(silent=True) or {}
+    if str(data.get("confirm", "")).strip().upper() != "DELETE":
+        return jsonify({"ok": False, "error": 'Type DELETE to confirm.'}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        delete_user_data(conn, uid)
+    finally:
+        conn.close()
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.errorhandler(500)
+def _server_error(e):
+    """Log what broke with who and where, and answer API calls with JSON the page can show."""
+    original = getattr(e, "original_exception", None) or e
+    app.logger.error("Unhandled error on %s %s (user %s): %r", request.method, request.path,
+                     session.get("user_id"), original, exc_info=original if isinstance(original, BaseException) else None)
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Something went wrong on our side. Try again in a moment."}), 500
+    return "Something went wrong on our side. Go back and try again.", 500
+
+
+@app.route("/healthz")
+def healthz():
+    """For the host's health check: the app is up and the database answers."""
+    try:
+        conn = get_conn(DB_PATH)
+        try:
+            conn.execute("SELECT 1").fetchone()
+        finally:
+            conn.close()
+    except Exception as e:
+        app.logger.error("Health check failed: %s", e)
+        return jsonify({"ok": False}), 503
     return jsonify({"ok": True})
 
 

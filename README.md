@@ -51,6 +51,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `DB_PATH` | Optional | Path to SQLite database file (default: `jobs.db`) |
 | `MIN_SCORE` | Optional | Threshold score to include a scraped job in recommendation runs (default: `6.0`) |
 | `DASHBOARD_PORT` | Optional | Local port to run the Flask dashboard server (default: `5050`) |
+| `LOG_LEVEL` | Optional | How much the server logs: `DEBUG`, `INFO` (default), `WARNING` or `ERROR` |
 
 ---
 
@@ -101,3 +102,5 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 - Saved Gmail app passwords and Gemini keys are encrypted in the database and never sent back to the browser.
 - Refreshing, re-scoring and the daily run happen in the background, so the page stays responsive.
 - Profiles appear on the landing page only when a user opts in.
+- Users can download their data (jobs as CSV, or everything as JSON) and delete their own account from Profile Settings.
+- Point the host's health check at `/healthz`. It needs no login and answers 200 when the app and database are up, 503 otherwise.

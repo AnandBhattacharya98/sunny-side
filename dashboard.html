@@ -1139,6 +1139,17 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .jmove:hover, .jmove:focus-within { color: var(--txt); border-color: var(--bdr-strong); }
 .jmove select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
 
+/* Settings: your data */
+.yd { border-top: 1px solid var(--bdr); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.yd-h { font-size: 11px; font-weight: 700; color: var(--mut); text-transform: uppercase; }
+.yd-p { font-size: 12.5px; color: var(--mut); margin: 0; line-height: 1.5; }
+.yd-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.yd-row a.btn { text-decoration: none; }
+.yd-del summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--rd); }
+.yd-del[open] { display: flex; flex-direction: column; gap: 8px; }
+.yd-del input { width: 140px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--bdr); background: var(--bg); color: var(--txt); font-size: 13px; }
+.yd-go { background: var(--rd) !important; color: #fff !important; border-color: var(--rd) !important; }
+
 /* Progress page */
 .pg-wrap { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding-bottom: 24px; }
 .pg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -2358,6 +2369,25 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         </div>
       </div>
       
+      <div class="yd">
+        <label class="yd-h">Your data</label>
+        <p class="yd-p">Download everything Sunny Side keeps about you, or delete your account.</p>
+        <div class="yd-row">
+          <a class="btn" href="/api/account/export?format=csv" download>Download jobs (CSV)</a>
+          <a class="btn" href="/api/account/export?format=json" download>Download everything (JSON)</a>
+        </div>
+        {% if session.get('user_id') != 1 %}
+        <details class="yd-del">
+          <summary>Delete my account</summary>
+          <p class="yd-p">This removes your profile, resume, every job, note, cover letter and email Sunny Side has stored for you. It can't be undone. Type <b>DELETE</b> to confirm.</p>
+          <div class="yd-row">
+            <input type="text" id="yd-confirm" autocomplete="off" placeholder="DELETE" aria-label="Type DELETE to confirm">
+            <button type="button" class="btn yd-go" onclick="deleteMyAccount()">Delete my account</button>
+          </div>
+        </details>
+        {% endif %}
+      </div>
+
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
         <button class="btn" onclick="closeSettingsModal()">Cancel</button>
         <button class="btn btn-p" onclick="saveSettings()">Save Configuration</button>
@@ -4512,6 +4542,21 @@ function toast(msg) {
 // Settings Modal functions
 function openSettingsModal() {
   document.getElementById('modal-settings').style.display = 'flex';
+}
+
+async function deleteMyAccount() {
+  const confirmText = (document.getElementById('yd-confirm').value || '').trim();
+  if (confirmText.toUpperCase() !== 'DELETE') { toast('Type DELETE to confirm.'); return; }
+  try {
+    const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: confirmText }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not delete your account.');
+    try { Object.keys(sessionStorage).filter(k => k.startsWith('va_')).forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
+    location.href = '/';
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 function closeSettingsModal() {
