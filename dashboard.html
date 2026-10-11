@@ -1222,6 +1222,32 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .bs-web:hover { border-color: var(--ink); }
 @media (max-width: 768px) { .fj-go, .fj-q, .fj-loc { flex: 1 1 100%; } }
 
+/* Phones: thumb-sized tap targets, filters in two columns, popups that fit a narrow screen */
+@media (max-width: 768px) {
+  .mh-btn { min-width: 44px; min-height: 44px; }
+  /* iPhone Safari zooms the page into any field under 16px and leaves it zoomed */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), select, textarea { font-size: 16px !important; }
+  .board-header > .board-filters { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+  .board-filters select { min-width: 0; height: 40px; }
+  .board-filters select:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .set-2col { grid-template-columns: 1fr !important; }
+  .modal-content { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .modal-tabs { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--bdr);
+    padding: 8px 12px; gap: 6px; scrollbar-width: none; }
+  .modal-tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { flex: 0 0 auto; white-space: nowrap; min-height: 36px; }
+  .modal-body { padding: 16px; }
+  .modal-close { min-width: 44px; min-height: 44px; margin: -10px -12px 0 0; }
+  .jcard .jfb { padding: 10px !important; margin: -8px -4px; }
+  .jmove { padding: 7px 12px; font-size: 11px; }
+  .jcard .jdetails { flex-wrap: wrap; row-gap: 8px; }
+  .jcard .jdetails > div:last-child { flex: 1 1 100%; flex-direction: row !important; justify-content: space-between; align-items: baseline !important; gap: 8px; text-align: left !important; }
+  .jcard .jdetails > div:last-child .jc { margin-top: 0 !important; }
+  #whatsapp-quick-input, #whatsapp-quick-input + button { min-height: 40px; }
+  .jcard button[onclick^="openRoundModal"] { min-height: 32px; padding: 0 4px !important; }
+  .jcard .delete-card-btn { opacity: 1 !important; padding: 8px !important; top: 2px !important; right: 2px !important; }
+}
+
 /* Scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--bdr-strong) transparent; }
 </style>
@@ -1542,11 +1568,11 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 
 <!-- Mobile Header -->
 <div class="mobile-header" style="display:none; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--sur); border-bottom:1px solid var(--bdr); position:fixed; top:0; left:0; width:100%; height:60px; z-index:9999; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);">
-  <button onclick="toggleMobileSidebar()" style="background:none; border:none; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+  <button class="mh-btn" onclick="toggleMobileSidebar()" aria-label="Open menu" style="background:none; border:none; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
   </button>
   <span style="font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:700; background: linear-gradient(135deg, var(--pur), #FF5E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Sunny Side</span>
-  <button id="mobile-voice-btn" onclick="toggleVoiceAssistant()" style="background:none; border:none; color:var(--pur); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+  <button id="mobile-voice-btn" class="mh-btn" onclick="toggleVoiceAssistant()" aria-label="Talk to Sunny" style="background:none; border:none; color:var(--pur); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
   </button>
 </div>
@@ -1655,13 +1681,13 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
       </button>
     </div>
     
-    <div style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
+    <div class="board-filters" style="display:flex;gap:10px;align-items:center;flex-shrink: 0;">
       <select id="score-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
-        <option value="0">Min Score: Any</option>
-        <option value="9">Min Score: 9+</option>
-        <option value="8">Min Score: 8+</option>
-        <option value="7">Min Score: 7+</option>
-        <option value="6">Min Score: 6+</option>
+        <option value="0">Score: Any</option>
+        <option value="9">Score: 9+</option>
+        <option value="8">Score: 8+</option>
+        <option value="7">Score: 7+</option>
+        <option value="6">Score: 6+</option>
       </select>
       <select id="source-filter" onchange="filterBoard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="all">Source: All</option>
@@ -1823,10 +1849,10 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
               </span>
               <!-- Thumbs Up/Down -->
               <div style="display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
-                <button onclick="submitFeedback(event, '{{ job.job_id }}', 1)" title="Like role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#22c55e'" onmouseout="this.style.color='{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}'">
+                <button onclick="submitFeedback(event, '{{ job.job_id }}', 1)" class="jfb" title="Like role" aria-label="Like role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#22c55e'" onmouseout="this.style.color='{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}'">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                 </button>
-                <button onclick="submitFeedback(event, '{{ job.job_id }}', -1)" title="Dislike role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}'">
+                <button onclick="submitFeedback(event, '{{ job.job_id }}', -1)" class="jfb" title="Dislike role" aria-label="Dislike role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}'">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>
                 </button>
               </div>
@@ -2344,7 +2370,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         <textarea id="settings-resume" placeholder="Paste your resume details here to let the AI score and tailor applications specifically for you..." style="width:100%; height:120px; border-radius:12px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); padding:12px; font-size:12px; outline:none; font-family:monospace; resize:vertical;">{{ (settings or {}).get('resume_text', '') or '' }}</textarea>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="set-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">Full Name</label>
           <input type="text" id="settings-name" value="{{ (settings or {}).get('name', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="Your full name">
@@ -2365,7 +2391,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         <input type="text" id="settings-linkedin" value="{{ (settings or {}).get('linkedin_profile', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="https://linkedin.com/in/yourname">
       </div>
       
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="set-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase;">IMAP Email (Gmail)</label>
           <input type="email" id="settings-imap-email" value="{{ (settings or {}).get('imap_email', '') or '' }}" style="padding:10px 12px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; outline:none;" placeholder="your.name@gmail.com">
@@ -2437,7 +2463,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         </div>
         <div id="adv-settings-content" style="display:none; flex-direction:column; gap:12px; margin-top:12px; border-top:1px solid var(--bdr); padding-top:12px;">
           <p style="font-size:11.5px; color:var(--mut); line-height:1.4;">Adjust how active feedback and pipeline columns weigh AI recommendation scores.</p>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="set-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div style="display:flex; flex-direction:column; gap:4px;">
               <label style="font-size:11px; font-weight:600; color:var(--mut);">Thumbs Up Weight [0 to 10]</label>
               <input type="number" min="0" max="10" id="settings-w-up" value="{{ (settings or {}).get('weight_thumbs_up', 1.0)|round|int }}" style="padding:8px 10px; border-radius:8px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;">
@@ -5179,7 +5205,16 @@ class Walkthrough {
       { element: '.board-header', title: 'Search & Filters', text: 'Search listings by company or filter them by match score, location, and source.' },
       { element: '.board', title: 'Pipeline Columns', text: 'Drag and drop job cards between stages as you progress from new leads to applications and offers.' },
       { element: '.sidebar-footer', title: 'Sync Controls', text: 'Import referral descriptions directly or trigger email scraping runs.' }
+
     ];
+    // On phones the sidebar is tucked behind the menu button and cards move with their Move menu
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      this.steps = [
+        { element: '.mobile-header', title: 'Menu', text: 'Tap the menu button at the top left for your board, Find Jobs, Progress, synced emails and settings.' },
+        this.steps[1],
+        { element: '.board', title: 'Pipeline Columns', text: 'Swipe sideways to see each stage. Tap Move on a card to send it to the next one.' }
+      ];
+    }
     this.currentStep = 0;
   }
   
@@ -5214,7 +5249,8 @@ class Walkthrough {
     overlay.style.zIndex = '99999';
     overlay.style.pointerEvents = 'auto';
     
-    target.style.position = 'relative';
+    this.savedStyle = { position: target.style.position, zIndex: target.style.zIndex, boxShadow: target.style.boxShadow };
+    if (getComputedStyle(target).position === 'static') target.style.position = 'relative';
     target.style.zIndex = '100000';
     target.style.boxShadow = '0 0 0 9999px rgba(0,0,0,0.5), 0 0 15px rgba(255,167,0,0.5)';
     
@@ -5226,7 +5262,7 @@ class Walkthrough {
     tooltip.style.border = '1px solid var(--bdr)';
     tooltip.style.borderRadius = '12px';
     tooltip.style.padding = '16px';
-    tooltip.style.width = '280px';
+    tooltip.style.width = 'min(280px, calc(100vw - 20px))';
     tooltip.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
     tooltip.style.zIndex = '100001';
     tooltip.style.fontFamily = 'Inter, sans-serif';
@@ -5235,7 +5271,10 @@ class Walkthrough {
     tooltip.style.gap = '8px';
     
     let top, left;
-    if (step.element === '.sidebar' || step.element === '.sidebar-footer') {
+    if (step.element === '.mobile-header') {
+      top = rect.bottom + window.scrollY + 10;
+      left = 10;
+    } else if (step.element === '.sidebar' || step.element === '.sidebar-footer') {
       top = rect.top + window.scrollY + 50;
       left = rect.right + window.scrollX + 20;
       if (top + 200 > window.innerHeight + window.scrollY) {
@@ -5258,8 +5297,8 @@ class Walkthrough {
       <h4 style="font-family:\'Space Grotesk\', sans-serif; font-size:14px; font-weight:700; color:var(--txt); margin:0;">${step.title}</h4>
       <p style="font-size:12px; color:var(--mut); line-height:1.4; margin:0;">${step.text}</p>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-        <button onclick="window.walkthrough.skip()" style="background:none; border:none; font-size:11px; color:var(--mut); cursor:pointer;">Skip</button>
-        <button onclick="window.walkthrough.next()" style="background:var(--yolk); border:none; border-radius:12px; padding:6px 12px; font-size:11px; font-weight:700; color:#0D0C0A; cursor:pointer;">Next</button>
+        <button onclick="window.walkthrough.skip()" style="background:none; border:none; font-size:12px; color:var(--mut); cursor:pointer; min-height:40px; padding:0 8px 0 0;">Skip</button>
+        <button onclick="window.walkthrough.next()" style="background:var(--yolk); border:none; border-radius:12px; padding:0 16px; min-height:40px; font-size:12px; font-weight:700; color:#0D0C0A; cursor:pointer;">Next</button>
       </div>
     `;
     
@@ -5284,9 +5323,8 @@ class Walkthrough {
     const tooltip = document.getElementById('walkthrough-tooltip');
     if (tooltip) tooltip.remove();
     if (this.activeElement) {
-      this.activeElement.style.position = '';
-      this.activeElement.style.zIndex = '';
-      this.activeElement.style.boxShadow = '';
+      Object.assign(this.activeElement.style, this.savedStyle);
+      this.activeElement = null;
     }
   }
 }
