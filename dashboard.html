@@ -1139,6 +1139,41 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .jmove:hover, .jmove:focus-within { color: var(--txt); border-color: var(--bdr-strong); }
 .jmove select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
 
+/* Progress page */
+.pg-wrap { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding-bottom: 24px; }
+.pg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.pg-kpi { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.pg-kpi-n { font-family: var(--font-sans); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--txt); }
+.pg-kpi-l { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); }
+.pg-card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 16px; }
+.pg-card h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; color: var(--txt); }
+.pg-funnel { display: flex; flex-direction: column; gap: 8px; }
+.pg-frow { display: grid; grid-template-columns: 96px 1fr minmax(110px, auto); align-items: center; gap: 10px; }
+.pg-flabel { font-size: 12.5px; color: var(--txt); }
+.pg-fbar { height: 14px; background: var(--sur2); border-radius: 999px; overflow: hidden; }
+.pg-fbar span { display: block; height: 100%; background: var(--yolk); border-radius: 999px; min-width: 2px; }
+.pg-fnum { font-family: var(--font-mono); font-size: 12px; color: var(--txt); }
+.pg-fnum small { color: var(--hin); font-size: 10px; margin-left: 4px; }
+.pg-note { font-size: 12.5px; color: var(--mut); margin: 10px 0 0; }
+.pg-weeks { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; height: 150px; align-items: end; }
+.pg-week { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+.pg-wbar { width: 100%; max-width: 36px; background: var(--ink); border-radius: 6px 6px 2px 2px; min-height: 2px; }
+[data-theme="dark"] .pg-wbar { background: var(--paper); }
+.pg-wnum { font-family: var(--font-mono); font-size: 11px; color: var(--txt); }
+.pg-wlab { font-family: var(--font-mono); font-size: 9.5px; color: var(--hin); }
+.pg-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pg-table th { text-align: left; font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--bdr); }
+.pg-table td { padding: 8px; border-bottom: 1px solid var(--bdr); color: var(--txt); }
+.pg-rate { display: inline-block; width: 60px; height: 6px; background: var(--sur2); border-radius: 999px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.pg-rate span { display: block; height: 100%; background: var(--yolk); }
+.pg-ivs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pg-ivs li { font-size: 13px; color: var(--txt); }
+.pg-iv-meta { font-family: var(--font-mono); font-size: 11px; color: var(--mut); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+.pg-iv-meta a, .jiv a { color: var(--purt); font-weight: 600; text-decoration: none; }
+.pg-iv-meta a:hover, .jiv a:hover { text-decoration: underline; }
+.jiv { font-family: var(--font-mono); font-size: 10px; color: var(--txt); margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 768px) { .pg-frow { grid-template-columns: 80px 1fr; } .pg-fnum { grid-column: 2; } }
+
 /* Find Jobs tab */
 .fj-intro { font-size: 13.5px; color: var(--mut); max-width: 640px; margin: -4px 0 16px; line-height: 1.5; }
 .fj-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -1521,6 +1556,10 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"></path></svg>
     Find Jobs
   </a>
+  <a class="nl {% if view_mode=='progress' %}on{% endif %}" href="/progress" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><line x1="6" y1="20" x2="6" y2="12"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="18" y1="20" x2="18" y2="14"></line></svg>
+    Progress
+  </a>
   <a class="nl {% if view_mode=='emails' %}on{% endif %}" href="/emails" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
     Synced Emails <span class="nc" style="margin-left:auto;background:var(--yolk);color:#0D0C0A;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
@@ -1806,8 +1845,14 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             {% else %}
             <span style="font-size:10px; font-weight:500; color:var(--mut); font-style:italic;">No round set</span>
             {% endif %}
-            <button onclick="openRoundModal('{{ job.job_id }}', '{{ job.interview_round or '' }}')" style="background:none; border:none; color:var(--pur); font-size:10px; font-weight:600; cursor:pointer; padding:2px 4px; border-radius:4px; transition: background 0.15s;" onmouseover="this.style.background='var(--purl)'" onmouseout="this.style.background='none'">Edit Stage</button>
+            <button onclick="openRoundModal('{{ job.job_id }}', {{ (job.interview_round or '')|tojson|forceescape }}, '{{ job.interview_at or '' }}')" style="background:none; border:none; color:var(--pur); font-size:10px; font-weight:600; cursor:pointer; padding:2px 4px; border-radius:4px; transition: background 0.15s;" onmouseover="this.style.background='var(--purl)'" onmouseout="this.style.background='none'">Edit Stage</button>
           </div>
+          {% if job.interview_at %}
+          <div class="jiv" onclick="event.stopPropagation();">
+            <span><time class="local-time" data-fmt="weekday-hm" datetime="{{ job.interview_at }}">{{ job.interview_at[:16]|replace('T', ' ') }}</time></span>
+            <a href="/api/job/{{ job.job_id|urlencode }}/interview.ics" title="Download a calendar invite with reminders">Add to calendar</a>
+          </div>
+          {% endif %}
           {% endif %}
         </div>
         {% endfor %}
@@ -1958,6 +2003,79 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
       </div>
       <div class="wr-list" id="cs-list"></div>
       <div class="wr-foot" id="cs-foot"></div>
+    </section>
+  </div>
+  {% elif view_mode == 'progress' %}
+  {% set f = progress.funnel %}
+  <div class="board-header">
+    <h2 class="board-title">Progress</h2>
+  </div>
+  <div class="pg-wrap">
+    <div class="pg-kpis">
+      <div class="pg-kpi"><span class="pg-kpi-n">{{ progress.total_applied }}</span><span class="pg-kpi-l">Applications sent</span></div>
+      <div class="pg-kpi"><span class="pg-kpi-n">{% if progress.reply_rate is not none %}{{ progress.reply_rate }}%{% else %}–{% endif %}</span><span class="pg-kpi-l">Got a reply</span></div>
+      <div class="pg-kpi"><span class="pg-kpi-n">{{ f[3].count }}</span><span class="pg-kpi-l">Reached interviews</span></div>
+      <div class="pg-kpi"><span class="pg-kpi-n">{{ f[4].count }}</span><span class="pg-kpi-l">Offers</span></div>
+    </div>
+
+    {% if interviews %}
+    <section class="pg-card">
+      <h3>Upcoming interviews</h3>
+      <ul class="pg-ivs">
+        {% for iv in interviews %}
+        <li>
+          <div><b>{{ iv.round }}</b> · {{ iv.title }} at {{ iv.company }}</div>
+          <div class="pg-iv-meta"><time class="local-time" data-fmt="weekday-hm" datetime="{{ iv.at }}">{{ iv.at[:16]|replace('T', ' ') }} UTC</time>
+            <a href="/api/job/{{ iv.job_id|urlencode }}/interview.ics">Add to calendar</a></div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <section class="pg-card">
+      <h3>From saved to offer</h3>
+      {% set top = (f[0].count or 1) %}
+      <div class="pg-funnel" role="list">
+        {% for st in f %}
+        <div class="pg-frow" role="listitem">
+          <span class="pg-flabel">{{ {'saved': 'Saved', 'shortlisted': 'Shortlisted', 'applied': 'Applied', 'interviewing': 'Interviewing', 'offer': 'Offer'}[st.stage] }}</span>
+          <span class="pg-fbar"><span style="width: {{ (100 * st.count / top)|round(1) if st.count else 0 }}%"></span></span>
+          <span class="pg-fnum">{{ st.count }}{% if st.rate is not none %} <small>{{ st.rate }}% of the step before</small>{% endif %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if progress.rejected %}<p class="pg-note">{{ progress.rejected }} {{ 'role' if progress.rejected == 1 else 'roles' }} said no. Every no is still a reply.</p>{% endif %}
+    </section>
+
+    <section class="pg-card">
+      <h3>Applications per week</h3>
+      {% set wmax = (progress.weeks|map(attribute='applied')|max) or 1 %}
+      <div class="pg-weeks">
+        {% for w in progress.weeks %}
+        <div class="pg-week" title="Week of {{ w.start }}: {{ w.applied }} sent">
+          <span class="pg-wnum">{{ w.applied or '' }}</span>
+          <span class="pg-wbar" style="height: {{ (100 * w.applied / wmax)|round(1) }}%"></span>
+          <span class="pg-wlab">{{ w.start[5:] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="pg-card">
+      <h3>Which sources reply</h3>
+      {% if progress.sources %}
+      <table class="pg-table">
+        <thead><tr><th>Source</th><th>Applied</th><th>Replied</th><th>Reply rate</th></tr></thead>
+        <tbody>
+          {% for r in progress.sources %}
+          <tr><td>{{ r.label }}</td><td>{{ r.applied }}</td><td>{{ r.replied }}</td><td><span class="pg-rate"><span style="width: {{ r.rate }}%"></span></span> {{ r.rate }}%</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="pg-note">Move a job to Applied and this shows which sources lead to interviews.</p>
+      {% endif %}
     </section>
   </div>
   {% elif view_mode == 'users' %}
@@ -2279,6 +2397,8 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
       </select>
       
       <input type="text" id="custom-round-input" placeholder="e.g. Final Portfolio Review" style="display: none; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--bdr); font-size: 13px; background: var(--bg); color: var(--txt); width: 100%;" />
+      <label for="round-when" style="font-size: 13px; color: var(--mut); margin-top: 4px;">When is it? (optional, adds a calendar invite and a reminder from Sunny)</label>
+      <input type="datetime-local" id="round-when" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--bdr); font-size: 13px; background: var(--bg); color: var(--txt); width: 100%;" />
     </div>
     <div style="display: flex; gap: 12px; justify-content: flex-end;">
       <button class="btn" onclick="closeRoundModal()">Cancel</button>
@@ -2679,12 +2799,15 @@ function scheduleAssistantHint() {
   if (vaGet('localStorage', 'va_hint_off') || vaGet('sessionStorage', 'va_hint_seen')) return;
   const used = vaGet('localStorage', 'va_used');
   const digest = VA.welcome?.digest_count || 0;
-  if (used && !digest) return;
+  const reminder = VA.welcome?.interview_reminder;
+  if (used && !digest && !reminder) return;
   VA.hintTimer = setTimeout(() => {
     if (document.body.classList.contains('va-panel-open')) return;
     const text = document.getElementById('va-hint-text');
     if (text) {
-      if (digest) {
+      if (reminder) {
+        text.textContent = reminder;
+      } else if (digest) {
         text.innerHTML = vaT(`You have <b>${esc(digest)} new match${digest === 1 ? '' : 'es'}</b>. Want me to walk you through ${digest === 1 ? 'it' : 'them'}?`,
                              `आपके लिए <b>${esc(digest)} नए मैच</b> हैं। क्या मैं आपको बताऊँ?`);
       } else {
@@ -3655,6 +3778,7 @@ function formatLocalTimes(root) {
     const fmt = el.dataset.fmt;
     if (fmt === 'ymd') el.textContent = ymd(d);
     else if (fmt === 'ymd-hm') el.textContent = `${ymd(d)} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    else if (fmt === 'weekday-hm') el.textContent = d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     else el.textContent = d.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     el.title = d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   });
@@ -3884,9 +4008,15 @@ async function moveJob(jobId, col) {
 
 let activeRoundJobId = null;
 
-function openRoundModal(jobId, currentRound = '') {
+function openRoundModal(jobId, currentRound = '', currentWhen = '') {
   activeRoundJobId = jobId;
   document.getElementById('modal-interview-round').style.display = 'flex';
+  const whenInput = document.getElementById('round-when');
+  if (whenInput) {
+    const d = currentWhen ? new Date(currentWhen) : null;
+    const pad = n => String(n).padStart(2, '0');
+    whenInput.value = d && !isNaN(d) ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+  }
   
   const select = document.getElementById('round-select');
   const customInput = document.getElementById('custom-round-input');
@@ -3923,6 +4053,14 @@ function toggleCustomRoundInput() {
   } else {
     customInput.style.display = 'none';
   }
+}
+
+// The datetime-local value is in the viewer's own time; the server stores UTC.
+function roundWhenIso() {
+  const v = (document.getElementById('round-when') || {}).value;
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d) ? null : d.toISOString();
 }
 
 async function submitRoundSelection() {
@@ -3971,7 +4109,7 @@ async function submitRoundSelection() {
     const roundRes = await fetch('/api/job/' + activeRoundJobId + '/interview-round', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ round: roundVal })
+      body: JSON.stringify({ round: roundVal, when: roundWhenIso() })
     });
     
     if (!roundRes.ok) {
