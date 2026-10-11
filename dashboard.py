@@ -1683,7 +1683,7 @@ def search_web_jobs_api():
         return jsonify({"ok": False, "error": "That's a lot of searches. Give it a minute and try again."}), 429
 
     remote_only = request.args.get("remote") in ("1", "true", "on")
-    found = search_web_jobs(query, location, remote_only=remote_only)
+    found = search_web_jobs(query, location, remote_only=remote_only, boards=_user_boards(uid))
     _remember_search_results(uid, found["results"])
     for r in found["results"]:
         r["snippet"] = _snippet_text(r.pop("description", "") or "")
@@ -1695,6 +1695,80 @@ def search_web_jobs_api():
     for r in found["results"]:
         r["on_board"] = r["url"] in on_board_urls or (r["title"].lower(), r["company"].lower()) in on_board_pairs
     return jsonify({"ok": True, "query": query, "location": location, "remote": remote_only, **found})
+
+
+def _user_boards(uid):
+    from scraper import boards_for_user
+    conn = get_conn(DB_PATH)
+    try:
+        return boards_for_user(conn, uid)
+    finally:
+        conn.close()
+
+
+MAX_USER_COMPANIES = 25
+
+
+@app.route("/api/companies", methods=["GET"])
+def list_user_companies():
+    from scraper import user_boards
+    conn = get_conn(DB_PATH)
+    try:
+        boards = user_boards(conn, get_user_id())
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "companies": [{"id": b["id"], "company": b["company"], "ats": b["ats"], "board": b["board"]}
+                                              for b in boards]})
+
+
+@app.route("/api/companies", methods=["POST"])
+def add_user_company():
+    """Follow a company's Greenhouse or Lever careers page; its roles join refreshes and Find Jobs."""
+    from scraper import parse_board_url, _fetch_board_postings, COMPANY_BOARDS
+    uid = get_user_id()
+    data = request.get_json(silent=True) or {}
+    cfg = parse_board_url(str(data.get("url", ""))[:300])
+    if not cfg:
+        return jsonify({"ok": False, "error": "Paste a careers link from Greenhouse or Lever, like jobs.lever.co/acme."}), 400
+    if not ve.rate_limiter.allow(uid, "add_company", 10):
+        return jsonify({"ok": False, "error": "That's a lot of companies at once. Give it a minute."}), 429
+    company = re.sub(r"\s+", " ", str(data.get("company", ""))).strip()[:60] or cfg["board"].replace("-", " ").title()
+    if any(b["ats"] == cfg["ats"] and b["board"].lower() == cfg["board"].lower() for b in COMPANY_BOARDS):
+        return jsonify({"ok": False, "error": f"{company} is already included for everyone."}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        rows = conn.execute("SELECT ats, board FROM user_company_boards WHERE user_id = ?", (uid,)).fetchall()
+        if any(r[0].split(":")[0] == cfg["ats"] and r[1].lower() == cfg["board"].lower() for r in rows):
+            return jsonify({"ok": False, "error": "You already follow that company."}), 400
+        if len(rows) >= MAX_USER_COMPANIES:
+            return jsonify({"ok": False, "error": f"You can follow up to {MAX_USER_COMPANIES} companies."}), 400
+    finally:
+        conn.close()
+    try:
+        postings = _fetch_board_postings({**cfg, "company": company})
+    except Exception as e:
+        print(f"[add company] {cfg}: {e}")
+        return jsonify({"ok": False, "error": "Couldn't read that careers page. Check the link and try again."}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        ats = cfg["ats"] + (":eu" if cfg.get("region") == "eu" else "")
+        conn.execute("INSERT INTO user_company_boards (user_id, company, ats, board, created_at) VALUES (?, ?, ?, ?, ?)",
+                     (uid, company, ats, cfg["board"], datetime.now().isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "company": company, "open_roles": len(postings)})
+
+
+@app.route("/api/companies/<int:board_id>/delete", methods=["POST"])
+def delete_user_company(board_id):
+    conn = get_conn(DB_PATH)
+    try:
+        conn.execute("DELETE FROM user_company_boards WHERE id = ? AND user_id = ?", (board_id, get_user_id()))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
 
 
 # Remote-board results are kept for a while so "Add to board" saves the full
@@ -1761,7 +1835,7 @@ def add_web_search_result():
 
     if source == "direct":
         try:
-            job = find_board_posting(str(data.get("ref", "")))
+            job = find_board_posting(str(data.get("ref", "")), boards=_user_boards(uid))
         except Exception as e:
             print(f"[web search add] {e}")
             job = None
@@ -1807,10 +1881,11 @@ def add_web_search_result():
 
     conn = get_conn(DB_PATH)
     try:
-        dup = conn.execute("SELECT job_id FROM jobs WHERE user_id = ? AND (url = ? OR (LOWER(title) = ? AND LOWER(company) = ?))",
-                           (uid, job["url"], job["title"].lower(), job["company"].lower())).fetchone()
-        if dup:
-            return jsonify({"ok": True, "already": True, "job_id": dup[0]})
+        from scraper import find_duplicate
+        dup = conn.execute("SELECT job_id FROM jobs WHERE user_id = ? AND url = ?", (uid, job["url"])).fetchone()
+        dup_id = dup[0] if dup else find_duplicate(conn, uid, job["title"], job["company"])
+        if dup_id:
+            return jsonify({"ok": True, "already": True, "job_id": dup_id})
         if not _insert_job(conn, job, user_id=uid):
             return jsonify({"ok": True, "already": True, "job_id": job["job_id"]})
         add_timeline(conn, job["job_id"], "Added from web search")
@@ -1875,7 +1950,7 @@ def career_switch_jobs():
     current, _, _ = _career_context(conn, uid)
     rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
     conn.close()
-    found = search_web_jobs(query, location)
+    found = search_web_jobs(query, location, boards=_user_boards(uid))
     _remember_search_results(uid, found["results"])
     for r in found["results"]:
         r["snippet"] = _snippet_text(r.pop("description", "") or "")

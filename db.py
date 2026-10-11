@@ -295,7 +295,9 @@ def migrate_db(conn) -> None:
         ("picked_at", "TEXT", "NULL"),
         ("interview_round", "TEXT", "NULL"),
         ("interview_round_updated_at", "TEXT", "NULL"),
-        ("followup_snoozed_until", "TEXT", "NULL")
+        ("followup_snoozed_until", "TEXT", "NULL"),
+        ("closed_at", "TEXT", "NULL"),
+        ("closed_checked_at", "TEXT", "NULL")
     ]:
         if col not in jobs_cols:
             alter_q = f"ALTER TABLE jobs ADD COLUMN {col} {ctype}"
@@ -503,6 +505,15 @@ def init_db(db_path: str = DB_PATH):
             token_hash    TEXT UNIQUE,
             expires_at    TEXT,
             used_at       TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS user_company_boards (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       INTEGER,
+            company       TEXT,
+            ats           TEXT,
+            board         TEXT,
+            created_at    TEXT
         );
 
         CREATE TABLE IF NOT EXISTS tailored_resumes (

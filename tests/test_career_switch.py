@@ -33,7 +33,7 @@ def client(monkeypatch):
         yield c
 
 
-def fake_search(query, location=""):
+def fake_search(query, location="", **kwargs):
     return {"results": [
         {"title": "UX Researcher", "company": "Swiggy", "location": "Bengaluru", "url": "https://example.com/ux-swiggy",
          "source": "direct", "ref": "x:1", "posted_at": ""},
