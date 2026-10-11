@@ -230,7 +230,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 /* Toast */
 #toast{position:fixed;bottom:20px;right:20px;background:#1a1a18;color:#fff;
        padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;
-       transition:opacity .2s;pointer-events:none;z-index:9999}
+       transition:opacity .2s;pointer-events:none;z-index:21000}
 #toast.show{opacity:1}
 
 /* B-Egg Onboarding, Parsing, & Forms */
@@ -416,6 +416,11 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     height: calc(100vh - 60px) !important;
     margin-top: 60px !important;
     overflow-y: auto !important;
+  }
+  /* iPhone Safari counts the space behind its toolbar in 100vh, which hid the bottom of every page */
+  @supports (height: 100dvh) {
+    .app, .sidebar { height: 100dvh !important; }
+    .main { height: calc(100dvh - 60px) !important; }
   }
   .mobile-header {
     display: flex !important;
@@ -1246,6 +1251,38 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
   .modal-body { padding: 16px; }
   .modal-close { min-width: 44px; min-height: 44px; margin: -10px -12px 0 0; }
   .jcard .jfb { padding: 10px !important; margin: -8px -4px; }
+  /* Room under the last card so Sunny's button never sits on top of it */
+  .main > .board, .pg-wrap, .cs-wrap, .main > div[style*="overflow-y:auto"] { padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important; }
+  /* Board: one vertical scroll for the page, swipe sideways between whole columns */
+  .main > .board { flex: 0 0 auto; overflow-y: visible; scroll-snap-type: x proximity; }
+  .board .col { max-height: none; scroll-snap-align: start; }
+  .board .col-cards { overflow-y: visible; flex: 0 0 auto; }
+  /* Job popup: a full-screen sheet above the app header and Sunny, with one scroll area */
+  .modal-backdrop[id^="modal-backdrop-"] { z-index: 11500; align-items: stretch; justify-content: stretch; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal { width: 100%; max-width: none; height: 100%; height: 100dvh; max-height: none;
+    border: none; border-radius: 0; animation: none; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-header { padding: 10px 8px 10px 16px; gap: 8px; align-items: center; flex-shrink: 0; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-header > div { min-width: 0; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-title { font-size: 17px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-header .jc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 0; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-content { flex: 1 1 auto; min-height: 0; }
+  .modal-backdrop[id^="modal-backdrop-"] .modal-body { overscroll-behavior: contain; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  /* No boxes that scroll inside the scrolling popup: let long text flow */
+  .modal-body [style*="max-height"], .modal-body .mcard-body { max-height: none !important; overflow: visible !important; }
+  .mcard-header { flex-direction: column !important; gap: 4px; }
+  .mcard-sender, .mcard-subject { overflow-wrap: anywhere; }
+  .modal-backdrop[id^="modal-backdrop-"] .tab-panel { overflow-wrap: anywhere; }
+  .modal-body .mcard-sender, .modal-body .mcard-subject, .modal-body .cl2 a[href^="mailto:"] { overflow-wrap: anywhere; }
+  .modal-body .cl2 { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .modal-body .cl2 a { white-space: nowrap; }
+  .modal-body .cl2 a[href^="mailto:"] { white-space: normal; }
+  .modal-body textarea.body { height: 55vh; }
+  .modal-body .mcard-body, .modal-body .fit, .modal-body .contact { overflow-wrap: anywhere; }
+  .qz-intro { flex-wrap: wrap; }
+  .qz-intro > div:last-child { flex: 1 1 100%; flex-direction: row !important; justify-content: space-between; align-items: center !important; }
+  /* Sunny's button and hint sit above everything else; hide them while a popup is open */
+  body:is(:has(.modal-backdrop[style*="flex"]), :has(.fu-modal:not([hidden]))) :is(#va-fab, #va-hint-bubble, #va-act-bubble) { display: none !important; }
   .jmove { padding: 7px 12px; font-size: 11px; }
   .jcard .jdetails { flex-wrap: wrap; row-gap: 8px; }
   .jcard .jdetails > div:last-child { flex: 1 1 100%; flex-direction: row !important; justify-content: space-between; align-items: baseline !important; gap: 8px; text-align: left !important; }
@@ -4066,6 +4103,7 @@ function switchTab(btn, jobId, panelName) {
   const tabContainer = btn.closest('.modal-tabs');
   tabContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (btn.scrollIntoView) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   
   // Hide all panels
   const modalContent = btn.closest('.modal-content');
