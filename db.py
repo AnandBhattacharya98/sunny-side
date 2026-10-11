@@ -297,7 +297,8 @@ def migrate_db(conn) -> None:
         ("interview_round_updated_at", "TEXT", "NULL"),
         ("followup_snoozed_until", "TEXT", "NULL"),
         ("closed_at", "TEXT", "NULL"),
-        ("closed_checked_at", "TEXT", "NULL")
+        ("closed_checked_at", "TEXT", "NULL"),
+        ("interview_at", "TEXT", "NULL")
     ]:
         if col not in jobs_cols:
             alter_q = f"ALTER TABLE jobs ADD COLUMN {col} {ctype}"

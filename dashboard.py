@@ -9,6 +9,7 @@ import voice_engine as ve
 import quiz_coach
 import followups
 import jobmeta
+import progress
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
@@ -1477,7 +1478,12 @@ def get_daily_recommendations():
 def update_interview_round(job_id):
     uid = get_user_id()
     d = request.json or {}
-    round_name = d.get("round", "").strip()
+    round_name = str(d.get("round", "")).strip()[:80]
+    when = None
+    if d.get("when"):
+        when = progress._parse(str(d["when"])[:40])
+        if not when:
+            return jsonify({"ok": False, "error": "That date doesn't look right."}), 400
     
     conn = get_conn(DB_PATH)
     row = conn.execute("SELECT 1 FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
@@ -1487,16 +1493,48 @@ def update_interview_round(job_id):
         
     from datetime import datetime
     
+    at = when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if when else None
     conn.execute(
-        "UPDATE jobs SET interview_round = ?, interview_round_updated_at = ? WHERE job_id = ? AND user_id = ?",
-        (round_name, datetime.now().isoformat(), job_id, uid)
+        "UPDATE jobs SET interview_round = ?, interview_round_updated_at = ?, interview_at = ? WHERE job_id = ? AND user_id = ?",
+        (round_name, datetime.now().isoformat(), at, job_id, uid)
     )
     conn.commit()
     
-    add_timeline(conn, job_id, f"Interview round -> {round_name}")
+    add_timeline(conn, job_id, f"Interview round -> {round_name}" + (f" on {at}" if at else ""))
     
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/job/<job_id>/interview.ics")
+def interview_calendar_file(job_id):
+    """A calendar invite (with reminders a day and an hour before) for the job's next interview."""
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT job_id, title, company, url, interview_round, interview_at FROM jobs WHERE job_id = ? AND user_id = ?",
+                           (job_id, get_user_id())).fetchone()
+    finally:
+        conn.close()
+    at = progress._parse(row["interview_at"]) if row else None
+    if not at:
+        return "No interview time set for this job.", 404
+    body = progress.interview_ics(dict(row), at)
+    name = re.sub(r"[^A-Za-z0-9]+", "-", f"interview-{row['company'] or 'job'}").strip("-").lower()
+    return app.response_class(body, mimetype="text/calendar",
+                              headers={"Content-Disposition": f'attachment; filename="{name}.ics"'})
+
+
+@app.route("/progress")
+def progress_page():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        data = progress.compute_progress(conn, uid)
+        interviews = progress.upcoming_interviews(conn, uid)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="progress", progress=data, interviews=interviews, stats=stats)
 
 
 @app.route("/api/job/<job_id>/interview-prep", methods=["GET"])
@@ -2530,13 +2568,16 @@ def voice_welcome():
         digest_count = len(_digest_rows(conn, uid))
         followup_count = len(followups.stale_applications(conn, uid))
         has_key = bool(settings.get("gemini_api_key") or get_fallback_gemini_key())
+        soon = progress.upcoming_interviews(conn, uid, within_days=2)
     finally:
         conn.close()
+    reminder = _interview_reminder(soon, lang, _viewer_tz())
     return jsonify({
         "ok": True,
         "greeting": ve.greeting_text(settings.get("name"), lang=lang),
         "suggestions": ve.default_suggestions(snapshot, digest_count, lang=lang, followup_count=followup_count),
         "followup_count": followup_count,
+        "interview_reminder": reminder,
         "lang": lang,
         "digest_count": digest_count,
         "has_jobs": bool(snapshot),
@@ -2610,6 +2651,23 @@ def _voice_card(job):
             "score": job["score"], "status": job["status"], "location": job["location"]}
 
 
+def _interview_reminder(interviews, lang="en", tz=None):
+    """Sunny's nudge about an interview later today or tomorrow, in the viewer's timezone."""
+    now = datetime.now(tz or timezone.utc)
+    for iv in interviews:
+        at = iv["when"].astimezone(tz) if tz else iv["when"]
+        days = (at.date() - now.date()).days
+        if days not in (0, 1) or at < now:
+            continue
+        clock = at.strftime("%I:%M %p").lstrip("0")
+        if lang == "hi":
+            day = "आज" if days == 0 else "कल"
+            return f"{day} {clock} बजे {iv['company']} के साथ आपका {iv['round']} है। Quiz Mode में अभ्यास करें?"
+        day = "today" if days == 0 else "tomorrow"
+        return f"Your {iv['round']} with {iv['company']} is {day} at {clock}. Want to practise in Quiz Mode?"
+    return None
+
+
 def _spoken_time(value, lang="en", tz=None):
     """Say when a stored timestamp happened, in the viewer's timezone (tz) or the server's if unknown."""
     dt = _server_dt(value)
@@ -2630,7 +2688,7 @@ def _spoken_time(value, lang="en", tz=None):
 
 # Replies are written in English and Hindi. For any other language Sunny supports, the JSON
 # a voice or quiz route returns is translated on its way out, in one Gemini call.
-_TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer")
+_TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer", "interview_reminder")
 _TRANSLATED_LISTS = ("suggestions", "strengths", "improve")
 
 
