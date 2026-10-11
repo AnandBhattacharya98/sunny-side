@@ -1,0 +1,232 @@
+{# One job's details popup. Loaded on demand by openJobModal() from /job/<id>/modal. #}
+<div class="modal-backdrop" id="modal-backdrop-{{ job.job_id }}" onclick="closeJobModal('{{ job.job_id }}')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">{{ job.title }}</h3>
+        <p class="jc" style="font-size:12px">{{ job.company }} &middot; {{ job.location }} &middot; <a href="{{ job.url }}" target="_blank" style="color:var(--pur);text-decoration:none">View Posting ↗</a></p>
+      </div>
+      <button class="modal-close" onclick="closeJobModal('{{ job.job_id }}')">&times;</button>
+    </div>
+    <div class="modal-content">
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab(this, '{{ job.job_id }}', 'fit')">Fit Analysis</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'cl')">Cover Letter</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'resume')">Resume</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
+        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">Quiz Mode</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Fit Analysis Panel -->
+        <div class="tab-panel active" id="panel-fit-{{ job.job_id }}">
+          <span class="lbl">Fit analysis</span>
+          <div class="fit">{{ job.ai_summary or 'No summary yet — click Regenerate.' }}</div>
+          
+          {% if job.status == 'interviewing' %}
+          <div style="margin-top:14px; margin-bottom:14px; padding:12px; background:var(--purl); border:1px dashed var(--pur); border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:600; color:var(--pur);">Prepping for an interview? Try Quiz Mode &rarr;</span>
+            <button class="btn btn-p" style="font-size:11px; padding:4px 10px; border:none; background:var(--yolk); color:#0D0C0A; border-radius:12px; cursor:pointer;" onclick="const t = this.closest('.modal-content').querySelector('.modal-tabs button[onclick*=\'quiz\']'); if(t) t.click();">Open Prep</button>
+          </div>
+          {% endif %}
+          
+          {% if job.key_reqs_list %}
+          <div class="reqs">
+            {% for r in job.key_reqs_list %}<span class="rtag">{{ r }}</span>{% endfor %}
+          </div>
+          {% endif %}
+
+          {% if job.matched_skills_list or job.missing_skills_list %}
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+            {% if job.matched_skills_list %}
+            <div>
+              <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Matched Skills</span>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                {% for s in job.matched_skills_list %}
+                <span style="font-size:11px; background-color:rgba(46, 204, 113, 0.15); color:#2ecc71; border:1px solid rgba(46, 204, 113, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">✓ {{ s }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            
+            {% if job.missing_skills_list %}
+            <div>
+              <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Skill Gaps (Missing)</span>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                {% for s in job.missing_skills_list %}
+                <span style="font-size:11px; background-color:rgba(231, 76, 60, 0.15); color:#e74c3c; border:1px solid rgba(231, 76, 60, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">⚠ {{ s }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          
+          {% if job.description %}
+          <span class="lbl" style="margin-top:16px;display:block">Job Description Preview</span>
+          <div style="font-size:12px;color:var(--mut);max-height:220px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;line-height:1.5">{{ job.description }}</div>
+          {% endif %}
+        </div>
+        
+        <!-- Cover Letter Panel -->
+        <div class="tab-panel" id="panel-cl-{{ job.job_id }}">
+          <span class="lbl">Cover letter</span>
+          {% if job.cover_letter %}
+          <input class="subj" id="subj-{{ job.job_id }}" value="{{ job.cover_letter.subject }}" placeholder="Subject line">
+          <textarea class="body" id="body-{{ job.job_id }}">{{ job.cover_letter.body }}</textarea>
+          
+          {% if job.cover_letter.linkedin_note %}
+          <span class="lbl" style="display:block;margin-top:14px">LinkedIn connection note</span>
+          <div class="note-box">{{ job.cover_letter.linkedin_note }}</div>
+          {% endif %}
+          
+          <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-p" onclick="saveCL('{{ job.job_id }}')">Save Changes</button>
+            <button class="btn" onclick="regen('{{ job.job_id }}')">↺ Regenerate with AI</button>
+            <button class="btn btn-g" onclick="sendEmail('{{ job.job_id }}')">✉ Send email</button>
+          </div>
+          {% else %}
+          <div style="color:var(--mut);font-size:13px;margin-bottom:8px">No cover letter generated yet.</div>
+          <button class="btn btn-p" onclick="regen('{{ job.job_id }}')">Generate with Gemini</button>
+          {% endif %}
+        </div>
+        
+        <!-- Emails Panel -->
+        <div class="tab-panel" id="panel-emails-{{ job.job_id }}">
+          <span class="lbl">Received Emails</span>
+          {% if job.emails %}
+            {% for mail in job.emails %}
+            <div class="mcard">
+              <div class="mcard-header">
+                <div>
+                  <div class="mcard-sender">From: {{ mail.sender }}</div>
+                  <div class="mcard-subject">Subject: {{ mail.subject }}</div>
+                </div>
+                <div class="mcard-time">
+                  <time class="local-time" data-fmt="ymd-hm" datetime="{{ mail.received_at|utc_iso }}">{{ mail.received_at[:10] }} &middot; {{ mail.received_at[11:16] }}</time>
+                </div>
+              </div>
+              <div class="mcard-body">{{ mail.body }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="text-align:center;padding:40px 10px;color:var(--hin)">
+              <div style="font-size:24px;margin-bottom:8px">✉</div>
+              <div style="font-size:12px">No updates matched for this job yet from your Gmail.</div>
+              <div style="font-size:10px;color:var(--hin);margin-top:4px">Make sure IMAP is configured in your .env and click Refresh.</div>
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Notes & Contacts Panel -->
+        <div class="tab-panel" id="panel-notes-{{ job.job_id }}">
+          <span class="lbl">Hiring Contacts</span>
+          {% if job.contacts %}
+            {% for c in job.contacts %}
+            <div class="contact">
+              <div class="cn">{{ c.name }}</div>
+              <div class="ct2">{{ c.title }}</div>
+              <div class="cl2">
+                {% if c.linkedin_url %}
+                  <a href="{{ c.linkedin_url }}" target="_blank">LinkedIn ↗</a>
+                {% endif %}
+                {% if c.email %}
+                  <a href="mailto:{{ c.email }}">{{ c.email }}</a>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div style="font-size:12px;color:var(--mut);margin-bottom:10px">No contacts found.</div>
+          {% endif %}
+          
+          <span class="lbl" style="display:block;margin-top:14px">Your application notes</span>
+          <textarea class="notes" id="note-{{ job.job_id }}"
+                    placeholder="Interview details, referral notes, salary targets…"
+                    onblur="saveNote('{{ job.job_id }}')">{{ job.notes.note if job.notes else '' }}</textarea>
+        </div>
+        
+        <!-- Timeline Panel -->
+        <div class="tab-panel" id="panel-timeline-{{ job.job_id }}">
+          <span class="lbl">Timeline</span>
+          {% if job.timeline %}
+            {% for t in job.timeline %}
+            <div class="tl-item">{{ t.event }} <span style="opacity:.6">— <time class="local-time" data-fmt="ymd" datetime="{{ t.created_at|utc_iso }}">{{ t.created_at[:10] }}</time></span></div>
+            {% endfor %}
+          {% else %}
+            <div style="font-size:12px;color:var(--mut)">No events logged.</div>
+          {% endif %}
+        </div>
+
+        <!-- Tailored Resume Panel -->
+        <div class="tab-panel" id="panel-resume-{{ job.job_id }}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span class="lbl">Tailored Resume</span>
+            <a href="/resume/{{ job.job_id }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
+              Save / Download as PDF
+            </a>
+          </div>
+          
+          <div class="resume-loading-{{ job.job_id }}" style="text-align:center;padding:40px;color:var(--mut);">
+            Tailoring your resume for this JD...
+          </div>
+          
+          <div class="resume-content-box-{{ job.job_id }}" style="display:none;background:var(--bg);padding:16px;border-radius:8px;font-size:12px;color:var(--txt);line-height:1.6;overflow-y:auto;max-height:380px;white-space:pre-wrap;font-family:monospace;border:1px solid var(--bdr);text-align:left;">
+          </div>
+        </div>
+        
+        <!-- Quiz Mode Panel -->
+        <div class="tab-panel quiz-theme" id="panel-quiz-{{ job.job_id }}" style="position:relative;">
+          <style>
+            #panel-quiz-{{ job.job_id }} {
+              --pur: #6C5CE7;
+              --purl: rgba(108, 92, 231, 0.08);
+            }
+          </style>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <span class="lbl" style="color:var(--pur); font-weight:700;">Interview Prep Quiz</span>
+            <button class="btn btn-p" style="background:var(--yolk); border:none; color:#0D0C0A; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">Regenerate Questions</button>
+          </div>
+          
+          <div class="quiz-loading-{{ job.job_id }}" style="text-align:center; padding:40px; color:var(--mut);">
+            Generating tailored interview questions...
+          </div>
+          
+          <div class="quiz-content-{{ job.job_id }}" style="display:none; flex-direction:column; gap:20px; text-align:left;">
+            <div class="qz-practice"></div>
+            <div>
+              <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Quick-Fire Flashcards (Tap to Reveal)</span>
+              <div class="flashcard-container-{{ job.job_id }}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:8px;">
+                <!-- JS populated cards -->
+              </div>
+            </div>
+            
+            <div style="border-top: 1px solid var(--bdr); padding-top:16px;">
+              <span class="lbl" style="font-size:11px; margin-bottom:8px; color:var(--mut); text-transform:uppercase; display:block;">Deeper Prep Questions</span>
+              
+              <!-- STAR Method Guideline -->
+              <div style="background: var(--purl); border: 1px solid var(--pur); border-radius: 12px; padding: 12px; font-size: 11.5px; color: var(--txt); line-height: 1.5; margin-bottom: 12px;">
+                <strong style="color: var(--purt); display: block; margin-bottom: 4px;">STAR Framework Guideline</strong>
+                Use the STAR method to structure your answers:
+                <ul style="margin-left: 16px; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                  <li><strong>Situation:</strong> Set the scene (context, company, background).</li>
+                  <li><strong>Task:</strong> Describe the specific challenge or goal you needed to address.</li>
+                  <li><strong>Action:</strong> Explain the exact steps you took (focus on your individual contribution).</li>
+                  <li><strong>Result:</strong> Share the quantitative/qualitative outcomes of your actions.</li>
+                </ul>
+              </div>
+
+              <div class="deep-questions-list-{{ job.job_id }}" style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+                <!-- JS populated deep questions -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

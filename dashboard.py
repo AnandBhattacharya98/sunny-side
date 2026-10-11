@@ -8,6 +8,7 @@ from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, 
 import voice_engine as ve
 import quiz_coach
 import followups
+import jobmeta
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
@@ -958,6 +959,7 @@ def _batch_full_jobs(conn, raw_jobs, uid):
         j["timeline"] = timelines.get(jid, [])
         j["emails"] = emails.get(jid, [])
         
+        jobmeta.annotate(j)
         full_jobs.append(j)
         
     return full_jobs
@@ -1030,6 +1032,21 @@ def index():
     cols = ["whatsapp", "new", "shortlisted", "interviewing", "applied", "offer", "rejected"]
     return render_template("dashboard.html", board=board, cols=cols, stats=stats,
                            companies=companies, settings=settings, view_mode="board", is_new_user=is_new_user)
+
+
+@app.route("/job/<job_id>/modal")
+def job_modal(job_id):
+    """A job's details popup, rendered when the card is opened rather than for every card up front."""
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if not row:
+            return "Not found", 404
+        job = _batch_full_jobs(conn, [row], uid)[0]
+    finally:
+        conn.close()
+    return render_template("job_modal.html", job=job)
 
 
 @app.route("/emails")
