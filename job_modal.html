@@ -45,7 +45,7 @@
               <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Matched Skills</span>
               <div style="display:flex; flex-wrap:wrap; gap:6px;">
                 {% for s in job.matched_skills_list %}
-                <span style="font-size:11px; background-color:rgba(46, 204, 113, 0.15); color:#2ecc71; border:1px solid rgba(46, 204, 113, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">✓ {{ s }}</span>
+                <span style="font-size:11px; background-color:rgba(46, 204, 113, 0.15); color:var(--ok-txt); border:1px solid rgba(46, 204, 113, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">✓ {{ s }}</span>
                 {% endfor %}
               </div>
             </div>
@@ -56,7 +56,7 @@
               <span class="lbl" style="font-size:11px; margin-bottom:4px; color:var(--mut);">Skill Gaps (Missing)</span>
               <div style="display:flex; flex-wrap:wrap; gap:6px;">
                 {% for s in job.missing_skills_list %}
-                <span style="font-size:11px; background-color:rgba(231, 76, 60, 0.15); color:#e74c3c; border:1px solid rgba(231, 76, 60, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">⚠ {{ s }}</span>
+                <span style="font-size:11px; background-color:rgba(231, 76, 60, 0.15); color:var(--bad-txt); border:1px solid rgba(231, 76, 60, 0.3); padding:3px 8px; border-radius:12px; font-weight:600;">⚠ {{ s }}</span>
                 {% endfor %}
               </div>
             </div>
@@ -187,6 +187,10 @@
             #panel-quiz-{{ job.job_id }} {
               --pur: #6C5CE7;
               --purl: rgba(108, 92, 231, 0.08);
+            }
+            [data-theme="dark"] #panel-quiz-{{ job.job_id }} {
+              --pur: #A29BFE;
+              --purl: rgba(162, 155, 254, 0.12);
             }
           </style>
           

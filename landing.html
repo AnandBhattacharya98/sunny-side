@@ -7,7 +7,19 @@
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#FAF6EE">
+<meta name="theme-color" content="#F5F2EB">
+<script>
+  // Same theme as the board: saved choice, else the device setting
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0D0C0A' : '#F5F2EB');
+  })();
+</script>
 <meta name="apple-mobile-web-app-title" content="Sunny Side">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,8 +29,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-/* Dashboard colors and fonts, light only: near-black, warm off-white, yolk */
+/* Dashboard colors and fonts: near-black, warm off-white, yolk */
 :root {
+  color-scheme: light;
   --ink: #0D0C0A;
   --paper: #F5F2EB;
   --yolk: #FFA700;
@@ -35,6 +48,20 @@
   --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0D0C0A;
+  --sur: #161512;
+  --sur2: #1F1D19;
+  --bdr: rgba(245, 242, 235, 0.09);
+  --bdr-strong: rgba(245, 242, 235, 0.22);
+  --txt: #F5F2EB;
+  --mut: #B5AFA3;
+  --hin: #959085;
+  --accent-txt: #FFB938;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+}
+[data-theme="dark"] .col-ct { background: var(--paper); color: var(--ink); }
 
 html, body { background: var(--bg); }
 body {
