@@ -52,6 +52,30 @@ LEVER = [
 ]
 
 
+REMOTIVE = {"jobs": [
+    {"id": 501, "url": "https://remotive.com/remote-jobs/product/pm-501", "title": "Product Manager, Platform",
+     "company_name": "Doist", "candidate_required_location": "Worldwide", "publication_date": "2026-10-09T08:00:00",
+     "salary": "$90k - $120k", "description": "<p>Lead our platform roadmap.</p>"},
+    {"id": 502, "url": "https://remotive.com/remote-jobs/product/pm-502", "title": "Product Manager",
+     "company_name": "UScorp", "candidate_required_location": "USA only", "publication_date": "2026-10-09T08:00:00",
+     "description": ""},
+]}
+
+JOBICY = {"jobs": [
+    {"id": 601, "url": "https://jobicy.com/jobs/601-product-manager", "jobTitle": "Senior Product Manager",
+     "companyName": "Hotjar", "jobGeo": "APAC", "pubDate": "2026-10-08 10:00:00",
+     "annualSalaryMin": 80000, "annualSalaryMax": 100000, "salaryCurrency": "USD", "jobExcerpt": "Own the funnel."},
+]}
+
+ARBEITNOW = {"data": [
+    {"slug": "pm-berlin-77", "company_name": "Remote GmbH", "title": "Product Manager (Remote)", "remote": True,
+     "url": "https://www.arbeitnow.com/jobs/companies/remote-gmbh/pm-berlin-77", "location": "Berlin",
+     "created_at": 1759900000, "description": "<p>Remote PM.</p>"},
+    {"slug": "dev-1", "company_name": "Other", "title": "Backend Developer", "remote": True,
+     "url": "https://www.arbeitnow.com/jobs/companies/other/dev-1", "location": "Berlin", "created_at": 1759900000},
+]}
+
+
 class FakeResp:
     def __init__(self, text="", data=None):
         self.text = text
@@ -75,6 +99,12 @@ def fake_get(url, **kwargs):
         return FakeResp(data=LEVER)
     if "greenhouse" in url:
         return FakeResp(data={"jobs": []})
+    if "remotive.com/api" in url:
+        return FakeResp(data=REMOTIVE)
+    if "jobicy.com/api" in url:
+        return FakeResp(data=JOBICY)
+    if "arbeitnow.com/api" in url:
+        return FakeResp(data=ARBEITNOW)
     return FakeResp(data=[])
 
 
@@ -212,3 +242,66 @@ def test_adds_stay_with_the_user_who_added_them(client):
 
 def test_unknown_board_posting_is_404(client):
     assert client.post("/api/jobs/search/add", json={"source": "direct", "ref": "cred:nope"}).status_code == 404
+
+
+# ── Find Jobs tab: remote-job boards ─────────────────────────────────────
+
+def test_remote_boards_keep_roles_open_to_india():
+    remotive = scraper.search_remotive("Product Manager")
+    assert [r["company"] for r in remotive] == ["Doist"]  # "USA only" is left out
+    assert remotive[0]["remote"] and remotive[0]["salary"] == "$90k - $120k"
+    assert "platform roadmap" in remotive[0]["description"]
+    jobicy = scraper.search_jobicy("Product Manager")
+    assert jobicy[0]["company"] == "Hotjar" and "80,000" in jobicy[0]["salary"]
+    arbeit = scraper.search_arbeitnow("Product Manager")
+    assert [r["title"] for r in arbeit] == ["Product Manager (Remote)"]
+
+
+def test_city_search_skips_remote_boards():
+    found = scraper.search_web_jobs("Product Manager", "Bengaluru")
+    assert not {"remotive", "jobicy", "arbeitnow"} & {r["source"] for r in found["results"]}
+    assert not found["failed"]
+
+
+def test_remote_only_returns_remote_roles():
+    found = scraper.search_web_jobs("Product Manager", remote_only=True)
+    sources = {r["source"] for r in found["results"]}
+    assert {"remotive", "jobicy", "arbeitnow"} <= sources
+    # Company-feed roles in Bengaluru aren't remote, so they drop out.
+    assert "direct" not in sources
+
+
+def test_linkedin_falls_back_to_guest_feed(monkeypatch):
+    def get(url, **kwargs):
+        if "jobs-guest" in url:
+            return FakeResp(text=LINKEDIN_HTML)
+        return FakeResp(text="<html>sign in</html>")
+    monkeypatch.setattr(scraper.requests, "get", get)
+    assert len(scraper.search_linkedin("Product Manager")) == 2
+
+
+def test_find_page_renders(client):
+    html = client.get("/find?q=Data+Analyst").get_data(as_text=True)
+    assert 'id="fj-q"' in html and 'value="Data Analyst"' in html
+
+
+def test_search_hides_full_descriptions_but_add_keeps_them(client):
+    data = client.get("/api/jobs/search?q=Product+Manager&remote=1").get_json()
+    doist = next(r for r in data["results"] if r["company"] == "Doist")
+    assert "description" not in doist and "platform roadmap" in doist["snippet"]
+    res = client.post("/api/jobs/search/add", json={"source": "remotive", "ref": doist["ref"],
+                                                    "title": "Made up", "url": "https://evil.example/x"}).get_json()
+    assert res["ok"]
+    conn = get_conn(DB_PATH)
+    row = conn.execute("SELECT title, description, source, url FROM jobs WHERE job_id = ?", (res["job_id"],)).fetchone()
+    conn.close()
+    assert row["title"] == "Product Manager, Platform" and "platform roadmap" in row["description"]
+    assert row["source"] == "remotive" and row["url"].startswith("https://remotive.com/")
+
+
+def test_remote_add_without_cache_checks_the_link(client):
+    dashboard._SEARCH_RESULTS.clear()
+    body = {"source": "jobicy", "ref": "jobicy:999", "title": "PM", "company": "X"}
+    assert client.post("/api/jobs/search/add", json={**body, "url": "https://evil.example/jobs/1"}).status_code == 400
+    assert client.post("/api/jobs/search/add", json={**body, "url": "https://jobicy.com.evil.example/1"}).status_code == 400
+    assert client.post("/api/jobs/search/add", json={**body, "url": "https://jobicy.com/jobs/999-pm"}).get_json()["ok"]
