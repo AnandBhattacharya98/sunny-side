@@ -212,7 +212,7 @@ def _check_oauth_state():
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -372,12 +372,21 @@ def handle_social_login(provider, email, name):
         return "Social authentication error. Please try again.", 500
 
 
+# The Android and iOS apps (mobile/) add this to their user agent.
+IN_APP_UA_MARK = "SunnySideApp"
+GOOGLE_IN_APP_ERROR = ("Google sign-in doesn't work inside the app yet. Please log in with a username and password, "
+                       "or sign in with Google on the website.")
+
+
 @app.route("/auth/google")
 def auth_google():
     from dotenv import load_dotenv
     base_dir = os.path.dirname(os.path.abspath(__file__))
     load_dotenv(dotenv_path=os.path.join(base_dir, ".env"), override=True)
     client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if client_id and IN_APP_UA_MARK in request.headers.get("User-Agent", ""):
+        # Google refuses sign-in inside an app's embedded browser ("disallowed_useragent").
+        return render_template("dashboard.html", view_mode="login", error=GOOGLE_IN_APP_ERROR)
     if not client_id:
         if ALLOW_DEV_LOGIN:
             return render_template("dashboard.html", view_mode="mock_auth", provider="google")
@@ -3286,6 +3295,28 @@ def serve_logo():
 def serve_favicon():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     return send_file(os.path.join(base_dir, "logo.svg"), mimetype="image/svg+xml")
+
+
+# Installable web app: the manifest and service worker live at the root so the worker's
+# scope covers the whole site. The phone apps in mobile/ load this same site.
+@app.route("/manifest.webmanifest")
+def serve_manifest():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_file(os.path.join(base_dir, "static", "manifest.webmanifest"), mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def serve_service_worker():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    resp = send_file(os.path.join(base_dir, "static", "sw.js"), mimetype="text/javascript")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/offline")
+def serve_offline():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_file(os.path.join(base_dir, "static", "offline.html"), mimetype="text/html")
 
 
 @app.route("/hero_background.png")
