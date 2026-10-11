@@ -31,7 +31,7 @@
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#FAF6EE">
+<meta name="theme-color" content="#F5F2EB">
 <meta name="apple-mobile-web-app-title" content="Sunny Side">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -48,11 +48,10 @@
       t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t === 'dark' ? '#0D0C0A' : '#F5F2EB');
   })();
 </script>
-{% if view_mode in ('login', 'signup', 'mock_auth', 'onboarding', 'forgot', 'reset') %}
-<script>document.documentElement.setAttribute('data-theme', 'light');</script>
-{% endif %}
 {% if view_mode in ('login', 'signup', 'onboarding', 'forgot', 'reset') %}
 <style>
 body {
@@ -635,7 +634,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   background: var(--yolk); color: var(--ink); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; }
 [data-theme="dark"] #va-hint-bubble { background: var(--paper); color: var(--ink); }
 [data-theme="dark"] #va-hint-bubble .va-hint-x { color: var(--ink); }
-[data-theme="dark"] #va-hint-bubble b { color: #A86400; }
+[data-theme="dark"] #va-hint-bubble b { color: #8A5200; }
 body.va-panel-open #va-fab, body.va-panel-open #va-hint-bubble { display: none; }
 body.has-va-fab #toast { bottom: 108px; }
 
@@ -1045,7 +1044,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .auth-input { border-radius: 12px; }
 .auth-card h1, .auth-card h2, .auth-card h3 { font-family: var(--font-sans); letter-spacing: -0.03em; }
 
-/* Sign in, sign up and resume onboarding: same look as the homepage (light only) */
+/* Sign in, sign up and resume onboarding: same look as the homepage */
 .auth-shell { min-height: 100vh; width: 100%; background: var(--bg); color: var(--txt);
               font-family: var(--font-sans); display: flex; flex-direction: column; }
 .auth-nav { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 24px;
@@ -1303,6 +1302,42 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
   .jcard button[onclick^="openRoundModal"] { min-height: 32px; padding: 0 4px !important; }
   .jcard .delete-card-btn { opacity: 1 !important; padding: 8px !important; top: 2px !important; right: 2px !important; }
 }
+
+/* Dark mode: native controls, readable hints, and surfaces that match the rest */
+:root, [data-theme="light"] { color-scheme: light; --ok-txt: #15803D; --bad-txt: #B42318; }
+[data-theme="dark"] { color-scheme: dark; --hin: #959085; --ok-txt: #4ADE80; --bad-txt: #FF7A7E; --field: #1B1A16; }
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--yolk); }
+[data-theme="dark"] :is(.modal, .fu-modal, .auth-card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select) {
+  background-color: var(--field) !important; color: var(--txt); border-color: var(--bdr-strong);
+}
+[data-theme="dark"] ::placeholder { color: var(--hin); opacity: 1; }
+[data-theme="dark"] .yd-go { background: #C62F35 !important; border-color: #C62F35 !important; }
+[data-theme="dark"] .auth-error { border-color: rgba(229, 72, 77, 0.35); }
+[data-theme="dark"] .auth-btn-p:hover { color: var(--ink); }
+[data-theme="dark"] .gapv-vid img { background: var(--sur2); }
+.mcard-feed .mcard-header { background: rgba(229, 227, 219, 0.25); }
+[data-theme="dark"] .mcard-feed .mcard-header { background: var(--sur2); }
+
+/* Today's picks strip */
+.dp-strip { margin: 0 20px 20px 20px; padding: 16px; border-radius: 16px;
+            background: linear-gradient(135deg, #FFFDF6 0%, #FFF2CC 100%); border: 1px solid #FFE082;
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.05); --dp-hover-shadow: 0 4px 12px rgba(255, 193, 7, 0.15); }
+.dp-tag { font-size: 12px; font-weight: 700; color: #B45309; background: #FFF8E1; padding: 2px 8px; border-radius: 10px; }
+.dp-title { font-family: var(--font-sans); font-size: 14px; font-weight: 700; color: #5D4037; }
+.dp-when { font-size: 11px; color: #795548; font-weight: 500; background: #FFFDE7; padding: 2px 8px; border-radius: 10px; }
+.dp-toggle { background: none; border: none; color: #795548; font-size: 12px; font-weight: 600; cursor: pointer; }
+.dp-card { flex: 0 0 240px; background: var(--sur); border: 1px solid #FFE082; border-radius: 12px; padding: 12px;
+           cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.dp-score { font-size: 10px; font-weight: 700; background: #EAF3DE; color: #3B6D11; padding: 2px 6px; border-radius: 8px; }
+[data-theme="dark"] .dp-strip { background: linear-gradient(135deg, rgba(255, 167, 0, 0.10) 0%, rgba(255, 167, 0, 0.02) 100%), var(--sur);
+                                border-color: rgba(255, 167, 0, 0.28); box-shadow: none; --dp-hover-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+[data-theme="dark"] .dp-tag { background: var(--yolk); color: var(--ink); }
+[data-theme="dark"] .dp-title { color: var(--txt); }
+[data-theme="dark"] .dp-when { background: var(--sur2); color: var(--mut); }
+[data-theme="dark"] .dp-toggle { color: var(--mut); }
+[data-theme="dark"] .dp-card { background: var(--sur2); border-color: var(--bdr); }
+[data-theme="dark"] .dp-card:hover { border-color: var(--bdr-strong); }
+[data-theme="dark"] .dp-score { background: var(--yolk); color: var(--ink); }
 
 /* Scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--bdr-strong) transparent; }
@@ -1706,7 +1741,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     </button>
     <button id="voice-assistant-btn" class="btn btn-sec" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;" onclick="toggleVoiceAssistant()">
       <svg id="voice-assistant-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Ask Sunny
-      <span id="assistant-badge" class="nc" style="display: none; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: auto;"></span>
+      <span id="assistant-badge" class="nc" style="display: none; background: #DC2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: auto;"></span>
     </button>
   </div>
 </nav>
@@ -1775,14 +1810,14 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
   <!-- Web search results -->
 
   <!-- Today's Picks Strip -->
-  <div id="daily-picks-strip" style="display:none; margin: 0 20px 20px 20px; padding: 16px; background: linear-gradient(135deg, #FFFDF6 0%, #FFF2CC 100%); border: 1px solid #FFE082; border-radius: 16px; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.05);">
+  <div id="daily-picks-strip" class="dp-strip" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; cursor:pointer;" onclick="toggleDailyPicksBody()">
       <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:12px; font-weight:700; color:#F57C00; background:#FFF8E1; padding:2px 8px; border-radius:10px;">RECS</span>
-        <h4 style="font-family:'Space Grotesk', sans-serif; font-size:14px; font-weight:700; color:#5D4037;" id="daily-picks-title">Today's Picks</h4>
-        <span style="font-size:11px; color:#795548; font-weight:500; background:#FFFDE7; padding:2px 8px; border-radius:10px;" id="daily-picks-timestamp">Since yesterday</span>
+        <span class="dp-tag">RECS</span>
+        <h4 class="dp-title" id="daily-picks-title">Today's Picks</h4>
+        <span class="dp-when" id="daily-picks-timestamp">Since yesterday</span>
       </div>
-      <button style="background:none; border:none; color:#795548; font-size:12px; font-weight:600; cursor:pointer;" id="daily-picks-toggle-btn">Hide</button>
+      <button class="dp-toggle" id="daily-picks-toggle-btn">Hide</button>
     </div>
     <div id="daily-picks-body" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:4px;">
       <!-- JavaScript populated cards -->
@@ -1967,8 +2002,8 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
   <div style="flex:1;overflow-y:auto;min-height:0;padding-right:8px;display:flex;flex-direction:column;gap:12px;">
     {% if emails %}
       {% for mail in emails %}
-      <div class="mcard" style="border-radius:10px;border:1px solid var(--bdr);">
-        <div class="mcard-header" style="background:rgba(229, 227, 219, 0.25);padding:12px 16px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;" onclick="toggleEmailBody(this)">
+      <div class="mcard mcard-feed" style="border-radius:10px;border:1px solid var(--bdr);">
+        <div class="mcard-header" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;" onclick="toggleEmailBody(this)">
           <div>
             <div class="mcard-sender" style="font-size:12px;font-weight:600;">From: {{ mail.sender }}</div>
             <div class="mcard-subject" style="font-size:12px;color:var(--mut);font-weight:500;margin-top:2px;">Subject: {{ mail.subject }}</div>
@@ -4922,18 +4957,33 @@ async function uploadResumeFile(input) {
 const sunSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
 const moonSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather" style="width:14px;height:14px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
 
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const target = current === 'dark' ? 'light' : 'dark';
+function applyTheme(target) {
   document.documentElement.setAttribute('data-theme', target);
-  localStorage.setItem('theme', target);
-  
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', target === 'dark' ? '#0D0C0A' : '#F5F2EB');
   const icon = document.getElementById('theme-icon');
   const text = document.getElementById('theme-text');
   if (icon && text) {
     icon.innerHTML = target === 'dark' ? sunSvg : moonSvg;
     text.textContent = target === 'dark' ? 'Light Mode' : 'Dark Mode';
   }
+}
+
+function toggleTheme() {
+  const target = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('theme', target); } catch (e) {}
+  applyTheme(target);
+}
+
+// With no saved choice, follow the device when it switches between light and dark
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const follow = e => {
+    let saved = null;
+    try { saved = localStorage.getItem('theme'); } catch (err) {}
+    if (saved !== 'light' && saved !== 'dark') applyTheme(e.matches ? 'dark' : 'light');
+  };
+  if (mq.addEventListener) mq.addEventListener('change', follow); else if (mq.addListener) mq.addListener(follow);
 }
 
 // Initialise Theme on Load
@@ -6088,12 +6138,12 @@ async function loadDailyRecommendations() {
     
     data.picks.forEach(job => {
       const card = document.createElement('div');
-      card.style.cssText = "flex: 0 0 240px; background:var(--sur); border:1px solid #FFE082; border-radius:12px; padding:12px; cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;";
+      card.className = "dp-card";
       card.innerHTML = `
         <div style="font-size:12px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(job.title)}</div>
         <div style="font-size:11px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(job.company)}</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-          <span style="font-size:10px; font-weight:700; background:#EAF3DE; color:#3B6D11; padding:2px 6px; border-radius:8px;">${job.ai_score.toFixed(1)}/10</span>
+          <span class="dp-score">${job.ai_score.toFixed(1)}/10</span>
           <span style="font-size:10px; color:var(--pur); font-weight:600;">View in Board &rarr;</span>
         </div>
       `;
@@ -6103,7 +6153,7 @@ async function loadDailyRecommendations() {
       
       card.onmouseover = () => {
         card.style.transform = "translateY(-2px)";
-        card.style.boxShadow = "0 4px 12px rgba(255, 193, 7, 0.15)";
+        card.style.boxShadow = "var(--dp-hover-shadow)";
       };
       card.onmouseout = () => {
         card.style.transform = "translateY(0)";
