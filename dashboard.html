@@ -1130,6 +1130,8 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .jtags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .jtag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; color: var(--txt); border: 1px solid var(--bdr); border-radius: 999px; padding: 1px 7px; }
 .jtag-pay { background: var(--purl); border-color: transparent; }
+.jtag-closed { color: var(--rd); border-color: currentColor; }
+.jcard.is-closed .jt { color: var(--mut); text-decoration: line-through; text-decoration-color: var(--bdr-strong); }
 
 /* Card "Move" menu: a native select so it works with touch and screen readers */
 .jmove { position: relative; display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--mut); border: 1px solid var(--bdr); border-radius: 999px; padding: 2px 8px; cursor: pointer; }
@@ -1151,6 +1153,20 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .fj-go:hover { background: var(--yolk); color: var(--ink); }
 .fj-go[disabled] { opacity: .6; cursor: progress; }
 [data-theme="dark"] .fj-go { background: var(--paper); color: var(--ink); }
+.fj-companies { margin: 0 0 14px; border: 1px solid var(--bdr); border-radius: 12px; padding: 10px 14px; background: var(--sur); }
+.fj-companies summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--txt); }
+.fj-companies summary span { font-family: var(--font-mono); font-size: 11px; color: var(--mut); font-weight: 400; margin-left: 4px; }
+.fj-co-help { font-size: 12px; color: var(--mut); margin: 8px 0; line-height: 1.5; }
+.fj-co-help code { font-family: var(--font-mono); font-size: 11px; }
+.fj-co-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.main .fj-co-form input { flex: 1 1 200px; height: 36px; border-radius: 8px; padding: 0 10px; font-size: 13px; }
+.fj-co-add { height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--yolk); color: #0D0C0A; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.fj-co-add[disabled] { opacity: .6; cursor: progress; }
+.fj-co-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fj-co-list li { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--bdr-strong); border-radius: 999px; padding: 3px 4px 3px 10px; }
+.fj-co-list li small { font-family: var(--font-mono); font-size: 10px; color: var(--hin); }
+.fj-co-list button { border: 0; background: none; color: var(--mut); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+.fj-co-list button:hover { color: var(--rd); }
 .fj-status { font-family: var(--font-mono); font-size: 11px; color: var(--hin); margin-bottom: 10px; min-height: 14px; }
 .fj-list { overflow-y: auto; padding-bottom: 24px; }
 .wr-snip { font-size: 12px; color: var(--mut); line-height: 1.45; }
@@ -1734,7 +1750,7 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         {% elif job.source %}
           {% set source_type = job.source %}
         {% endif %}
-        <div class="jcard" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" data-remote="{{ 1 if job.is_remote else 0 }}" data-salary="{{ 1 if job.salary_text else 0 }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
+        <div class="jcard{% if job.closed_at %} is-closed{% endif %}" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" data-remote="{{ 1 if job.is_remote else 0 }}" data-salary="{{ 1 if job.salary_text else 0 }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
           <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;display:flex;align-items:center;justify-content:center;">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           </button>
@@ -1743,8 +1759,9 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
             <img src="https://www.google.com/s2/favicons?sz=32&domain={{ source_domain }}" alt="" style="width:12px;height:12px;object-fit:contain;border-radius:2px;flex-shrink:0;">
             <span>{{ job.company }}</span>
           </div>
-          {% if job.salary_text or job.is_remote %}
+          {% if job.salary_text or job.is_remote or job.closed_at %}
           <div class="jtags">
+            {% if job.closed_at %}<span class="jtag jtag-closed" title="The posting was taken down{% if job.closed_at %} around {{ job.closed_at[:10] }}{% endif %}">Closed</span>{% endif %}
             {% if job.is_remote %}<span class="jtag">Remote</span>{% endif %}
             {% if job.salary_text %}<span class="jtag jtag-pay" title="Pay stated in the posting">{{ job.salary_text }}</span>{% endif %}
           </div>
@@ -1857,6 +1874,16 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     <label class="fj-remote"><input type="checkbox" id="fj-remote" {% if find_remote %}checked{% endif %}> Remote only</label>
     <button type="submit" class="fj-go" id="fj-go">Search the web</button>
   </form>
+  <details class="fj-companies" id="fj-companies">
+    <summary>Companies you follow <span id="fj-co-count"></span></summary>
+    <p class="fj-co-help">Paste a company's careers link from Greenhouse or Lever (for example <code>jobs.lever.co/acme</code> or <code>job-boards.greenhouse.io/acme</code>). Its openings join your daily refresh and these searches.</p>
+    <form class="fj-co-form" onsubmit="event.preventDefault(); addFollowedCompany();">
+      <input type="text" id="fj-co-url" placeholder="Careers link" aria-label="Careers link" maxlength="300" required>
+      <input type="text" id="fj-co-name" placeholder="Company name (optional)" aria-label="Company name" maxlength="60">
+      <button type="submit" class="fj-co-add" id="fj-co-add">Follow</button>
+    </form>
+    <ul class="fj-co-list" id="fj-co-list"></ul>
+  </details>
   <div class="fj-status" id="fj-status" aria-live="polite"></div>
   <div class="wr-list fj-list" id="fj-list"></div>
   {% elif view_mode == 'career' %}
@@ -4104,7 +4131,7 @@ async function findJobsSearch() {
   btn.disabled = true;
   try {
     const res = await fetch(`/api/jobs/search?q=${encodeURIComponent(q)}&location=${encodeURIComponent(loc)}${remote ? '&remote=1' : ''}`);
-    const data = await res.json();
+    const data = await res.json().catch(() => ({ ok: false, error: 'Search failed.' }));
     if (seq !== WEB_SEARCH.seq) return;
     if (!data.ok) throw new Error(data.error || 'Search failed.');
     WEB_SEARCH.results = data.results;
@@ -4167,9 +4194,51 @@ async function addWebResult(btn) {
   }
 }
 
+async function loadFollowedCompanies() {
+  const list = document.getElementById('fj-co-list');
+  if (!list) return;
+  try {
+    const data = await (await fetch('/api/companies')).json();
+    if (!data.ok) return;
+    document.getElementById('fj-co-count').textContent = data.companies.length ? `(${data.companies.length})` : '';
+    list.innerHTML = data.companies.map(c => `<li>${esc(c.company)} <small>${esc(c.ats)}</small><button type="button" aria-label="Stop following ${esc(c.company)}" onclick="removeFollowedCompany(${+c.id})">&times;</button></li>`).join('');
+  } catch (e) { /* the list is a convenience; searching still works */ }
+}
+
+async function addFollowedCompany() {
+  const url = document.getElementById('fj-co-url');
+  const name = document.getElementById('fj-co-name');
+  const btn = document.getElementById('fj-co-add');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const res = await fetch('/api/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url.value.trim(), company: name.value.trim() }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not follow that company.');
+    toast(`Following ${data.company}. ${data.open_roles} open ${data.open_roles === 1 ? 'role' : 'roles'} right now.`);
+    url.value = ''; name.value = '';
+    loadFollowedCompanies();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Follow';
+  }
+}
+
+async function removeFollowedCompany(id) {
+  try {
+    await fetch(`/api/companies/${id}/delete`, { method: 'POST' });
+  } finally {
+    loadFollowedCompanies();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const qEl = document.getElementById('fj-q');
   if (!qEl) return;
+  loadFollowedCompanies();
   if (qEl.value.trim().length >= 2) findJobsSearch();
   else qEl.focus();
 });

@@ -42,6 +42,62 @@ COMPANY_BOARDS = [
     {"company": "Paytm",    "ats": "lever",      "board": "paytm"},
 ]
 
+_BOARD_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,79}$")
+_BOARD_URLS = [
+    (re.compile(r"(?:job-boards|boards)\.eu\.greenhouse\.io/(?:embed/job_board\?for=)?([\w-]+)", re.I), "greenhouse", "eu"),
+    (re.compile(r"(?:job-boards|boards)\.greenhouse\.io/(?:embed/job_board\?for=)?([\w-]+)", re.I), "greenhouse", ""),
+    (re.compile(r"boards-api(?:\.eu)?\.greenhouse\.io/v1/boards/([\w-]+)", re.I), "greenhouse", ""),
+    (re.compile(r"jobs\.lever\.co/([\w-]+)", re.I), "lever", ""),
+]
+
+
+def parse_board_url(text: str) -> dict | None:
+    """Reads a Greenhouse or Lever careers link (or "greenhouse:slug" / "lever:slug") into a board config."""
+    text = (text or "").strip()
+    m = re.match(r"^(greenhouse|lever)\s*[:/]\s*([\w-]+)$", text, re.I)
+    if m:
+        return {"ats": m.group(1).lower(), "board": m.group(2), "region": ""}
+    for pat, ats, region in _BOARD_URLS:
+        m = pat.search(text)
+        if m and _BOARD_SLUG.match(m.group(1)):
+            region = "eu" if ".eu." in text.lower() else region
+            return {"ats": ats, "board": m.group(1), "region": region}
+    return None
+
+
+def user_boards(conn, user_id: int) -> list[dict]:
+    rows = conn.execute("SELECT id, company, ats, board FROM user_company_boards WHERE user_id = ? ORDER BY id",
+                        (user_id,)).fetchall()
+    out = []
+    for r in rows:
+        ats, _, region = (r[2] or "").partition(":")
+        out.append({"id": r[0], "company": r[1], "ats": ats, "board": r[3], "region": region, "custom": True})
+    return out
+
+
+def boards_for_user(conn, user_id: int | None) -> list[dict]:
+    """The built-in company feeds plus any the user added in Settings."""
+    boards = list(COMPANY_BOARDS)
+    if user_id is None or conn is None:
+        return boards
+    seen = {(b["ats"], b["board"].lower()) for b in boards}
+    for b in user_boards(conn, user_id):
+        if (b["ats"], b["board"].lower()) not in seen:
+            seen.add((b["ats"], b["board"].lower()))
+            boards.append(b)
+    return boards
+
+
+def boards_for_user_id(user_id: int | None) -> list[dict]:
+    if user_id is None:
+        return list(COMPANY_BOARDS)
+    conn = init_db(DB_PATH)
+    try:
+        return boards_for_user(conn, user_id)
+    finally:
+        conn.close()
+
+
 # A board posting is kept only if its location looks like India (or remote).
 INDIA_LOCATION_HINTS = [
     "india", "bengaluru", "bangalore", "mumbai", "delhi", "gurgaon", "gurugram",
@@ -64,6 +120,9 @@ def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     job["job_id"] = jid
     
     if job_exists(conn, jid):
+        return False
+    # The same opening often turns up from LinkedIn, a company feed and web search.
+    if find_duplicate(conn, user_id, job["title"], job["company"]):
         return False
     conn.execute(
         """INSERT OR IGNORE INTO jobs
@@ -130,6 +189,75 @@ def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manage
     return new_jobs
 
 
+# ── Duplicates ────────────────────────────────────────────────────────────
+_COMPANY_SUFFIXES = re.compile(
+    r"\b(private|pvt|limited|ltd|inc|llc|llp|corp|corporation|co|technologies|technology|tech|"
+    r"software|solutions|services|labs|india|global)\b\.?")
+_TITLE_NOISE = re.compile(r"\(.*?\)|\[.*?\]|\b(remote|hybrid|on-?site|urgent|hiring)\b")
+
+
+def normalize_company(company: str) -> str:
+    c = _COMPANY_SUFFIXES.sub(" ", (company or "").lower())
+    c = re.sub(r"[^a-z0-9]+", " ", c).strip()
+    return c or (company or "").lower().strip()
+
+
+def normalize_title(title: str) -> str:
+    t = _TITLE_NOISE.sub(" ", (title or "").lower())
+    t = t.replace("sr.", "senior").replace("sr ", "senior ").replace("jr.", "junior").replace("jr ", "junior ")
+    return re.sub(r"[^a-z0-9]+", " ", t).strip()
+
+
+def job_key(title: str, company: str) -> tuple[str, str]:
+    return normalize_title(title), normalize_company(company)
+
+
+def find_duplicate(conn, user_id: int, title: str, company: str) -> str | None:
+    """job_id of a job on this user's board that is the same opening, if any."""
+    key = job_key(title, company)
+    if not key[0] or not key[1]:
+        return None
+    rows = conn.execute("SELECT job_id, title, company FROM jobs WHERE user_id = ? AND status != 'archived'",
+                        (user_id,)).fetchall()
+    for r in rows:
+        if job_key(r[1], r[2]) == key:
+            return r[0]
+    return None
+
+
+# Columns a job moves through; a job further along is the copy worth keeping.
+_STATUS_RANK = {"offer": 7, "interviewing": 6, "applied": 5, "shortlisted": 4, "rejected": 3,
+                "ready": 2, "scored": 2, "whatsapp": 1, "new": 1}
+_UNTOUCHED = {"new", "scored", "ready"}
+
+
+def fold_duplicates(conn, user_id: int) -> int:
+    """Archives extra copies of the same opening. Only untouched Inbox copies are archived."""
+    from db import add_timeline
+    rows = conn.execute("SELECT job_id, title, company, status, scraped_at FROM jobs WHERE user_id = ? AND status != 'archived'",
+                        (user_id,)).fetchall()
+    groups: dict[tuple, list] = {}
+    for r in rows:
+        key = job_key(r[1], r[2])
+        if key[0] and key[1]:
+            groups.setdefault(key, []).append(r)
+    folded = 0
+    for copies in groups.values():
+        if len(copies) < 2:
+            continue
+        copies.sort(key=lambda r: (-_STATUS_RANK.get(r[3], 0), r[4] or ""))
+        keep = copies[0]
+        for r in copies[1:]:
+            if r[3] not in _UNTOUCHED:
+                continue
+            conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (r[0], user_id))
+            add_timeline(conn, r[0], f"Archived as a duplicate of {keep[1]} at {keep[2]}")
+            folded += 1
+    if folded:
+        conn.commit()
+    return folded
+
+
 def _title_matches(title: str, keywords: str) -> bool:
     """Every word of the user's designation (3+ letters) must appear in the title.
 
@@ -194,12 +322,13 @@ def _fetch_board_postings(cfg: dict) -> list[dict]:
 
 def scrape_company_pages(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
     new_jobs = []
-    for cfg in COMPANY_BOARDS:
+    for cfg in boards_for_user(conn, user_id):
         try:
             postings = _fetch_board_postings(cfg)
         except Exception as e:
             print(f"  [{cfg['company']}] {e}")
             continue
+        mark_closed_board_postings(conn, user_id, cfg, postings)
         count = 0
         for p in postings:
             if count >= 5:
@@ -223,6 +352,65 @@ def scrape_company_pages(conn, user_id: int = 1, keywords: str = "Product Manage
                 count += 1
     print(f"  Company boards: {len(new_jobs)} new jobs")
     return new_jobs
+
+
+# ── Closed listings ───────────────────────────────────────────────────────
+
+def mark_closed_board_postings(conn, user_id: int, cfg: dict, postings: list[dict]) -> int:
+    """A company feed lists every open role, so a saved role missing from it has closed."""
+    prefix = board_job_id(cfg["company"], "")
+    suffix = f"_u{user_id}"
+    open_ids = {board_job_id(cfg["company"], p["id"]) + suffix for p in postings if p.get("id")}
+    rows = conn.execute("SELECT job_id, closed_at FROM jobs WHERE user_id = ? AND source = 'direct' AND status != 'archived'",
+                        (user_id,)).fetchall()
+    now = datetime.now().isoformat()
+    changed = 0
+    for job_id, closed_at in rows:
+        if not job_id.startswith(prefix) or not job_id.endswith(suffix):
+            continue
+        is_open = job_id in open_ids
+        if is_open and closed_at:
+            conn.execute("UPDATE jobs SET closed_at = NULL WHERE job_id = ?", (job_id,))
+            changed += 1
+        elif not is_open and not closed_at:
+            conn.execute("UPDATE jobs SET closed_at = ? WHERE job_id = ?", (now, job_id))
+            changed += 1
+    if changed:
+        conn.commit()
+    return changed
+
+
+_LINKEDIN_CLOSED = re.compile(r"no longer accepting applications", re.I)
+
+
+def check_linkedin_closures(conn, user_id: int, limit: int = 10, recheck_days: int = 3) -> int:
+    """Opens a few saved LinkedIn postings per refresh and marks the ones that stopped taking applications."""
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=recheck_days)).isoformat()
+    rows = conn.execute(
+        "SELECT job_id, url FROM jobs WHERE user_id = ? AND url LIKE ? AND closed_at IS NULL "
+        "AND status IN ('new', 'scored', 'ready', 'shortlisted', 'whatsapp') "
+        "AND (closed_checked_at IS NULL OR closed_checked_at < ?) ORDER BY closed_checked_at IS NOT NULL, closed_checked_at LIMIT ?",
+        (user_id, "%linkedin.com/jobs/view/%", cutoff, limit)).fetchall()
+    closed = 0
+    for job_id, url in rows:
+        now = datetime.now().isoformat()
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=8)
+        except Exception:
+            continue
+        if resp.status_code == 200 and _LINKEDIN_CLOSED.search(resp.text or ""):
+            conn.execute("UPDATE jobs SET closed_at = ?, closed_checked_at = ? WHERE job_id = ?", (now, now, job_id))
+            closed += 1
+        elif resp.status_code in (200, 404, 410):
+            if resp.status_code != 200:
+                conn.execute("UPDATE jobs SET closed_at = ?, closed_checked_at = ? WHERE job_id = ?", (now, now, job_id))
+                closed += 1
+            else:
+                conn.execute("UPDATE jobs SET closed_checked_at = ? WHERE job_id = ?", (now, job_id))
+        time.sleep(0.3)
+    conn.commit()
+    return closed
 
 
 # ── On-demand search (the board's search bar) ─────────────────────────────
@@ -307,8 +495,9 @@ def search_linkedin(query: str, location: str = "", limit: int = 15, remote: boo
     return results
 
 
-def search_company_boards(query: str, location: str = "", limit: int = 15) -> list[dict]:
+def search_company_boards(query: str, location: str = "", limit: int = 15, boards: list[dict] | None = None) -> list[dict]:
     q = query.lower().strip()
+    boards = boards or COMPANY_BOARDS
 
     def one_board(cfg):
         try:
@@ -338,8 +527,8 @@ def search_company_boards(query: str, location: str = "", limit: int = 15) -> li
         return out
 
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(COMPANY_BOARDS)) as ex:
-        groups = list(ex.map(one_board, COMPANY_BOARDS))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(boards), 12)) as ex:
+        groups = list(ex.map(one_board, boards))
     # Newest first, without letting one company crowd out the rest.
     for g in groups:
         g.sort(key=lambda r: r["posted_at"] or "", reverse=True)
@@ -447,7 +636,7 @@ REMOTE_SOURCES = {"remotive", "jobicy", "arbeitnow"}
 SOURCE_HOSTS = {"remotive": ("remotive.com",), "jobicy": ("jobicy.com",), "arbeitnow": ("arbeitnow.com",)}
 
 
-def search_web_jobs(query: str, location: str = "", remote_only: bool = False) -> dict:
+def search_web_jobs(query: str, location: str = "", remote_only: bool = False, boards: list[dict] | None = None) -> dict:
     """Searches LinkedIn, company feeds and remote-job boards at once.
 
     Returns results plus the sources that failed. Remote boards only list remote
@@ -460,7 +649,7 @@ def search_web_jobs(query: str, location: str = "", remote_only: bool = False) -
     where = "" if loc.lower() == "remote" else loc
     remote = remote_only or loc.lower() == "remote"
     fns = {"linkedin": lambda: search_linkedin(query, where, remote=remote),
-           "direct": lambda: search_company_boards(query, where),
+           "direct": lambda: search_company_boards(query, where, boards=boards),
            "remotive": lambda: search_remotive(query, where),
            "jobicy": lambda: search_jobicy(query, where),
            "arbeitnow": lambda: search_arbeitnow(query, where)}
@@ -494,10 +683,10 @@ def search_web_jobs(query: str, location: str = "", remote_only: bool = False) -
     return {"results": mixed, "failed": failed}
 
 
-def find_board_posting(ref: str) -> dict | None:
+def find_board_posting(ref: str, boards: list[dict] | None = None) -> dict | None:
     """Looks a company-feed result up again by its ref, so what gets saved comes from the feed, not the browser."""
     board, _, posting_id = ref.partition(":")
-    cfg = next((c for c in COMPANY_BOARDS if c["board"] == board), None)
+    cfg = next((c for c in (boards or COMPANY_BOARDS) if c["board"] == board), None)
     if not cfg or not posting_id:
         return None
     for p in _board_postings_cached(cfg):
@@ -559,6 +748,17 @@ def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
         futures = [executor.submit(run_scraper, func, *args) for func, args in scrapers]
         for future in concurrent.futures.as_completed(futures):
             all_new += future.result()
+
+    conn = init_db(db_path)
+    try:
+        closed = check_linkedin_closures(conn, user_id)
+        folded = fold_duplicates(conn, user_id)
+        if closed or folded:
+            print(f"  Marked {closed} LinkedIn postings closed, archived {folded} duplicates")
+    except Exception as e:
+        print(f"  [closures/duplicates] {e}")
+    finally:
+        conn.close()
 
     print(f"  Total new jobs this run: {len(all_new)}\n")
     return all_new
