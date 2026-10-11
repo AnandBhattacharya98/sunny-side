@@ -189,6 +189,18 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
          font-weight:500;color:var(--mut);border-radius:6px;cursor:pointer;transition:all .12s}
 .tab-btn:hover,.tab-btn.active{background:var(--purl);color:var(--pur)}
 .modal-body{padding:20px;overflow-y:auto;height:100%}
+.gapv{display:flex;flex-direction:column;gap:8px}
+.gapv-body{display:flex;flex-direction:column;gap:12px}
+.gapv-note{font-size:12px;color:var(--mut)}
+.gapv-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;font-weight:600;margin-bottom:6px}
+.gapv-head a{font-size:11px;font-weight:500;color:var(--pur);text-decoration:none;white-space:nowrap}
+.gapv-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gapv-vid{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:inherit;background:var(--bg);border:1px solid var(--bdr,rgba(0,0,0,.08));border-radius:10px;overflow:hidden;min-width:0}
+.gapv-vid img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.gapv-meta{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px;min-width:0}
+.gapv-title{font-size:12px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.gapv-ch{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:420px){.gapv-list{grid-template-columns:1fr}.gapv-vid{flex-direction:row;align-items:center}.gapv-vid img{width:120px;flex:0 0 120px}.gapv-meta{padding:6px 8px 6px 0}}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
@@ -4056,11 +4068,37 @@ function loadJobModal(id) {
         holder.insertAdjacentHTML('beforeend', html);
         const modal = document.getElementById('modal-backdrop-' + id);
         if (modal && typeof formatLocalTimes === 'function') formatLocalTimes(modal);
+        if (modal) loadGapVideos(id);
         return !!modal;
       })
       .finally(() => { delete JOB_MODAL_LOADS[id]; });
   }
   return JOB_MODAL_LOADS[id];
+}
+
+// YouTube videos for the job's skill gaps, shown under "Skill Gaps" in the Fit Analysis tab
+async function loadGapVideos(id) {
+  const box = document.getElementById('gapv-' + id);
+  if (!box) return;
+  const body = box.querySelector('.gapv-body');
+  const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  try {
+    const res = await fetch('/api/job/' + encodeURIComponent(id) + '/videos');
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'failed');
+    if (!data.gaps.length) { box.remove(); return; }
+    body.innerHTML = data.gaps.map(g => `
+      <div class="gapv-skill">
+        <div class="gapv-head"><span>${e(g.skill)}</span><a href="${e(g.more)}" target="_blank" rel="noopener">More on YouTube ↗</a></div>
+        ${g.videos.length ? `<div class="gapv-list">${g.videos.map(v => `
+          <a class="gapv-vid" href="${e(v.url)}" target="_blank" rel="noopener">
+            <img src="${e(v.thumb)}" alt="" loading="lazy">
+            <span class="gapv-meta"><span class="gapv-title">${e(v.title)}</span><span class="gapv-ch">${e(v.channel)}</span></span>
+          </a>`).join('')}</div>` : ''}
+      </div>`).join('');
+  } catch (err) {
+    body.innerHTML = '<div class="gapv-note">Couldn\'t load videos right now.</div>';
+  }
 }
 
 async function openJobModal(id) {

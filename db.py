@@ -335,6 +335,16 @@ def migrate_db(conn) -> None:
     """)
     conn.commit()
 
+    # YouTube videos for each skill gap, shared across jobs and users (see learning_videos.py)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_videos (
+            skill_key TEXT PRIMARY KEY,
+            videos TEXT,
+            fetched_at TEXT
+        );
+    """)
+    conn.commit()
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
 
