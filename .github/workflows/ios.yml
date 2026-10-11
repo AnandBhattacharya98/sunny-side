@@ -1,0 +1,32 @@
+name: iOS app
+
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+jobs:
+  build-simulator:
+    # Checks the iOS project compiles. Store builds need signing, done in Xcode (see mobile/README.md).
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      SUNNY_SERVER_URL: ${{ vars.SUNNY_SERVER_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npx cap sync ios
+      - run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App
+          -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build
