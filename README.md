@@ -95,6 +95,12 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 
 ---
 
+## Phone apps
+
+`mobile/` holds the Android and iOS apps. They open this website in a native shell, so a deploy
+reaches app users without a store update. The site is also installable from the browser (manifest
+and service worker in `static/`). See [mobile/README.md](mobile/README.md) for building and publishing.
+
 ## Running for many users
 
 - Set `FLASK_SECRET_KEY`, `ADMIN_PASSWORD` and `CRON_SECRET` before going live (see `.env.example`).

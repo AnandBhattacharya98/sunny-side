@@ -1,0 +1,24 @@
+{
+  "name": "sunny-side-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android and iOS apps for Sunny Side. They open the Sunny Side website in a native shell.",
+  "scripts": {
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --android --ios --iconBackgroundColor '#FAF6EE' --iconBackgroundColorDark '#12100E' --splashBackgroundColor '#FAF6EE' --splashBackgroundColorDark '#12100E'",
+    "android": "cap sync android && cap open android",
+    "ios": "cap sync ios && cap open ios",
+    "build:android": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#FAF6EE">
+<title>You're offline · Sunny Side</title>
+<style>
+  :root { --bg:#FAF6EE; --ink:#2A2315; --muted:#7A6E58; --btn:#FFA700; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12100E; --ink:#F4EBDC; --muted:#B8AA92; } }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { min-height:100%; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:24px; box-sizing:border-box; }
+  img { width:96px; height:96px; margin-bottom:16px; }
+  h1 { font-size:22px; margin:0 0 8px; }
+  p { color:var(--muted); margin:0 0 24px; max-width:320px; line-height:1.5; }
+  button { font:inherit; font-weight:600; border:0; border-radius:999px; padding:12px 28px;
+    background:var(--btn); color:#2A2315; cursor:pointer; min-height:44px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/static/icons/icon-192.png" alt="">
+  <h1>You're offline</h1>
+  <p>Sunny Side needs the internet to load your board. Check your connection and try again.</p>
+  <button onclick="location.reload()">Try again</button>
+</main>
+<script>window.addEventListener('online', function(){ location.reload(); });</script>
+</body>
+</html>
