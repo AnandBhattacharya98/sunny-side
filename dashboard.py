@@ -1061,6 +1061,26 @@ def job_modal(job_id):
     return render_template("job_modal.html", job=job)
 
 
+@app.route("/api/job/<job_id>/videos", methods=["GET"])
+def job_gap_videos(job_id):
+    """YouTube videos for the skills this job asks for that the user's resume is missing."""
+    import learning_videos
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT missing_skills FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Job not found"}), 404
+        try:
+            gaps = json.loads(row[0] or "[]")
+        except ValueError:
+            gaps = []
+        groups = learning_videos.videos_for_gaps(conn, gaps if isinstance(gaps, list) else [])
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "gaps": groups})
+
+
 @app.route("/emails")
 def view_emails():
     conn = get_conn(DB_PATH)
