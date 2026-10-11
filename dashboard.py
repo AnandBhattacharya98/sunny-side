@@ -1727,6 +1727,75 @@ def add_web_search_result():
     return jsonify({"ok": True, "job_id": job["job_id"]})
 
 
+# ── Career Switch: paths away from the role the user already targets ─────
+
+def _career_context(conn, uid):
+    """The role the board is already built around, plus resume and key for suggestions."""
+    settings = get_user_settings(conn, uid)
+    current = (settings.get("designation") or "").strip()
+    if not current:
+        row = conn.execute("SELECT title, COUNT(*) AS n FROM jobs WHERE user_id = ? GROUP BY title ORDER BY n DESC LIMIT 1",
+                           (uid,)).fetchone()
+        current = row[0] if row else ""
+    return current, settings.get("resume_text") or "", settings.get("gemini_api_key") or get_fallback_gemini_key()
+
+
+@app.route("/career-switch")
+def career_switch_view():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    current, _, _ = _career_context(conn, uid)
+    settings = get_user_settings(conn, uid, mask_secrets=True)
+    stats = _stats(conn)
+    conn.close()
+    return render_template("dashboard.html", view_mode="career", stats=stats, settings=settings, current_role=current)
+
+
+@app.route("/api/career-switch/paths", methods=["GET"])
+def career_switch_paths():
+    from career_switch import suggest_paths
+    uid = get_user_id()
+    refresh = request.args.get("refresh") == "1"
+    if refresh and not ve.rate_limiter.allow(uid, "career_paths", 5):
+        return jsonify({"ok": False, "error": "You've asked for fresh ideas a few times already. Give it a minute."}), 429
+    conn = get_conn(DB_PATH)
+    current, resume, key = _career_context(conn, uid)
+    conn.close()
+    found = suggest_paths(uid, current, resume, api_key=key, refresh=refresh)
+    return jsonify({"ok": True, "current_role": current, **found})
+
+
+@app.route("/api/career-switch/jobs", methods=["GET"])
+def career_switch_jobs():
+    from career_switch import is_current_track
+    from scraper import search_web_jobs
+    uid = get_user_id()
+    query = (request.args.get("q") or "").strip()[:80]
+    location = (request.args.get("location") or "").strip()[:60]
+    if len(query) < 2:
+        return jsonify({"ok": False, "error": "Pick a path or type a field to explore."}), 400
+    if not ve.rate_limiter.allow(uid, "web_search", 10):
+        return jsonify({"ok": False, "error": "That's a lot of searches. Give it a minute and try again."}), 429
+
+    conn = get_conn(DB_PATH)
+    current, _, _ = _career_context(conn, uid)
+    rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
+    conn.close()
+    found = search_web_jobs(query, location)
+    on_board_urls = {r[0] for r in rows if r[0]}
+    on_board_pairs = {(r[1], r[2]) for r in rows}
+    results = []
+    hidden = 0
+    for r in found["results"]:
+        if is_current_track(r["title"], current, query):
+            hidden += 1
+            continue
+        r["on_board"] = r["url"] in on_board_urls or (r["title"].lower(), r["company"].lower()) in on_board_pairs
+        results.append(r)
+    return jsonify({"ok": True, "query": query, "location": location, "current_role": current,
+                    "results": results, "failed": found["failed"], "hidden": hidden})
+
+
 # ── Board Assistant (voice + chat) ─────────────────────────────────────────
 
 @app.route("/api/voice/transcribe", methods=["POST"])
