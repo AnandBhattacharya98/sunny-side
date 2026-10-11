@@ -1472,6 +1472,10 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
     Synced Emails <span class="nc" style="margin-left:auto;background:var(--yolk);color:#0D0C0A;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">{{ stats.email_count }}</span>
   </a>
+  <a class="nl {% if view_mode=='career' %}on{% endif %}" href="/career-switch" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+    Career Switch
+  </a>
   <a class="nl" href="javascript:void(0)" onclick="openSettingsModal()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     Profile Settings
@@ -1788,6 +1792,80 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
         <p style="color:var(--hin);margin-top:4px;">Configure your IMAP credentials in .env and click "Refresh Now" to scan your inbox.</p>
       </div>
     {% endif %}
+  {% elif view_mode == 'career' %}
+  <style>
+    .cs-wrap { flex: 1; overflow-y: auto; min-height: 0; padding-right: 8px; display: flex; flex-direction: column; gap: 18px; }
+    .cs-intro { font-size: 13.5px; color: var(--mut); line-height: 1.55; max-width: 720px; margin: 0; }
+    .cs-intro b { color: var(--txt); font-weight: 600; }
+    .cs-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .cs-bar input { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); background: var(--sur); color: var(--txt); font-size: 13px; outline: none; }
+    .cs-bar input:focus { border-color: var(--yolk); }
+    .cs-btn { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--yolk); background: var(--yolk); color: var(--ink); white-space: nowrap; }
+    .cs-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
+    .cs-btn[disabled] { opacity: .55; cursor: default; }
+    .cs-kicker { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--txt); display: flex; align-items: center; gap: 10px; }
+    .cs-kicker::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--yolk); }
+    .cs-mode { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); margin: -6px 0 12px; line-height: 1.5; }
+    .cs-mode:empty { display: none; }
+    .cs-paths { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .cs-path { text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--bdr); background: var(--sur); color: var(--txt); cursor: pointer; font: inherit; transition: border-color .15s, transform .15s; }
+    .cs-path:hover { border-color: var(--bdr-strong); transform: translateY(-1px); }
+    .cs-path.on { border-color: var(--yolk); box-shadow: 0 0 0 1px var(--yolk) inset; }
+    .cs-role { font-family: var(--font-sans); font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+    .cs-why { font-size: 12.5px; color: var(--mut); line-height: 1.45; }
+    .cs-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cs-tag { font-family: var(--font-mono); font-size: 10px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--bdr-strong); color: var(--txt); }
+    .cs-tag.gap { border-style: dashed; color: var(--mut); }
+    .cs-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--hin); }
+    .cs-step { font-size: 12px; color: var(--txt); line-height: 1.45; border-top: 1px solid var(--bdr); padding-top: 8px; margin-top: auto; }
+    .cs-step b { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); margin-right: 4px; }
+    .cs-results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .cs-results-head .wr-query { white-space: normal; }
+  </style>
+  <div class="board-header">
+    <h2 class="board-title">Career Switch</h2>
+  </div>
+  <div class="cs-wrap">
+    <p class="cs-intro">
+      Thinking about a change? These are roles <b>outside</b> what your board is built around{% if current_role %} (<b>{{ current_role }}</b>){% endif %},
+      picked for the skills you already have. Open a path to see live openings for it.
+    </p>
+
+    <section aria-labelledby="cs-paths-h">
+      <div class="cs-results-head" style="margin-bottom:12px;">
+        <div class="cs-kicker" id="cs-paths-h">Paths for you</div>
+        <button type="button" class="cs-btn ghost" id="cs-refresh" onclick="loadCareerPaths(true)">New ideas</button>
+      </div>
+      <p class="cs-mode" id="cs-mode"></p>
+      <div class="cs-paths" id="cs-paths" aria-live="polite">
+        <div class="wr-skel"></div><div class="wr-skel"></div><div class="wr-skel"></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="cs-explore-h">
+      <div class="cs-kicker" id="cs-explore-h" style="margin-bottom:10px;">Explore any field</div>
+      <form class="cs-bar" onsubmit="event.preventDefault(); exploreCareerField();">
+        <input type="search" id="cs-field" placeholder="A role you're curious about, like &quot;Data Analyst&quot;" aria-label="Role or field to explore" maxlength="80" autocomplete="off">
+        <input type="search" id="cs-location" placeholder="Anywhere in India" aria-label="Location" maxlength="60" autocomplete="off" style="flex:0 1 180px;">
+        <button type="submit" class="cs-btn">Find openings</button>
+      </form>
+    </section>
+
+    <section id="cs-results" class="web-results" hidden aria-live="polite" style="margin:0;">
+      <div class="wr-head">
+        <div class="wr-heading">
+          <span class="wr-kicker">Openings</span>
+          <span class="wr-query" id="cs-query"></span>
+        </div>
+        <div class="wr-actions">
+          <a class="wr-reload" id="cs-reload" hidden href="/" style="text-decoration:none;"></a>
+          <button type="button" class="wr-close" onclick="closeCareerResults()" aria-label="Close openings">&times;</button>
+        </div>
+      </div>
+      <div class="wr-list" id="cs-list"></div>
+      <div class="wr-foot" id="cs-foot"></div>
+    </section>
+  </div>
   {% elif view_mode == 'users' %}
   <div class="board-header">
     <h2 class="board-title">👥 User Management</h2>
@@ -5920,5 +5998,169 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 {% endif %}
 
+{% if view_mode == 'career' %}
+<script>
+// ── Career Switch: suggested paths and live openings for each ──
+const CAREER = { paths: [], results: [], added: 0, seq: 0, active: null };
+const CS_SOURCE_LABEL = { linkedin: 'LinkedIn', direct: 'Company site' };
+
+function csAge(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  if (isNaN(then)) return '';
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 month ago' : `${months} months ago`;
+}
+
+async function loadCareerPaths(refresh) {
+  const box = document.getElementById('cs-paths');
+  const btn = document.getElementById('cs-refresh');
+  btn.disabled = true;
+  if (refresh) box.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
+  try {
+    const res = await fetch('/api/career-switch/paths' + (refresh ? '?refresh=1' : ''));
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not load ideas.');
+    CAREER.paths = data.paths || [];
+    document.getElementById('cs-mode').textContent = data.mode === 'ai'
+      ? 'Based on your resume.'
+      : 'Common moves from your role. Add a Gemini key in Profile Settings to get ideas based on your resume.';
+    renderCareerPaths();
+  } catch (e) {
+    if (!CAREER.paths.length) box.innerHTML = `<div class="wr-empty">${esc(e.message || 'Could not load ideas.')} Try again in a moment.</div>`;
+    else toast(e.message || 'Could not load ideas.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderCareerPaths() {
+  const box = document.getElementById('cs-paths');
+  if (!CAREER.paths.length) {
+    box.innerHTML = '<div class="wr-empty">No ideas yet. Try the box below to explore a field you have in mind.</div>';
+    return;
+  }
+  box.innerHTML = CAREER.paths.map((p, i) => `
+    <button type="button" class="cs-path${CAREER.active === i ? ' on' : ''}" data-i="${i}" onclick="openCareerPath(${i})" aria-pressed="${CAREER.active === i}">
+      <span class="cs-role">${esc(p.role)}</span>
+      ${p.why ? `<span class="cs-why">${esc(p.why)}</span>` : ''}
+      ${(p.carry || []).length ? `<span class="cs-label">You bring</span><span class="cs-tags">${p.carry.map(t => `<span class="cs-tag">${esc(t)}</span>`).join('')}</span>` : ''}
+      ${(p.gaps || []).length ? `<span class="cs-label">To build</span><span class="cs-tags">${p.gaps.map(t => `<span class="cs-tag gap">${esc(t)}</span>`).join('')}</span>` : ''}
+      ${p.first_step ? `<span class="cs-step"><b>This week</b>${esc(p.first_step)}</span>` : ''}
+    </button>`).join('');
+}
+
+function openCareerPath(i) {
+  const p = CAREER.paths[i];
+  if (!p) return;
+  CAREER.active = i;
+  renderCareerPaths();
+  searchCareerJobs(p.query, document.getElementById('cs-location').value.trim(), p.role);
+}
+
+function exploreCareerField() {
+  const q = document.getElementById('cs-field').value.trim();
+  if (q.length < 2) {
+    toast('Type a role you want to explore, like "Data Analyst".');
+    document.getElementById('cs-field').focus();
+    return;
+  }
+  CAREER.active = null;
+  renderCareerPaths();
+  searchCareerJobs(q, document.getElementById('cs-location').value.trim(), q);
+}
+
+async function searchCareerJobs(q, loc, label) {
+  const seq = ++CAREER.seq;
+  const panel = document.getElementById('cs-results');
+  const list = document.getElementById('cs-list');
+  const foot = document.getElementById('cs-foot');
+  document.getElementById('cs-query').innerHTML = `${esc(label)}<em>${esc(loc || 'India')}</em>`;
+  foot.textContent = 'Searching LinkedIn and company career pages…';
+  list.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const res = await fetch(`/api/career-switch/jobs?q=${encodeURIComponent(q)}&location=${encodeURIComponent(loc)}`);
+    const data = await res.json();
+    if (seq !== CAREER.seq) return;
+    if (!data.ok) throw new Error(data.error || 'Search failed.');
+    CAREER.results = data.results;
+    renderCareerResults(data);
+  } catch (e) {
+    if (seq !== CAREER.seq) return;
+    list.innerHTML = `<div class="wr-empty">${esc(e.message || 'Search failed.')} Try again in a moment.</div>`;
+    foot.textContent = '';
+  }
+}
+
+function renderCareerResults(data) {
+  const list = document.getElementById('cs-list');
+  if (!data.results.length) {
+    list.innerHTML = '<div class="wr-empty">Nothing open for this right now. Try another path, or clear the location.</div>';
+  } else {
+    list.innerHTML = data.results.map((r, i) => `
+      <article class="wr-item" style="animation-delay:${Math.min(i, 8) * 35}ms">
+        <a class="wr-title" href="${/^https?:\/\//i.test(r.url) ? esc(r.url) : '#'}" target="_blank" rel="noopener noreferrer" title="Open the posting">${esc(r.title)}<span class="wr-arrow" aria-hidden="true">↗</span></a>
+        <div class="wr-sub"><b>${esc(r.company)}</b> · ${esc(r.location)}</div>
+        <div class="wr-meta">
+          <span class="wr-src">${esc(CS_SOURCE_LABEL[r.source] || r.source)}</span>
+          <span class="wr-age">${esc(csAge(r.posted_at))}</span>
+          <span class="wr-spacer"></span>
+          <button type="button" class="wr-add" data-i="${i}" onclick="addCareerResult(this)" ${r.on_board ? 'disabled' : ''}>${r.on_board ? 'On board' : 'Add to board'}</button>
+        </div>
+      </article>`).join('');
+  }
+  const n = data.results.length;
+  const failed = (data.failed || []).map(f => CS_SOURCE_LABEL[f] || f);
+  let text = `${n} ${n === 1 ? 'opening' : 'openings'} from LinkedIn and company career pages`;
+  if (data.hidden) text += `. Hid ${data.hidden} that ${data.hidden === 1 ? 'looks' : 'look'} like ${data.current_role ? 'your current ' + data.current_role + ' search' : 'your current search'}`;
+  if (failed.length) text += `. ${failed.join(' and ')} didn't answer this time`;
+  document.getElementById('cs-foot').textContent = text + '.';
+}
+
+async function addCareerResult(btn) {
+  const r = CAREER.results[+btn.dataset.i];
+  if (!r || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const res = await fetch('/api/jobs/search/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: r.source, ref: r.ref, title: r.title, company: r.company, location: r.location, posted_at: r.posted_at }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not add it.');
+    r.on_board = true;
+    btn.textContent = data.already ? 'On board' : 'Added ✓';
+    btn.classList.toggle('done', !data.already);
+    if (!data.already) {
+      CAREER.added++;
+      const link = document.getElementById('cs-reload');
+      link.textContent = `See ${CAREER.added} on board`;
+      link.hidden = false;
+      toast('Added to your Inbox. Scoring it now.');
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Add to board';
+    toast(e.message || 'Could not add it.');
+  }
+}
+
+function closeCareerResults() {
+  CAREER.seq++;
+  CAREER.active = null;
+  renderCareerPaths();
+  document.getElementById('cs-results').hidden = true;
+}
+
+loadCareerPaths(false);
+</script>
+{% endif %}
 </body>
 </html>
