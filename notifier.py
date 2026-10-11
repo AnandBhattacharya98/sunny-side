@@ -2,7 +2,8 @@
 notifier.py — Sends digest via email and/or Telegram.
 
 WITHOUT credentials: prints a summary to the terminal (always works).
-WITH SENDER_EMAIL + SENDER_PASSWORD: sends a full HTML email digest.
+WITH SENDER_EMAIL + BREVO_API_KEY: sends email through Brevo's HTTPS API (works on hosts that block SMTP, like Render's free plan).
+WITH SENDER_EMAIL + SENDER_PASSWORD: sends email through Gmail SMTP.
 WITH TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID: sends a Telegram ping.
 """
 
@@ -15,6 +16,8 @@ from datetime import datetime
 
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "")
 SENDER_PASSWORD   = os.getenv("SENDER_PASSWORD", "")
+SENDER_NAME       = os.getenv("SENDER_NAME", "Sunny Side")
+BREVO_API_KEY     = os.getenv("BREVO_API_KEY", "")
 RECIPIENT_EMAIL   = os.getenv("RECIPIENT_EMAIL", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -101,21 +104,14 @@ def send_email_digest(jobs: list[dict], recipient: str = None) -> bool:
     it goes to RECIPIENT_EMAIL / SENDER_EMAIL."""
     if not jobs:
         return False
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
-        print("  [Email] No credentials set — skipping. Add SENDER_EMAIL + SENDER_PASSWORD to .env")
+    if not email_configured():
+        print("  [Email] No credentials set — skipping. Add SENDER_EMAIL + BREVO_API_KEY (or SENDER_PASSWORD) to .env")
         return False
 
     recipient = recipient or RECIPIENT_EMAIL or SENDER_EMAIL
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Job matches — {len(jobs)} today ({datetime.now().strftime('%d %b')})"
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = recipient
-    msg.attach(MIMEText(_build_html(jobs), "html"))
-
+    subject = f"Job matches — {len(jobs)} today ({datetime.now().strftime('%d %b')})"
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as srv:
-            srv.login(SENDER_EMAIL, SENDER_PASSWORD)
-            srv.sendmail(SENDER_EMAIL, recipient, msg.as_string())
+        _deliver(recipient, subject, _build_html(jobs))
         print(f"  [Email] Digest sent to {recipient}")
         return True
     except Exception as e:
@@ -125,17 +121,10 @@ def send_email_digest(jobs: list[dict], recipient: str = None) -> bool:
 
 def send_email(recipient: str, subject: str, html: str) -> bool:
     """Sends one HTML email from SENDER_EMAIL. Returns False when email isn't configured or fails."""
-    if not SENDER_EMAIL or not SENDER_PASSWORD or not recipient:
+    if not email_configured() or not recipient:
         return False
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = recipient
-    msg.attach(MIMEText(html, "html"))
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as srv:
-            srv.login(SENDER_EMAIL, SENDER_PASSWORD)
-            srv.sendmail(SENDER_EMAIL, recipient, msg.as_string())
+        _deliver(recipient, subject, html)
         return True
     except Exception as e:
         print(f"  [Email] Failed to send '{subject}': {e}")
@@ -143,7 +132,29 @@ def send_email(recipient: str, subject: str, html: str) -> bool:
 
 
 def email_configured() -> bool:
-    return bool(SENDER_EMAIL and SENDER_PASSWORD)
+    return bool(SENDER_EMAIL and (BREVO_API_KEY or SENDER_PASSWORD))
+
+
+def _deliver(recipient: str, subject: str, html: str) -> None:
+    """Sends one HTML email from SENDER_EMAIL, raising on failure. Brevo's HTTPS API wins when
+    its key is set, since many hosts (Render's free plan included) block outbound SMTP."""
+    if BREVO_API_KEY:
+        import requests as req
+        res = req.post("https://api.brevo.com/v3/smtp/email", timeout=20,
+                       headers={"api-key": BREVO_API_KEY, "accept": "application/json"},
+                       json={"sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
+                             "to": [{"email": recipient}], "subject": subject, "htmlContent": html})
+        if res.status_code >= 300:
+            raise RuntimeError(f"Brevo returned {res.status_code}: {res.text[:200]}")
+        return
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = recipient
+    msg.attach(MIMEText(html, "html"))
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as srv:
+        srv.login(SENDER_EMAIL, SENDER_PASSWORD)
+        srv.sendmail(SENDER_EMAIL, recipient, msg.as_string())
 
 
 def send_telegram_ping(jobs: list[dict]) -> None:
