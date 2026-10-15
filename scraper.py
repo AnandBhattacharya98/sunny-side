@@ -140,7 +140,7 @@ def _insert_job(conn, job: dict, user_id: int = 1) -> bool:
     return True
 
 
-def scrape_linkedin_jobs(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
+def scrape_linkedin_jobs(conn, user_id: int, keywords: str) -> list[dict]:
     import urllib.parse
     q_keywords = urllib.parse.quote_plus(keywords)
     url = (
@@ -259,7 +259,7 @@ def fold_duplicates(conn, user_id: int) -> int:
 
 
 def _title_matches(title: str, keywords: str) -> bool:
-    """Every word of the user's designation (3+ letters) must appear in the title.
+    """Every word of the role being searched for (3+ letters) must appear in the title.
 
     Company boards list every role, so a loose "any word" match would let
     "Engineering Manager" through for "Product Manager"."""
@@ -320,7 +320,9 @@ def _fetch_board_postings(cfg: dict) -> list[dict]:
     raise ValueError(f"Unknown ATS {cfg['ats']!r}")
 
 
-def scrape_company_pages(conn, user_id: int = 1, keywords: str = "Product Manager") -> list[dict]:
+def scrape_company_pages(conn, user_id: int, keywords: str | list[str]) -> list[dict]:
+    """Saves matching India roles from each company feed. keywords is one role or several."""
+    roles = [keywords] if isinstance(keywords, str) else list(keywords)
     new_jobs = []
     for cfg in boards_for_user(conn, user_id):
         try:
@@ -335,7 +337,7 @@ def scrape_company_pages(conn, user_id: int = 1, keywords: str = "Product Manage
                 break
             if not p["title"] or not p["url"]:
                 continue
-            if not _title_matches(p["title"], keywords) or not _is_india_location(p["location"]):
+            if not any(_title_matches(p["title"], r) for r in roles) or not _is_india_location(p["location"]):
                 continue
             job = {
                 "job_id": board_job_id(cfg["company"], p["id"]),
@@ -716,13 +718,16 @@ def _fetch_description(url: str) -> str:
 
 
 def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
+    from roles import roles_for_user
     conn = init_db(db_path)
-    # Query user's designation to use as query keywords
-    row = conn.execute("SELECT designation FROM users WHERE id = ?", (user_id,)).fetchone()
-    keywords = row[0] if row and row[0] else "Product Manager"
+    # Search for the roles on this user's own resume (or the job title they typed in)
+    roles = roles_for_user(conn, user_id)
     conn.close()
+    if not roles:
+        print(f"\n[Scraping skipped for user {user_id}: no resume or job title to search for yet]")
+        return []
 
-    print(f"\n[Scraping job listings in parallel for user {user_id}...]")
+    print(f"\n[Scraping job listings in parallel for user {user_id}: {', '.join(roles)}]")
     
     import concurrent.futures
     
@@ -739,10 +744,8 @@ def run_all_scrapers(db_path: str = DB_PATH, user_id: int = 1) -> list[dict]:
             thread_conn.close()
 
     all_new = []
-    scrapers = [
-        (scrape_linkedin_jobs, (user_id, keywords)),
-        (scrape_company_pages, (user_id, keywords)),
-    ]
+    scrapers = [(scrape_linkedin_jobs, (user_id, role)) for role in roles]
+    scrapers.append((scrape_company_pages, (user_id, roles)))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
         futures = [executor.submit(run_scraper, func, *args) for func, args in scrapers]

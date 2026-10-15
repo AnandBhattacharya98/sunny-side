@@ -255,7 +255,8 @@ def signup():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         name = request.form.get("name", "").strip() or username.capitalize()
-        designation = request.form.get("designation", "").strip() or "Product Manager"
+        # Left blank, the roles to search for come from the resume (see roles.py)
+        designation = request.form.get("designation", "").strip()
         share_profile = 1 if request.form.get("share_profile") else 0
         linkedin_profile = request.form.get("linkedin_profile", "").strip()
         imap_email = request.form.get("imap_email", "").strip()
@@ -626,9 +627,10 @@ def update_profile():
     conn = get_conn(DB_PATH)
     
     # Fetch old values to check for changes
-    old = conn.execute("SELECT resume_text, designation FROM users WHERE id = ?", (uid,)).fetchone()
+    from roles import roles_for_user
+    old = conn.execute("SELECT resume_text FROM users WHERE id = ?", (uid,)).fetchone()
     old_resume = old[0] if old else ""
-    old_designation = old[1] if old else ""
+    old_roles = roles_for_user(conn, uid)
     old_secrets = get_user_secrets(conn, uid)
     old_key = old_secrets["gemini_api_key"]
     
@@ -639,10 +641,7 @@ def update_profile():
     new_imap_password = d.get("imap_password", "")
     if new_imap_password == SECRET_PLACEHOLDER:
         new_imap_password = old_secrets["imap_password"]
-    new_designation = d.get("designation", "")
-    
     should_reparse = (new_resume != old_resume) or (new_key != old_key)
-    designation_changed = (new_designation != old_designation)
     
     profile_json = None
     if should_reparse:
@@ -668,8 +667,9 @@ def update_profile():
     )
     conn.commit()
     
-    if designation_changed:
-        conn.execute("DELETE FROM jobs WHERE user_id = ? AND status = 'new'", (uid,))
+    # A new title or resume means a different search: clear the untouched suggestions from the old one
+    if roles_for_user(conn, uid) != old_roles:
+        conn.execute("DELETE FROM jobs WHERE user_id = ? AND status = 'new' AND COALESCE(feedback, 0) = 0", (uid,))
         conn.commit()
         
     conn.close()
@@ -1824,7 +1824,15 @@ def run_user_sync(uid, min_score=None):
 
 @app.route("/api/refresh", methods=["POST"])
 def refresh_listings():
+    from roles import roles_for_user
     uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        roles = roles_for_user(conn, uid)
+    finally:
+        conn.close()
+    if not roles:
+        return jsonify({"ok": False, "error": "Add your resume or a job title in Settings first, so I know which jobs to look for."})
     started = run_in_background(("sync", uid), run_user_sync, uid)
     return jsonify({"ok": True, "message": "Sync started in background" if started else "A sync is already running"})
 
@@ -2063,8 +2071,9 @@ def add_web_search_result():
 
 def _career_context(conn, uid):
     """The role the board is already built around, plus resume and key for suggestions."""
+    from roles import roles_for_user
     settings = get_user_settings(conn, uid)
-    current = (settings.get("designation") or "").strip()
+    current = (settings.get("designation") or "").strip() or next(iter(roles_for_user(conn, uid)), "")
     if not current:
         row = conn.execute("SELECT title, COUNT(*) AS n FROM jobs WHERE user_id = ? GROUP BY title ORDER BY n DESC LIMIT 1",
                            (uid,)).fetchone()
@@ -2931,7 +2940,7 @@ def scrape_job_url(url: str) -> dict:
     
     domain = url.split("://")[-1].split("/")[0].replace("www.", "")
     company = domain.split(".")[0].capitalize()
-    title = "Product Manager"
+    title = "Untitled role"
     desc = "Forwarded via WhatsApp."
     loc = "India"
     
@@ -3069,7 +3078,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
     added_count = 0
     for item in parsed:
         company = item.get("company", "Unknown Company").strip()
-        title = item.get("title", "Product Manager").strip()
+        title = item.get("title", "Untitled role").strip()
         url = item.get("url", "").strip()
         desc = item.get("description", "Imported from WhatsApp.").strip()
         loc = item.get("location", "Remote").strip()
