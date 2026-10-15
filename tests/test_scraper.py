@@ -91,10 +91,10 @@ def test_company_boards_keep_matching_india_roles(conn, fake_boards):
 
 
 def test_company_boards_do_not_duplicate(conn, fake_boards):
-    assert len(scraper.scrape_company_pages(conn, user_id=1)) == 3
-    assert scraper.scrape_company_pages(conn, user_id=1) == []
+    assert len(scraper.scrape_company_pages(conn, user_id=1, keywords="Product Manager")) == 3
+    assert scraper.scrape_company_pages(conn, user_id=1, keywords="Product Manager") == []
     # Another user gets their own copies.
-    assert len(scraper.scrape_company_pages(conn, user_id=2)) == 3
+    assert len(scraper.scrape_company_pages(conn, user_id=2, keywords="Product Manager")) == 3
 
 
 def test_one_failing_board_does_not_stop_others(conn, monkeypatch):
@@ -108,7 +108,7 @@ def test_one_failing_board_does_not_stop_others(conn, monkeypatch):
         {"company": "Gone", "ats": "greenhouse", "board": "gone"},
         {"company": "Paytm", "ats": "lever", "board": "paytm"},
     ])
-    jobs = scraper.scrape_company_pages(conn, user_id=1)
+    jobs = scraper.scrape_company_pages(conn, user_id=1, keywords="Product Manager")
     assert [j["company"] for j in jobs] == ["Paytm"]
 
 
@@ -122,7 +122,17 @@ def test_title_matches(title, keywords, ok):
     assert scraper._title_matches(title, keywords) is ok
 
 
+def _set_user_profile(user_id, designation="", resume_text=""):
+    from db import init_db
+    c = init_db(os.environ["DB_PATH"])
+    c.execute("UPDATE users SET designation = ?, resume_text = ?, resume_profile_json = NULL WHERE id = ?",
+              (designation, resume_text, user_id))
+    c.commit()
+    c.close()
+
+
 def test_run_all_scrapers_only_uses_live_sources(monkeypatch):
+    _set_user_profile(1, designation="Product Manager")
     called = []
     monkeypatch.setattr(scraper, "scrape_linkedin_jobs", lambda c, *a: called.append("linkedin") or [])
     monkeypatch.setattr(scraper, "scrape_company_pages", lambda c, *a: called.append("boards") or [])
@@ -130,3 +140,28 @@ def test_run_all_scrapers_only_uses_live_sources(monkeypatch):
     assert sorted(called) == ["boards", "linkedin"]
     assert not hasattr(scraper, "scrape_naukri")
     assert not hasattr(scraper, "scrape_google_search_jobs")
+
+
+def test_run_all_scrapers_searches_the_roles_on_the_resume(monkeypatch):
+    _set_user_profile(1, resume_text="Asha Rao\nData Analyst @ Swiggy (2022 - Present)\nSQL, Tableau\n"
+                                     "Software Engineer, Infosys | 2019 - 2022")
+    searched, board_roles = [], []
+    monkeypatch.setattr(scraper, "scrape_linkedin_jobs", lambda c, uid, kw: searched.append(kw) or [])
+    monkeypatch.setattr(scraper, "scrape_company_pages", lambda c, uid, kw: board_roles.extend(kw) or [])
+    scraper.run_all_scrapers(os.environ["DB_PATH"], user_id=1)
+    assert sorted(searched) == ["Data Analyst", "Software Engineer"]
+    assert board_roles == ["Data Analyst", "Software Engineer"]
+
+
+def test_run_all_scrapers_never_falls_back_to_product_manager(monkeypatch):
+    _set_user_profile(1)
+    called = []
+    monkeypatch.setattr(scraper, "scrape_linkedin_jobs", lambda c, *a: called.append(a) or [])
+    monkeypatch.setattr(scraper, "scrape_company_pages", lambda c, *a: called.append(a) or [])
+    assert scraper.run_all_scrapers(os.environ["DB_PATH"], user_id=1) == []
+    assert called == []
+
+
+def test_company_boards_match_any_of_several_roles(conn, fake_boards):
+    jobs = scraper.scrape_company_pages(conn, user_id=1, keywords=["Data Analyst", "Associate Product Manager"])
+    assert {j["title"] for j in jobs} == {"Associate Product Manager"}

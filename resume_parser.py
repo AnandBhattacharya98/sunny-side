@@ -89,20 +89,9 @@ def parse_resume_local(raw_text: str) -> dict:
             else:
                 extracted_skills.append(name)
 
-    # 3. Title detection from first 15 lines
-    lines = [line.strip() for line in raw_text.split("\n") if line.strip()][:15]
-    detected_titles = []
-    title_keywords = [
-        "product manager", "pm", "product lead", "director of product", "associate product manager", "apm",
-        "software engineer", "developer", "data scientist", "data analyst", "system administrator",
-        "scrum master", "product owner", "project manager", "program manager", "intern"
-    ]
-    for line in lines:
-        for keyword in title_keywords:
-            if re.search(rf"\b{re.escape(keyword)}\b", line, re.IGNORECASE):
-                if len(line) < 60:
-                    detected_titles.append(line)
-                    break
+    # 3. Titles held, for any kind of role (see roles.py)
+    from roles import extract_titles
+    detected_titles = extract_titles(raw_text)
 
     # 4. Seniority detection
     seniority = "associate"

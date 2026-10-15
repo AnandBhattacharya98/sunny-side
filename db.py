@@ -347,6 +347,7 @@ def migrate_db(conn) -> None:
 
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
+    _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
 
     if IS_POSTGRES:
         seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep"]
@@ -414,6 +415,22 @@ def _reset_landing_wall_optin(conn) -> None:
     signup checkbox was pre-ticked. Hide everyone once; people can opt back in from settings."""
     conn.execute("UPDATE users SET share_profile = 0 WHERE share_profile = 1")
     conn.commit()
+
+
+def _drop_default_pm_title(conn) -> None:
+    """Signup used to fill in "Product Manager" when the job title was left blank, so people
+    with other resumes only ever got PM jobs. Clear that default where the resume isn't about
+    product work, so their search comes from the resume (roles.py), and drop the untouched
+    PM suggestions; the next refresh or daily run brings jobs that fit."""
+    rows = conn.execute(
+        "SELECT id FROM users WHERE designation = ? AND COALESCE(resume_text, '') <> '' "
+        "AND LOWER(resume_text) NOT LIKE ?", ("Product Manager", "%product%")).fetchall()
+    for (uid,) in rows:
+        conn.execute("UPDATE users SET designation = '' WHERE id = ?", (uid,))
+        conn.execute("DELETE FROM jobs WHERE user_id = ? AND status = 'new' AND COALESCE(feedback, 0) = 0", (uid,))
+    conn.commit()
+    if rows:
+        print(f"Cleared the default 'Product Manager' title for {len(rows)} user(s) whose resume is about other work")
 
 
 def _encrypt_legacy_secrets(conn) -> None:

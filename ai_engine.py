@@ -380,7 +380,8 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
             years_exp = float(resume_profile.get("years_experience") or 0) or None
         except (TypeError, ValueError):
             years_exp = None
-        target_titles = [designation] + list(resume_profile.get("titles") or [])
+        from roles import roles_for
+        target_titles = roles_for(designation, resume_profile, resume_text if "No resume provided" not in resume_text else "")
         res = _local_score(title, company, description, liked_titles=liked_titles, disliked_titles=disliked_titles,
                            w_up=w_up, w_app=w_app, w_down=w_down, w_rej=w_rej, resume_text=resume_text,
                            years_exp=years_exp, target_titles=target_titles,

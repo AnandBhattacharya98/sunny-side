@@ -119,7 +119,7 @@ def extract_job_info_from_email(subject: str, body: str, sender: str) -> tuple[s
     sender_clean = sender.lower()
     
     company = None
-    title = "Product Manager"
+    title = "Untitled role"
     
     # Heuristics for subject:
     # 1. "Your application to [Company] was sent" or "your application to [Company]"
