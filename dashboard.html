@@ -2277,6 +2277,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     .cl-link { background: none; border: none; padding: 0; color: var(--txt); text-decoration: underline; cursor: pointer; font: inherit; font-size: 11.5px; }
     .cl-transcript { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--txt); }
     .cl-empty { text-align: center; padding: 40px 16px; color: var(--mut); font-size: 13px; }
+    .cl-phone-step { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+    .cl-phone-step + .cl-phone-step { border-top: 1px dashed var(--bdr); padding-top: 10px; }
+    .cl-tel { color: var(--txt); font-weight: 700; white-space: nowrap; }
+    .cl-code-big { font-family: var(--font-mono); font-size: 22px; font-weight: 700; letter-spacing: .18em; color: var(--txt); }
     @media (max-width: 640px) {
       .cl-table thead { display: none; }
       .cl-table, .cl-table tbody, .cl-table tr, .cl-table td { display: block; width: 100%; }
@@ -2318,6 +2322,35 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         <p class="cl-warn">Practice calls need LiveKit. Set <code>LIVEKIT_URL</code>, <code>LIVEKIT_API_KEY</code> and <code>LIVEKIT_API_SECRET</code> on the server, and deploy the recruiter agent in <code>voice_agent/</code>.</p>
         {% endif %}
       </section>
+
+      {% if phone_number or call_me_ready %}
+      <section class="cl-card" aria-labelledby="cl-phone-h">
+        <h3 id="cl-phone-h">Practise on your phone</h3>
+        <p>The same recruiter screen on a real phone call, so you can practise with the phone at your ear, away from the laptop. It's logged below when you hang up.</p>
+        {% if phone_number %}
+        <div class="cl-phone-step">
+          <span class="cl-meta">Dial in</span>
+          <p>Ring <a class="cl-tel" href="tel:{{ phone_number|replace(' ', '') }}">{{ phone_number }}</a>. When it asks, type or say your code. Calls are charged like any call to that number.</p>
+          <div class="cl-row">
+            <button type="button" class="cl-btn" id="cl-code-btn" onclick="getPhoneCode()">Get my code</button>
+            <span class="cl-code-big" id="cl-code" hidden></span>
+            <span class="cl-meta" id="cl-code-exp"></span>
+          </div>
+        </div>
+        {% endif %}
+        {% if call_me_ready %}
+        <div class="cl-phone-step">
+          <span class="cl-meta">{% if phone_number %}Or have the recruiter ring you{% else %}Have the recruiter ring you{% endif %}</span>
+          <div class="cl-row">
+            <input type="tel" id="cl-phone" maxlength="24" autocomplete="tel" placeholder="+91 98765 43210" aria-label="Your phone number, with country code">
+            <button type="button" class="cl-btn" id="cl-callme" onclick="callMyPhone()">Call me</button>
+          </div>
+          <span class="cl-meta" id="cl-callme-state" aria-live="polite"></span>
+        </div>
+        {% endif %}
+        <div class="cl-warn" id="cl-phone-err" role="alert"></div>
+      </section>
+      {% endif %}
 
       <section class="cl-card" aria-labelledby="cl-api-h">
         <h3 id="cl-api-h">Add calls from curl or Postman</h3>
@@ -6820,7 +6853,8 @@ function renderCalls() {
   }
   const rows = CALLS.items.map(c => {
     const fresh = !CALLS.seen.has(c.id);
-    const kind = c.kind === 'practice' ? '<span class="cl-kind">practice</span>' : '';
+    const kind = c.kind === 'practice' ? '<span class="cl-kind">practice</span>'
+      : c.kind === 'phone' ? '<span class="cl-kind">phone practice</span>' : '';
     const more = c.has_transcript
       ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide transcript' : 'Show transcript'}</button></div><div class="cl-transcript" id="cl-tr-${c.id}"></div>`
       : '';
@@ -7062,6 +7096,78 @@ async function endPracticeCall() {
     refreshCalls();
   } catch (e) { practiceError("The call ended but couldn't be saved."); }
 }
+
+
+// ── Phone practice (LiveKit SIP): a one-time code for dialling in, or have the agent ring you ──
+const PHONE = { codeTimer: null };
+
+function phoneError(msg) {
+  const el = document.getElementById('cl-phone-err');
+  if (el) el.textContent = msg || '';
+}
+
+function practiceRole() {
+  return (document.getElementById('cl-role')?.value || '').trim();
+}
+
+async function getPhoneCode() {
+  const btn = document.getElementById('cl-code-btn');
+  phoneError('');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/calls/phone/code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: practiceRole() }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not make a code');
+    const codeEl = document.getElementById('cl-code');
+    codeEl.textContent = data.code;
+    codeEl.hidden = false;
+    btn.textContent = 'New code';
+    const until = Date.now() + data.expires_in * 1000;
+    clearInterval(PHONE.codeTimer);
+    const tick = () => {
+      const left = Math.round((until - Date.now()) / 1000);
+      const exp = document.getElementById('cl-code-exp');
+      if (left <= 0) {
+        clearInterval(PHONE.codeTimer);
+        codeEl.hidden = true;
+        exp.textContent = 'Code expired';
+        return;
+      }
+      exp.textContent = `works once, for ${clDuration(left)}`;
+    };
+    tick();
+    PHONE.codeTimer = setInterval(tick, 1000);
+  } catch (e) { phoneError(e.message); }
+  btn.disabled = false;
+}
+
+async function callMyPhone() {
+  const btn = document.getElementById('cl-callme');
+  const input = document.getElementById('cl-phone');
+  const state = document.getElementById('cl-callme-state');
+  phoneError('');
+  const number = input.value.trim();
+  if (!number) { phoneError('Enter your phone number with its country code.'); input.focus(); return; }
+  btn.disabled = true;
+  state.textContent = 'Starting the call…';
+  try {
+    const res = await fetch('/api/calls/phone/dial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone_number: number, role: practiceRole() }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not start the call');
+    try { localStorage.setItem('ss-practice-phone', number); } catch (e) {}
+    state.textContent = 'Your phone will ring in a few seconds. Say hello when you pick up.';
+    setTimeout(() => { btn.disabled = false; state.textContent = ''; }, 30000);
+  } catch (e) {
+    state.textContent = '';
+    phoneError(e.message);
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('cl-phone');
+  if (input) { try { input.value = localStorage.getItem('ss-practice-phone') || ''; } catch (e) {} }
+});
 
 window.addEventListener('pagehide', () => { if (PRACTICE.room) PRACTICE.room.disconnect(); });
 

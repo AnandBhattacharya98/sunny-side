@@ -23,7 +23,7 @@ import db
 log = logging.getLogger("calls")
 
 STATUSES = ("completed", "missed", "voicemail", "failed")
-KINDS = ("logged", "practice")
+KINDS = ("logged", "practice", "phone")
 API_KEY_PREFIX = "ss_"
 MAX_NAME = 200
 MAX_PHONE = 30
@@ -203,10 +203,15 @@ def room_token(api_key: str, api_secret: str, *, identity: str, name: str, room:
         "roomConfig": {"agents": [{"agentName": AGENT_NAME,
                                    "metadata": json.dumps(agent_metadata, separators=(",", ":"))}]},
     }
+    return sign_jwt(claims, api_secret)
+
+
+def sign_jwt(claims: dict, secret: str) -> str:
+    """An HS256 JWT, the format LiveKit uses for its access tokens."""
     header = {"alg": "HS256", "typ": "JWT"}
     signing_input = (_b64url(json.dumps(header, separators=(",", ":")).encode()) + "."
                      + _b64url(json.dumps(claims, separators=(",", ":")).encode()))
-    sig = hmac.new(api_secret.encode(), signing_input.encode(), hashlib.sha256).digest()
+    sig = hmac.new(secret.encode(), signing_input.encode(), hashlib.sha256).digest()
     return signing_input + "." + _b64url(sig)
 
 

@@ -12,6 +12,7 @@ import followups
 import jobmeta
 import progress
 import calls as call_log
+import phone_practice as phone
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
@@ -62,7 +63,9 @@ def _record_login_failure(username: str) -> None:
 # ── CSRF protection ───────────────────────────────────────────────────────
 # Every state-changing request must echo the per-session token, either as a
 # csrf_token form field or an X-CSRF-Token header (the page's fetch wrapper adds it).
-CSRF_EXEMPT_ENDPOINTS = {"cron_daily_recommendations"}
+# The voice agent calls these with Authorization: Bearer SUNNY_AGENT_SECRET, not a login cookie.
+AGENT_ENDPOINTS = {"api_agent_phone_claim", "api_agent_call_end"}
+CSRF_EXEMPT_ENDPOINTS = {"cron_daily_recommendations"} | AGENT_ENDPOINTS
 
 
 def csrf_token() -> str:
@@ -238,6 +241,10 @@ def _check_oauth_state():
 @app.before_request
 def require_login():
     allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
+    if request.endpoint in AGENT_ENDPOINTS:
+        if not phone.agent_authorized(request.headers.get("Authorization")):
+            return jsonify({"ok": False, "error": "Not authorized"}), 401
+        return
     if request.endpoint in API_KEY_ENDPOINTS and request.headers.get("X-API-Key"):
         if _api_key_user() is None:
             return jsonify({"ok": False, "error": "That API key isn't valid. Make a new one on the Calls page."}), 401
@@ -2195,6 +2202,8 @@ def calls_view():
         conn.close()
     return render_template("dashboard.html", view_mode="calls", stats=stats, settings=settings, calls=items,
                            api_key_hint=key_hint, practice_ready=call_log.practice_configured(),
+                           phone_number=phone.dial_in_number() if phone.dial_in_ready() else "",
+                           call_me_ready=phone.call_me_ready(),
                            api_base=request.host_url.rstrip("/"))
 
 
@@ -2303,16 +2312,23 @@ def api_practice_end():
         duration = max(0, min(int(body.get("duration_seconds") or 0), call_log.MAX_DURATION))
     except (TypeError, ValueError):
         duration = 0
+    saved = _log_practice_call(uid, transcript, role, duration, kind="practice", phone_label="Browser call")
+    return jsonify({"ok": True, "call": saved}), 201
+
+
+def _log_practice_call(uid: int, transcript: list, role: str, duration: int, *, kind: str, phone_label: str) -> dict:
+    """Saves a finished practice call, then writes its summary in the background."""
     answered = any(t["role"] == "user" for t in transcript)
+    what = "Phone practice" if kind == "phone" else "Practice screen"
     conn = get_conn(DB_PATH)
     try:
         saved = call_log.add_call(conn, uid, {
-            "caller_name": f"Practice screen{(' · ' + role) if role else ''}"[:call_log.MAX_NAME],
-            "phone_number": "Browser call",
+            "caller_name": f"{what}{(' · ' + role) if role else ''}"[:call_log.MAX_NAME],
+            "phone_number": phone_label[:call_log.MAX_PHONE],
             "status": "completed" if answered else "missed",
             "duration_seconds": duration,
             "summary": "Writing a summary…" if answered else call_log.fallback_summary(transcript, role),
-        }, kind="practice", transcript=transcript)
+        }, kind=kind, transcript=transcript)
         gemini_key = get_user_settings(conn, uid).get("gemini_api_key") or None
     finally:
         conn.close()
@@ -2326,7 +2342,122 @@ def api_practice_end():
             finally:
                 c.close()
         run_in_background(("practice_summary", uid, saved["id"]), work)
-    return jsonify({"ok": True, "call": saved}), 201
+    return saved
+
+
+# ── Phone practice (phone_practice.py): dial in with a code, or have the agent ring you ──
+
+def _practice_details(uid: int, role: str, company: str) -> dict:
+    """What the recruiter agent is told about the caller."""
+    conn = get_conn(DB_PATH)
+    try:
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+    finally:
+        conn.close()
+    return {"candidate_name": (settings.get("name") or "").strip()[:60],
+            "role": role or " ".join(str(settings.get("designation") or "").split())[:80],
+            "company": company,
+            "resume": (settings.get("resume_text") or "")[:1500]}
+
+
+def _clean_field(body: dict, key: str, limit: int = 80) -> str:
+    return " ".join(str(body.get(key) or "").split())[:limit]
+
+
+@app.route("/api/calls/phone/code", methods=["POST"])
+def api_phone_code():
+    """A one-time code the user types or says after dialling the practice number."""
+    uid = get_user_id()
+    if not phone.dial_in_ready():
+        return jsonify({"ok": False, "error": "Phone practice isn't set up on this server yet."}), 503
+    if not ve.rate_limiter.allow(uid, "phone_code", 10, window=600):
+        return jsonify({"ok": False, "error": "That's a lot of codes. Wait a few minutes."}), 429
+    body = request.get_json(silent=True) or {}
+    conn = get_conn(DB_PATH)
+    try:
+        code = phone.new_code(conn, uid, app.secret_key, role=_clean_field(body, "role"),
+                              company=_clean_field(body, "company"))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "code": code, "number": phone.dial_in_number(),
+                    "expires_in": phone.CODE_TTL_MINUTES * 60})
+
+
+@app.route("/api/calls/phone/dial", methods=["POST"])
+def api_phone_dial():
+    """Sends the recruiter agent into a new room with the user's number to ring."""
+    uid = get_user_id()
+    if not phone.call_me_ready():
+        return jsonify({"ok": False, "error": "Call me isn't set up on this server yet."}), 503
+    body = request.get_json(silent=True) or {}
+    try:
+        number = phone.normalize_phone(body.get("phone_number"))
+    except phone.PhoneError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    # Each call costs real money, so keep it to a handful an hour
+    if not ve.rate_limiter.allow(uid, "phone_dial", 3, window=3600):
+        return jsonify({"ok": False, "error": "That's three calls this hour. Try again a bit later."}), 429
+    role = _clean_field(body, "role")
+    details = _practice_details(uid, role, _clean_field(body, "company"))
+    room = f"{phone.ROOM_PREFIX_OUT}{uid}-{secrets.token_hex(6)}"
+    ref = phone.make_call_ref(app.secret_key, user_id=uid, room=room, role=details["role"],
+                              phone=phone.mask_phone(number))
+    try:
+        phone.dispatch_agent(room, {**details, "dial_to": number, "trunk_id": phone.outbound_trunk(),
+                                    "call_ref": ref})
+    except Exception as e:
+        app.logger.warning("phone dial failed: %s", e)
+        return jsonify({"ok": False, "error": "Couldn't start the call. Try again in a minute."}), 502
+    return jsonify({"ok": True, "room": room})
+
+
+@app.route("/api/agent/phone/claim", methods=["POST"])
+def api_agent_phone_claim():
+    """The agent trades the code a caller typed for who they are and what to practise."""
+    body = request.get_json(silent=True) or {}
+    room = _clean_field(body, "room", 120)
+    if not room.startswith(phone.ROOM_PREFIX_IN):
+        return jsonify({"ok": False, "error": "Unknown room"}), 400
+    # Three guesses per call, and a cap overall, so codes can't be guessed by redialling
+    if not (ve.rate_limiter.allow(room, "phone_claim", 3, window=3600)
+            and ve.rate_limiter.allow("all", "phone_claim", 60)):
+        return jsonify({"ok": False, "error": "Too many tries", "retry": False}), 429
+    conn = get_conn(DB_PATH)
+    try:
+        claimed = phone.claim_code(conn, body.get("code"), app.secret_key)
+    finally:
+        conn.close()
+    if not claimed:
+        return jsonify({"ok": False, "error": "Wrong or expired code", "retry": True}), 404
+    uid = claimed["user_id"]
+    details = _practice_details(uid, claimed["role"], claimed["company"])
+    caller = _clean_field(body, "caller", 30)
+    ref = phone.make_call_ref(app.secret_key, user_id=uid, room=room, role=details["role"],
+                              phone=phone.mask_phone(caller))
+    return jsonify({"ok": True, "details": details, "call_ref": ref})
+
+
+@app.route("/api/agent/calls/end", methods=["POST"])
+def api_agent_call_end():
+    """The agent logs a finished phone practice call with its transcript."""
+    body = request.get_json(silent=True) or {}
+    ref = phone.read_call_ref(app.secret_key, str(body.get("call_ref") or ""))
+    if not ref or ref.get("r") != body.get("room"):
+        return jsonify({"ok": False, "error": "Unknown call"}), 400
+    uid = ref["u"]
+    if not ve.rate_limiter.allow(ref["r"], "phone_end", 1, window=CALL_END_WINDOW):
+        return jsonify({"ok": True, "duplicate": True})
+    transcript = call_log.clean_transcript(body.get("transcript"))
+    try:
+        duration = max(0, min(int(body.get("duration_seconds") or 0), call_log.MAX_DURATION))
+    except (TypeError, ValueError):
+        duration = 0
+    saved = _log_practice_call(uid, transcript, ref.get("role") or "", duration, kind="phone",
+                               phone_label=ref.get("p") or "Phone call")
+    return jsonify({"ok": True, "call": {"id": saved["id"]}}), 201
+
+
+CALL_END_WINDOW = phone.CALL_REF_MAX_AGE
 
 
 # ── Board Assistant (voice + chat) ─────────────────────────────────────────
