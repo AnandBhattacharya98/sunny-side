@@ -1351,6 +1351,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 /* Scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--bdr-strong) transparent; }
 </style>
+<!-- Motion: Anime.js + AutoAnimate + canvas-confetti (static/vendor), house timings in static/motion -->
+<link rel="stylesheet" href="/static/motion/app-motion.css?v=1">
+<script defer src="/static/vendor/sunny-anim.min.js?v=1"></script>
+<script defer src="/static/motion/app-motion.js?v=1"></script>
 </head>
 <body data-uid="{{ session.get('user_id') or '' }}">
 
