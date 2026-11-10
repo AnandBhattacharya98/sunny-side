@@ -156,6 +156,100 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
                          animation: ssStripe 1.4s linear infinite; }
 @keyframes ssStripe { to { background-position: -200% 0; } }
 
+
+/* ---------- Sign in and sign up: the homepage's Sunny keeps you company ---------- */
+/* A faint dot grid and a warm light that follows the cursor, as on the homepage */
+.auth-shell .auth-main { position: relative; }
+.auth-glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.auth-glow::before { content: ""; position: absolute; width: 640px; height: 640px; border-radius: 50%;
+  left: calc(var(--px, 70%) - 320px); top: calc(var(--py, 40%) - 320px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--yolk) 20%, transparent), transparent 62%);
+  transition: left .5s var(--m-ease), top .5s var(--m-ease); }
+.auth-glow::after { content: ""; position: absolute; inset: -40px;
+  background-image: radial-gradient(var(--bdr-strong) 1px, transparent 1.4px); background-size: 28px 28px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 65% 40%, #000 20%, transparent 75%);
+          mask-image: radial-gradient(ellipse 70% 60% at 65% 40%, #000 20%, transparent 75%);
+  opacity: .45; animation: ssDots 40s linear infinite; }
+@keyframes ssDots { to { background-position: 280px 140px; } }
+
+.auth-sun:empty { display: none; }
+.auth-logo-sun { display: inline-flex; width: 22px; height: 22px; }
+.auth-logo-sun svg { width: 100%; height: 100%; overflow: visible; }
+.auth-logo-sun .rays { transform-origin: 12px 12px; animation: ssSpin 14s linear infinite; }
+.auth-logo:hover .auth-logo-sun .rays { animation-duration: 2s; }
+.auth-main:has(> .auth-sun:not(:empty)) { gap: 56px; align-items: center; padding-top: 40px; }
+.auth-sun { position: relative; width: 380px; height: 420px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.as-wrap { position: relative; width: 240px; height: 240px; cursor: pointer; animation: ssSunRise 1.1s var(--m-spring) .15s backwards; }
+.as-halo { position: absolute; inset: -30%; border-radius: 50%; z-index: -1;
+  background: radial-gradient(circle, rgba(255, 167, 0, .36), rgba(255, 167, 0, .08) 45%, transparent 68%);
+  animation: ssBreathe 5s ease-in-out infinite; }
+.as-burst { position: absolute; inset: -42%; border-radius: 50%; z-index: -1; opacity: .5;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 167, 0, .16) 0 6deg, transparent 6deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 30%, transparent 70%); mask-image: radial-gradient(circle, #000 30%, transparent 70%);
+  animation: ssSpin 60s linear infinite; }
+.as-wrap .sunny { display: block; width: 100%; height: 100%; overflow: visible; }
+.as-wrap .sunny .s-rays { transform-origin: 50px 50px; animation: ssSpin 28s linear infinite; }
+.as-wrap .sunny .s-body { transform-origin: 50px 56px; }
+.as-wrap .sunny .s-eyes { transition: transform .18s var(--m-ease), opacity .15s; }
+.as-wrap .sunny .s-eye { transform-box: fill-box; transform-origin: center; animation: ssBlink 4.8s infinite; }
+.as-wrap .sunny .s-shut, .as-wrap .sunny .s-joy { opacity: 0; transition: opacity .15s; }
+.as-wrap .sunny .s-smile { transform-box: fill-box; transform-origin: center; transition: transform .35s var(--m-spring); }
+.as-wrap .sunny .s-hands { opacity: 0; transform: translateY(26px); transition: transform .35s var(--m-spring), opacity .2s; }
+/* Password box focused: Sunny covers its eyes. "Show" pressed: it peeks between its fingers. */
+.auth-sun.shy .s-hands { opacity: 1; transform: none; }
+.auth-sun.shy .s-eyes { opacity: 0; }
+.auth-sun.shy .s-shut { opacity: 1; }
+.auth-sun.shy.peek .s-hands { transform: translateY(9px); }
+.auth-sun.shy.peek .s-eyes { opacity: 1; }
+.auth-sun.shy.peek .s-shut { opacity: 0; }
+/* Happy (button hover, success) and sad (wrong password) faces */
+.auth-sun.happy .s-eyes { opacity: 0; }
+.auth-sun.happy .s-joy { opacity: 1; }
+.auth-sun.happy .s-smile { transform: scale(1.25, 1.35); }
+.auth-sun.sad .s-smile { transform: scaleY(-.7) translateY(-4px); }
+.auth-sun.sad .s-body { animation: ssSad 1.2s ease-in-out 2; }
+.auth-sun.cheer .s-body { animation: ssCheer .8s var(--m-spring); }
+.auth-sun.cheer .s-rays { animation-duration: 1.2s; }
+.auth-sun.nod .s-body { animation: ssNod .3s var(--m-ease); }
+/* Little cards floating around, saying what's waiting on the other side */
+.as-chip { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  background: var(--sur); border: 1px solid var(--bdr); border-radius: 12px; padding: 8px 12px;
+  box-shadow: 0 2px 4px rgba(13, 12, 10, .04), 0 24px 48px -24px rgba(13, 12, 10, .35);
+  font-size: 13px; font-weight: 600; color: var(--txt);
+  transform: translate(calc(var(--mx, 0) * var(--depth, 10px)), calc(var(--my, 0) * var(--depth, 10px)));
+  animation: ssChipIn .6s var(--m-spring) backwards; }
+.as-chip > span { display: flex; align-items: center; gap: 8px; animation: ssBob var(--bob, 6s) ease-in-out infinite; }
+.as-chip small { font-family: var(--font-mono); font-size: 11px; color: var(--mut); font-weight: 400; }
+.as-chip .tag { font-family: var(--font-mono); font-size: 11px; font-weight: 700; background: var(--yolk); color: var(--ink); border-radius: 6px; padding: 1px 6px; }
+.as-chip .ico { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: var(--sur2); font-size: 12px; }
+.as-chip.c1 { top: 20px; left: 0; --depth: 18px; --bob: 6.5s; animation-delay: .6s; }
+.as-chip.c2 { top: 92px; right: -6px; --depth: -14px; --bob: 7.2s; animation-delay: .75s; }
+.as-chip.c3 { bottom: 40px; left: 10px; --depth: -20px; --bob: 5.8s; animation-delay: .9s; }
+.as-bubble { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 3;
+  background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 14px;
+  white-space: nowrap; animation: ssPop .4s var(--m-spring) backwards; }
+[data-theme="dark"] .as-bubble { background: var(--paper); color: var(--ink); }
+.as-bubble::after { content: ""; position: absolute; left: 50%; top: -6px; width: 12px; height: 12px; background: inherit;
+  transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+.auth-card .auth-head h1 .word { display: inline-block; }
+@keyframes ssSunRise { from { opacity: 0; transform: translateY(120px) scale(.6); } }
+@keyframes ssChipIn { from { opacity: 0; scale: .6; } }
+@keyframes ssBreathe { 50% { transform: scale(1.08); opacity: .8; } }
+@keyframes ssSpin { to { transform: rotate(360deg); } }
+@keyframes ssBlink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes ssBob { 50% { transform: translateY(-8px); } }
+@keyframes ssCheer { 30% { transform: translateY(-14px) scale(1.08); } 55% { transform: translateY(0) scale(.97); } 75% { transform: translateY(-5px); } }
+@keyframes ssSad { 25%, 75% { transform: translateY(5px) scale(.95, .92); } }
+@keyframes ssNod { 50% { transform: rotate(4deg) translateY(2px); } }
+@media (max-width: 900px) {
+  .auth-main:has(> .auth-sun:not(:empty)) { flex-direction: column-reverse; align-items: center; gap: 0; padding-top: 8px; }
+  .auth-sun { width: 100%; max-width: 420px; height: 190px; }
+  .as-wrap { width: 120px; height: 120px; }
+  .as-chip { font-size: 12px; padding: 6px 10px; }
+  .as-chip.c1 { top: 18px; left: 0; } .as-chip.c2 { top: auto; bottom: 30px; right: 0; } .as-chip.c3 { display: none; }
+  .as-bubble { display: none; }
+}
+
 @keyframes ssRise { from { opacity: 0; transform: translateY(10px); } }
 
 /* ---------- Reduce motion: keep every state change, drop the movement ---------- */
@@ -168,7 +262,9 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
   .sidebar .nl.on svg, .col.over, .col-ct.m-bump, .nc.m-bump, .auth-shell::before, .auth-shell::after,
   .auth-logo-dot, .auth-shell .auth-card, .auth-card .auth-head > *, .auth-card .auth-form > *,
   .auth-card > .auth-or, .auth-card > .auth-switch, .auth-error, .auth-shell .dropzone-box.over .dz-icon,
-  #onboard-progress-fill, .m-ripple { animation: none !important; }
+  #onboard-progress-fill, .m-ripple, .auth-glow::after, .as-wrap, .as-halo, .as-burst, .auth-logo-sun .rays, .as-wrap .sunny .s-rays,
+  .as-wrap .sunny .s-eye, .as-chip, .as-chip > span, .as-bubble, .auth-sun .s-body { animation: none !important; }
+  .as-chip, .auth-glow::before { transform: none !important; transition: none !important; }
   .jcard:hover, .jcard:active, .jcard.dragging, .sidebar .nl:hover, .sidebar .logo:hover img, .pg-kpi:hover,
   .btn:active, .auth-btn:active, .fj-go:active, .bs-go:active, .fu-btn:active, .fj-co-add:active,
   .auth-shell .auth-input:focus, .auth-shell .dropzone-box:hover, .auth-shell .dropzone-box.over,

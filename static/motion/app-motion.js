@@ -243,6 +243,168 @@
     });
   }
 
+  /* ---------- Sign in and sign up: Sunny keeps you company ----------
+     Its eyes follow the cursor and whichever box you're typing in, it covers its eyes
+     while you type a password (and peeks if you press Show), frowns at a wrong password
+     and cheers when you submit. */
+  var SUNNY_SVG = function () {
+    var rays = '';
+    for (var a = 0; a < 360; a += 45) rays += '<line x1="50" y1="3" x2="50" y2="14" transform="rotate(' + a + ' 50 50)"/>';
+    return '<svg class="sunny" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" focusable="false">' +
+      '<g class="s-rays" stroke="#FFA700" stroke-width="7" stroke-linecap="round">' + rays + '</g>' +
+      '<g class="s-body">' +
+        '<circle cx="50" cy="50" r="31" fill="#FFA700"/>' +
+        '<circle cx="50" cy="50" r="31" fill="none" stroke="#0D0C0A" stroke-width="2.5"/>' +
+        '<ellipse cx="34" cy="58" rx="5.5" ry="3.2" fill="#FF6B3D" opacity="0.5"/>' +
+        '<ellipse cx="66" cy="58" rx="5.5" ry="3.2" fill="#FF6B3D" opacity="0.5"/>' +
+        '<g class="s-eyes">' +
+          '<ellipse class="s-eye" cx="40" cy="46" rx="3.8" ry="5" fill="#0D0C0A"/>' +
+          '<ellipse class="s-eye" cx="60" cy="46" rx="3.8" ry="5" fill="#0D0C0A"/>' +
+          '<circle class="s-eye" cx="41.3" cy="44" r="1.3" fill="#FFFDF8"/>' +
+          '<circle class="s-eye" cx="61.3" cy="44" r="1.3" fill="#FFFDF8"/>' +
+        '</g>' +
+        '<g class="s-shut" stroke="#0D0C0A" stroke-width="3" stroke-linecap="round" fill="none">' +
+          '<path d="M35.5 45 Q40 50 44.5 45"/><path d="M55.5 45 Q60 50 64.5 45"/></g>' +
+        '<g class="s-joy" stroke="#0D0C0A" stroke-width="3" stroke-linecap="round" fill="none">' +
+          '<path d="M35.5 47 Q40 41 44.5 47"/><path d="M55.5 47 Q60 41 64.5 47"/></g>' +
+        '<path class="s-smile" d="M41 58 Q50 67 59 58" stroke="#0D0C0A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
+        '<g class="s-hands" fill="#FFC24D" stroke="#0D0C0A" stroke-width="2.2">' +
+          '<path d="M27 52 Q26 38 38 37 Q49 37 48 49 Q47 55 38 55 Q30 56 27 52 Z"/>' +
+          '<path d="M73 52 Q74 38 62 37 Q51 37 52 49 Q53 55 62 55 Q70 56 73 52 Z"/>' +
+          '<path d="M33 40 L35 45 M38 38 L39 44 M43 39 L43 45 M67 40 L65 45 M62 38 L61 44 M57 39 L57 45" fill="none" stroke-width="1.6" stroke-linecap="round"/></g>' +
+      '</g></svg>';
+  };
+  var AUTH_COPY = {
+    login: { hi: 'Welcome back!', chips: ['<span class="ico">✉</span>3 new matches <small>today</small>', 'Fit score <span class="tag">8.4</span>', '<span class="ico">☎</span>Interview <small>Tue, 3 pm</small>'] },
+    signup: { hi: "Let's find your next job", chips: ['<span class="ico">✎</span>Cover letter drafted', 'Fit score <span class="tag">8.4</span>', '<span class="ico">✉</span>Swiggy replied <small>2m ago</small>'] },
+    forgot: { hi: 'Happens to everyone', chips: ['<span class="ico">✉</span>Reset link <small>on its way</small>', 'Your board <span class="tag">safe</span>'] },
+    reset: { hi: 'Pick a good one', chips: ['<span class="ico">🔒</span>8+ characters', 'Your board <span class="tag">safe</span>'] }
+  };
+  function hookAuthSun() {
+    var aside = document.getElementById('auth-sun');
+    if (!aside) return;
+    var shell = aside.closest('.auth-shell');
+    var copy = AUTH_COPY[aside.dataset.mode] || AUTH_COPY.login;
+    var html = '<div class="as-wrap"><div class="as-burst"></div><div class="as-halo"></div>' + SUNNY_SVG() + '</div>';
+    copy.chips.forEach(function (c, i) { html += '<div class="as-chip c' + (i + 1) + '"><span>' + c + '</span></div>'; });
+    html += '<div class="as-bubble" id="as-bubble">' + copy.hi + '</div>';
+    aside.innerHTML = html;
+    // The same spinning sun logo as the homepage
+    var dot = shell && shell.querySelector('.auth-logo-dot');
+    if (dot) {
+      var rays = '';
+      [[12,1,12,4],[12,20,12,23],[1,12,4,12],[20,12,23,12],[4.2,4.2,6.3,6.3],[17.7,17.7,19.8,19.8],[4.2,19.8,6.3,17.7],[17.7,6.3,19.8,4.2]].forEach(function (l) {
+        rays += '<line x1="' + l[0] + '" y1="' + l[1] + '" x2="' + l[2] + '" y2="' + l[3] + '"/>';
+      });
+      var logo = document.createElement('span');
+      logo.className = 'auth-logo-sun';
+      logo.setAttribute('aria-hidden', 'true');
+      logo.innerHTML = '<svg viewBox="0 0 24 24"><g class="rays" stroke="#FFA700" stroke-width="2.2" stroke-linecap="round">' + rays + '</g><circle cx="12" cy="12" r="5.5" fill="#FFA700"/></svg>';
+      dot.replaceWith(logo);
+    }
+    if (shell && !shell.querySelector('.auth-glow')) {
+      var glow = document.createElement('div');
+      glow.className = 'auth-glow';
+      glow.setAttribute('aria-hidden', 'true');
+      shell.insertBefore(glow, shell.firstChild);
+    }
+    var wrap = aside.querySelector('.as-wrap'), eyes = aside.querySelector('.s-eyes'), bubble = aside.querySelector('#as-bubble');
+    var moodTimer = null;
+    function say(text) { if (bubble && text) { bubble.textContent = text; bubble.style.animation = 'none'; void bubble.offsetWidth; bubble.style.animation = ''; } }
+    function mood(name, ms, text) {
+      aside.classList.remove('happy', 'sad', 'cheer', 'nod'); void aside.offsetWidth;
+      aside.classList.add(name);
+      say(text);
+      clearTimeout(moodTimer);
+      if (ms) moodTimer = setTimeout(function () { aside.classList.remove(name); }, ms);
+    }
+    function lookAt(x, y) {
+      var r = wrap.getBoundingClientRect();
+      var dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height * .46);
+      var d = Math.hypot(dx, dy) || 1, k = Math.min(d / 300, 1) * 4.5;
+      eyes.style.transform = 'translate(' + (dx / d * k).toFixed(2) + 'px,' + (dy / d * k).toFixed(2) + 'px)';
+    }
+    // A wrong password: Sunny looks sad for a moment
+    if (document.querySelector('.auth-card .auth-error')) setTimeout(function () { mood('sad', 2600, 'Hmm, try again?'); }, 500);
+
+    if (!calm()) {
+      var queued = null;
+      window.addEventListener('pointermove', function (e) {
+        if (queued) return;
+        queued = requestAnimationFrame(function () {
+          queued = null;
+          lookAt(e.clientX, e.clientY);
+          if (shell) {
+            var sr = shell.getBoundingClientRect();
+            shell.style.setProperty('--px', (e.clientX - sr.left) + 'px');
+            shell.style.setProperty('--py', (e.clientY - sr.top) + 'px');
+          }
+          aside.style.setProperty('--mx', ((e.clientX / innerWidth) - .5).toFixed(3));
+          aside.style.setProperty('--my', ((e.clientY / innerHeight) - .5).toFixed(3));
+        });
+      }, { passive: true });
+    }
+    // Focus a box: look at it. A password box: cover the eyes.
+    var form = document.querySelector('.auth-card');
+    if (form) {
+      form.addEventListener('focusin', function (e) {
+        var el = e.target;
+        if (!el.matches || !el.matches('input, textarea')) return;
+        var r = el.getBoundingClientRect();
+        lookAt(r.left + Math.min(r.width, 40 + (el.value || '').length * 7), r.top + r.height / 2);
+        var secret = el.closest('.auth-pw') !== null;
+        aside.classList.toggle('shy', secret);
+        aside.classList.toggle('peek', secret && el.type === 'text');
+        if (secret) say(el.type === 'text' ? 'Just a peek…' : "I'm not looking!");
+        else say(copy.hi);
+      });
+      form.addEventListener('focusout', function () {
+        setTimeout(function () {
+          var a = document.activeElement;
+          if (!a || !a.closest || !a.closest('.auth-pw')) { aside.classList.remove('shy', 'peek'); say(copy.hi); }
+        }, 0);
+      });
+      form.addEventListener('input', function (e) {
+        var el = e.target;
+        if (el.closest && el.closest('.auth-pw')) return;
+        var r = el.getBoundingClientRect();
+        lookAt(r.left + Math.min(r.width - 10, 14 + (el.value || '').length * 8), r.top + r.height / 2);
+        if (!calm()) { aside.classList.remove('nod'); void aside.offsetWidth; aside.classList.add('nod'); }
+      });
+      // "Show" toggles the password box between hidden and visible: peek or cover again
+      form.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.auth-show');
+        if (!btn) return;
+        setTimeout(function () {
+          var input = btn.parentElement.querySelector('input');
+          var showing = input && input.type === 'text';
+          aside.classList.add('shy');
+          aside.classList.toggle('peek', !!showing);
+          say(showing ? 'Just a peek…' : "I'm not looking!");
+        }, 0);
+      });
+      form.addEventListener('submit', function () { mood('cheer', 0, "Let's go!"); aside.classList.add('happy'); });
+      Array.prototype.forEach.call(form.querySelectorAll('.auth-btn-p'), function (b) {
+        b.addEventListener('mouseenter', function () { if (!aside.classList.contains('shy')) aside.classList.add('happy'); });
+        b.addEventListener('mouseleave', function () { aside.classList.remove('happy'); });
+      });
+    }
+    wrap.addEventListener('click', function () {
+      mood('cheer', 900);
+      var r = wrap.getBoundingClientRect();
+      celebrate({ count: 50, origin: { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight } });
+    });
+    // The heading's words rise into place
+    var A = lib();
+    var h1 = document.querySelector('.auth-card .auth-head h1');
+    if (A && A.splitText && h1 && !calm()) {
+      try {
+        var words = A.splitText(h1, { words: { wrap: 'clip' } }).words;
+        A.animate(words, { y: ['110%', '0%'], duration: 800, delay: A.stagger(60, { start: 200 }), ease: 'outExpo' });
+      } catch (e) {}
+    }
+  }
+
   function init() {
     document.documentElement.classList.add('m-ready');
     stagger();
@@ -256,6 +418,7 @@
     hookTheme();
     hookOnboarding();
     hookLogout();
+    hookAuthSun();
     document.addEventListener('pointerdown', ripple, { passive: true });
   }
 
