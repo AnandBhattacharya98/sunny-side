@@ -3061,6 +3061,8 @@ def voice_welcome():
         # LiveKit hears 16-bit PCM, so the board converts recordings to WAV before sending them
         "stt_wav": livekit_tts.is_configured(),
         "tts_stream": livekit_tts.is_configured(),
+        # Real-time Sunny: a LiveKit room with the voice agent (voice_agent/), instead of request by request
+        "live_voice": call_log.practice_configured() and os.getenv("SUNNY_LIVE", "1") != "0",
     })
 
 
@@ -3102,6 +3104,65 @@ def _voice_reply(intent, text, cards=None, suggestions=None, ok=True, **extra):
         "lang": getattr(g, "voice_lang", "en"),
         **extra,
     }
+
+
+LIVE_MODES = ("sunny", "quiz")
+
+
+def _clip(value, limit: int) -> str:
+    return " ".join(str(value or "").split())[:limit]
+
+
+@app.route("/api/voice/live/start", methods=["POST"])
+def voice_live_start():
+    """A LiveKit room token that sends the voice agent in as Sunny (chat) or as the Quiz Mode coach.
+
+    The browser stays in charge of the board: the agent asks it, over LiveKit RPC, to run board
+    commands and grade quiz answers through the same endpoints the typed chat uses."""
+    uid = get_user_id()
+    if not call_log.practice_configured() or os.getenv("SUNNY_LIVE", "1") == "0":
+        return jsonify({"ok": False, "error": "Live voice isn't set up on this server."}), 503
+    if not ve.rate_limiter.allow(uid, "voice_live", 20, window=600):
+        return jsonify({"ok": False, "error": "That's a lot of live sessions. Give it a few minutes."}), 429
+    body = request.get_json(silent=True) or {}
+    mode = body.get("mode") if body.get("mode") in LIVE_MODES else "sunny"
+    lang = ve.reply_lang(body.get("lang"))
+    identity = f"user-{uid}"
+    conn = get_conn(DB_PATH)
+    try:
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+        meta = {"mode": mode, "lang": lang, "identity": identity,
+                "candidate_name": _clip(settings.get("name"), 60)}
+        if mode == "sunny":
+            meta["resumed"] = bool(body.get("resumed"))
+            meta["board"] = [{"title": _clip(shorten_title(j["title"]), 80), "company": _clip(clean_company(j["company"]), 60),
+                              "column": ve.column_label(j["status"]),
+                              "score": round(j["score"], 1) if isinstance(j["score"], (int, float)) else None}
+                             for j in _voice_jobs_snapshot(conn, uid)[:40]]
+        else:
+            job = _voice_job(conn, uid, str(body.get("job_id") or ""))
+            if not job:
+                return jsonify({"ok": False, "error": "Job not found"}), 404
+            questions = []
+            for item in (body.get("questions") or [])[:15]:
+                if isinstance(item, dict) and _clip(item.get("q"), 400):
+                    questions.append({"q": _clip(item.get("q"), 400), "hints": _clip(item.get("hints"), 600)})
+            if not questions:
+                return jsonify({"ok": False, "error": "No questions to practise"}), 400
+            try:
+                start = max(0, min(int(body.get("start") or 0), len(questions) - 1))
+            except (TypeError, ValueError):
+                start = 0
+            meta.update({"job_id": job["job_id"], "title": job["title"], "company": job["company"],
+                         "questions": questions, "start": start,
+                         "resume": (settings.get("resume_text") or "")[:1200]})
+    finally:
+        conn.close()
+    room = f"{mode}-{uid}-{secrets.token_hex(6)}"
+    url, key, secret = call_log.livekit_settings()
+    token = call_log.room_token(key, secret, identity=identity, name=meta["candidate_name"] or "You", room=room,
+                                agent_metadata=meta, ttl=3600)
+    return jsonify({"ok": True, "url": url, "token": token, "room": room, "mode": mode})
 
 
 def _voice_jobs_snapshot(conn, uid):

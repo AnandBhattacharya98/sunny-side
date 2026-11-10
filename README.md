@@ -44,6 +44,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `LIVEKIT_TTS_MODEL` / `LIVEKIT_TTS_VOICE` | Optional | LiveKit Inference model and voice id (defaults `cartesia/sonic-3` / `9626c31c-bec5-4cca-baa8-f8ba9e84c8bc`, which speaks all 11 of Sunny's languages). `provider/model:voice` in `LIVEKIT_TTS_MODEL` works too |
 | `LIVEKIT_URL` | Optional | The LiveKit project's `wss://...livekit.cloud` URL. With the key and secret above, turns on practice recruiter calls on the Calls page; the agent in `voice_agent/` must be running |
 | `LIVEKIT_AGENT_NAME` | Optional | The agent practice calls dispatch (default `sunny-screener`, matching `voice_agent/agent.py`) |
+| `SUNNY_LIVE` | Optional | With the LiveKit settings above, Sunny's mic and Quiz Mode run live through the agent in `voice_agent/` (streaming speech both ways, turn detection, talking over her). Set `0` to keep the older request-by-request voice. If the agent doesn't join within a few seconds, the board falls back to the older voice by itself |
 | `SUNNY_AGENT_SECRET` | Optional | A long random string, set to the same value on the voice agent. The agent uses it to log phone practice calls. Needed for both phone options below |
 | `LIVEKIT_SIP_NUMBER` | Optional | The LiveKit phone number users dial for phone practice, as shown on the Calls page (e.g. `+1 415 555 0100`). See `voice_agent/README.md` for the dispatch rule |
 | `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` | Optional | A LiveKit outbound SIP trunk (`ST_...`). Turns on **Call me**, where the recruiter rings the user's phone |

@@ -9,6 +9,9 @@ Three ways a call starts:
     phone-in-...; the agent asks for the one-time code from the Calls page to learn who is calling.
 Phone calls are logged by the agent posting the transcript to the website (see sunny_site.py).
 
+The same worker also runs real-time Sunny (metadata mode "sunny") and the Quiz Mode coach
+(mode "quiz") for the board's assistant panel; see sunny_live.py.
+
 Pipeline for every turn:  your voice -> STT -> LLM -> TTS -> you
 plus VAD (is anyone speaking?) and a turn detector (have they finished their thought?).
 
@@ -34,6 +37,7 @@ from livekit.agents import (Agent, AgentServer, AgentSession, JobContext, JobPro
 from livekit.agents.beta.tools import EndCallTool
 from livekit.plugins import silero
 
+import sunny_live
 import sunny_site
 
 load_dotenv(".env.local")
@@ -253,15 +257,16 @@ def build_noise_cancellation():
     return pick
 
 
-def build_session(ctx: JobContext) -> AgentSession:
+def build_session(ctx: JobContext, *, stt=None, tts=None, endpointing: tuple[float, float] | None = None) -> AgentSession:
+    min_delay, max_delay = endpointing or (MIN_ENDPOINTING_DELAY, MAX_ENDPOINTING_DELAY)
     return AgentSession(
         vad=ctx.proc.userdata["vad"],
-        stt=inference.STT(model=STT_MODEL, language=STT_LANGUAGE),
+        stt=stt or inference.STT(model=STT_MODEL, language=STT_LANGUAGE),
         llm=inference.LLM(model=LLM_MODEL),
-        tts=inference.TTS(model=TTS_MODEL, voice=TTS_VOICE) if TTS_VOICE else inference.TTS(model=TTS_MODEL),
+        tts=tts or (inference.TTS(model=TTS_MODEL, voice=TTS_VOICE) if TTS_VOICE else inference.TTS(model=TTS_MODEL)),
         turn_handling={
             "turn_detection": build_turn_detection(),
-            "endpointing": {"min_delay": MIN_ENDPOINTING_DELAY, "max_delay": MAX_ENDPOINTING_DELAY},
+            "endpointing": {"min_delay": min_delay, "max_delay": max_delay},
             "interruption": {
                 "enabled": ALLOW_INTERRUPTIONS,
                 "min_duration": MIN_INTERRUPTION_DURATION,
@@ -284,6 +289,10 @@ def room_options(identity: str | None = None) -> room_io.RoomOptions:
 async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name}
     details = call_details(ctx.job.metadata)
+    raw = _json_object(ctx.job.metadata)
+    if raw.get("mode") in ("sunny", "quiz"):
+        await run_live_sunny(ctx, sunny_live.live_details(raw))
+        return
     mode = "call-me" if details["dial_to"] else "dial-in" if ctx.room.name.startswith(PHONE_IN_PREFIX) else "browser"
     logger.info(
         "settings: mode=%s stt=%s llm=%s tts=%s voice=%s turn=%s endpointing=%.2f-%.2fs "
@@ -301,6 +310,32 @@ async def entrypoint(ctx: JobContext) -> None:
         await ring_candidate(ctx, session, details)
     else:
         await answer_dial_in(ctx, session)
+
+
+def _json_object(raw: str | None) -> dict:
+    try:
+        data = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+# Quiz answers are long and full of thinking pauses, so the coach waits longer before replying
+QUIZ_ENDPOINTING = (float(env("QUIZ_MIN_ENDPOINTING_DELAY", "1.0")), float(env("QUIZ_MAX_ENDPOINTING_DELAY", "5.0")))
+
+
+async def run_live_sunny(ctx: JobContext, live: dict) -> None:
+    """Real-time Sunny or the Quiz Mode coach, talking to the board in the browser."""
+    logger.info("live sunny: mode=%s lang=%s questions=%d board=%d resumed=%s",
+                live["mode"], live["lang"], len(live["questions"]), len(live["board"]), live["resumed"])
+    session = build_session(
+        ctx,
+        stt=sunny_live.stt_for(live["lang"], env("SUNNY_STT_MODEL", "")),
+        tts=sunny_live.tts_for(live["lang"]),
+        endpointing=QUIZ_ENDPOINTING if live["mode"] == "quiz" else None,
+    )
+    await session.start(agent=sunny_live.build_live_agent(live), room=ctx.room,
+                        room_options=room_options(live["identity"] or None))
 
 
 async def ring_candidate(ctx: JobContext, session: AgentSession, details: dict) -> None:
