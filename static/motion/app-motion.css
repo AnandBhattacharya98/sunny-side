@@ -10,16 +10,8 @@
   --m-slow: 560ms;
 }
 
-/* ---------- Page to page: the sidebar stays put, the page slides in ---------- */
-@view-transition { navigation: auto; }
-.sidebar { view-transition-name: ss-sidebar; }
-.mobile-header { view-transition-name: ss-mobile-header; }
-.logo, .auth-logo { view-transition-name: ss-logo; }
-::view-transition-group(*) { animation-duration: 300ms; animation-timing-function: var(--m-ease); }
-::view-transition-old(root) { animation: 180ms var(--m-ease) both ssPageOut; }
-::view-transition-new(root) { animation: 340ms var(--m-ease) 40ms both ssPageIn; }
-@keyframes ssPageOut { to { opacity: 0; transform: translateY(-6px); } }
-@keyframes ssPageIn { from { opacity: 0; transform: translateY(10px); } }
+/* Page to page: no cross-page transition. It made every click wait for a snapshot
+   and a third of a second of animation before the next page showed. */
 
 /* Theme switch: the new theme grows out of the button as a circle (see app-motion.js) */
 html.ss-theme-vt .sidebar, html.ss-theme-vt .mobile-header,
@@ -60,9 +52,9 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 /* ---------- Board: cards deal in column by column, lift on hover, tilt while dragged ---------- */
 .board-title { animation: ssRise var(--m-slow) var(--m-ease) backwards; }
 .col { animation: ssRise var(--m-slow) var(--m-ease) backwards; animation-delay: calc(var(--ci, 0) * 60ms); }
-.jcard { animation: ssCardIn 460ms var(--m-ease) backwards;
-         animation-delay: calc(var(--ci, 0) * 60ms + var(--i, 0) * 40ms + 80ms);
-         transition: transform 260ms var(--m-spring), box-shadow var(--m-med) var(--m-ease),
+.jcard.m-deal { animation: ssCardIn 460ms var(--m-ease) backwards;
+         animation-delay: calc(var(--ci, 0) * 60ms + var(--i, 0) * 40ms + 80ms); }
+.jcard { transition: transform 260ms var(--m-spring), box-shadow var(--m-med) var(--m-ease),
                      border-color var(--m-fast), opacity var(--m-fast); }
 .jcard:hover { transform: translateY(-3px); }
 .jcard:active { transform: translateY(-1px) scale(.99); }
@@ -126,7 +118,7 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 /* Two soft suns drifting behind the card */
 .auth-shell::before, .auth-shell::after {
   content: ""; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
-  filter: blur(40px); opacity: .55;
+  opacity: .55;
 }
 .auth-shell::before { width: 420px; height: 420px; top: -140px; right: -120px;
   background: radial-gradient(circle, color-mix(in srgb, var(--yolk) 55%, transparent), transparent 70%);
@@ -136,8 +128,6 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
   animation: ssDrift 22s ease-in-out -6s infinite alternate-reverse; }
 [data-theme="dark"] .auth-shell::before, [data-theme="dark"] .auth-shell::after { opacity: .3; }
 @keyframes ssDrift { to { transform: translate(-60px, 50px) scale(1.15); } }
-.auth-logo-dot { animation: ssSunPulse 3.2s ease-in-out infinite; }
-@keyframes ssSunPulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--yolk) 25%, transparent); } }
 /* The card rises, then its rows follow one by one */
 .auth-shell .auth-card { animation: ssPop 560ms var(--m-spring) backwards; }
 .auth-card .auth-head > *, .auth-card .auth-form > *, .auth-card > .auth-or, .auth-card > .auth-switch {
@@ -152,9 +142,7 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 .auth-shell .dropzone-box:hover, .auth-shell .dropzone-box.over { transform: scale(1.015); }
 .auth-shell .dropzone-box.over .dz-icon { animation: ssHop 700ms var(--m-spring) infinite; }
 @keyframes ssHop { 50% { transform: translateY(-5px); } }
-#onboard-progress-fill { background: linear-gradient(90deg, var(--yolk), #FF8A3D, var(--yolk)); background-size: 200% 100%;
-                         animation: ssStripe 1.4s linear infinite; }
-@keyframes ssStripe { to { background-position: -200% 0; } }
+#onboard-progress-fill { background: linear-gradient(90deg, var(--yolk), #FF8A3D); }
 
 
 /* ---------- Sign in and sign up: the homepage's Sunny keeps you company ---------- */
@@ -169,14 +157,13 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
   background-image: radial-gradient(var(--bdr-strong) 1px, transparent 1.4px); background-size: 28px 28px;
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 65% 40%, #000 20%, transparent 75%);
           mask-image: radial-gradient(ellipse 70% 60% at 65% 40%, #000 20%, transparent 75%);
-  opacity: .45; animation: ssDots 40s linear infinite; }
-@keyframes ssDots { to { background-position: 280px 140px; } }
+  opacity: .45; }
 
 .auth-sun:empty { display: none; }
 .auth-logo-sun { display: inline-flex; width: 22px; height: 22px; }
 .auth-logo-sun svg { width: 100%; height: 100%; overflow: visible; }
-.auth-logo-sun .rays { transform-origin: 12px 12px; animation: ssSpin 14s linear infinite; }
-.auth-logo:hover .auth-logo-sun .rays { animation-duration: 2s; }
+.auth-logo-sun .rays { transform-origin: 12px 12px; }
+.auth-logo:hover .auth-logo-sun .rays { animation: ssSpin 2s linear infinite; }
 .auth-main:has(> .auth-sun:not(:empty)) { gap: 56px; align-items: center; padding-top: 40px; }
 .auth-sun { position: relative; width: 380px; height: 420px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .as-wrap { position: relative; width: 240px; height: 240px; cursor: pointer; animation: ssSunRise 1.1s var(--m-spring) .15s backwards; }
@@ -188,10 +175,11 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
   -webkit-mask-image: radial-gradient(circle, #000 30%, transparent 70%); mask-image: radial-gradient(circle, #000 30%, transparent 70%);
   animation: ssSpin 60s linear infinite; }
 .as-wrap .sunny { display: block; width: 100%; height: 100%; overflow: visible; }
-.as-wrap .sunny .s-rays { transform-origin: 50px 50px; animation: ssSpin 28s linear infinite; }
+.as-wrap .sunny .s-rays { transform-origin: 50px 50px; }
 .as-wrap .sunny .s-body { transform-origin: 50px 56px; }
 .as-wrap .sunny .s-eyes { transition: transform .18s var(--m-ease), opacity .15s; }
-.as-wrap .sunny .s-eye { transform-box: fill-box; transform-origin: center; animation: ssBlink 4.8s infinite; }
+.as-wrap .sunny .s-eye { transform-box: fill-box; transform-origin: center; transition: transform 90ms ease-in; }
+.as-wrap .sunny.m-blink .s-eye { transform: scaleY(.1); }
 .as-wrap .sunny .s-shut, .as-wrap .sunny .s-joy { opacity: 0; transition: opacity .15s; }
 .as-wrap .sunny .s-smile { transform-box: fill-box; transform-origin: center; transition: transform .35s var(--m-spring); }
 .as-wrap .sunny .s-hands { opacity: 0; transform: translateY(26px); transition: transform .35s var(--m-spring), opacity .2s; }
@@ -209,7 +197,7 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 .auth-sun.sad .s-smile { transform: scaleY(-.7) translateY(-4px); }
 .auth-sun.sad .s-body { animation: ssSad 1.2s ease-in-out 2; }
 .auth-sun.cheer .s-body { animation: ssCheer .8s var(--m-spring); }
-.auth-sun.cheer .s-rays { animation-duration: 1.2s; }
+.auth-sun.cheer .s-rays { animation: ssSpin 1.2s var(--m-ease); }
 .auth-sun.nod .s-body { animation: ssNod .3s var(--m-ease); }
 /* Little cards floating around, saying what's waiting on the other side */
 .as-chip { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; white-space: nowrap;
@@ -236,7 +224,6 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 @keyframes ssChipIn { from { opacity: 0; scale: .6; } }
 @keyframes ssBreathe { 50% { transform: scale(1.08); opacity: .8; } }
 @keyframes ssSpin { to { transform: rotate(360deg); } }
-@keyframes ssBlink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
 @keyframes ssBob { 50% { transform: translateY(-8px); } }
 @keyframes ssCheer { 30% { transform: translateY(-14px) scale(1.08); } 55% { transform: translateY(0) scale(.97); } 75% { transform: translateY(-5px); } }
 @keyframes ssSad { 25%, 75% { transform: translateY(5px) scale(.95, .92); } }
@@ -252,19 +239,22 @@ html.ss-theme-vt::view-transition-new(root) { z-index: 2; }
 
 @keyframes ssRise { from { opacity: 0; transform: translateY(10px); } }
 
+/* Phones: the floating chips and the slow burst cost battery for little; keep them still */
+@media (hover: none) {
+  .as-chip > span, .as-burst, .auth-shell::before, .auth-shell::after { animation: none; }
+}
+
 /* ---------- Reduce motion: keep every state change, drop the movement ---------- */
 @media (prefers-reduced-motion: reduce) {
-  @view-transition { navigation: none; }
-  .board-title, .col, .jcard, .jcard.m-landed, #daily-picks-body > *, .fu-body > *,
+  .board-title, .col, .jcard.m-deal, .jcard.m-landed, #daily-picks-body > *, .fu-body > *,
   .modal-backdrop, .fu-modal, .modal-backdrop .modal, .modal-backdrop .modal-window,
   .fu-modal .fu-panel, .tab-panel.active, .tab-panel[style*="block"], .mcard-feed, .mcard-body,
   .fj-intro, .fj-form, .fj-companies, .pg-kpi, .pg-card, .pg-fbar > span, .pg-rate > span, .pg-wbar,
   .sidebar .nl.on svg, .col.over, .col-ct.m-bump, .nc.m-bump, .auth-shell::before, .auth-shell::after,
-  .auth-logo-dot, .auth-shell .auth-card, .auth-card .auth-head > *, .auth-card .auth-form > *,
+  .auth-shell .auth-card, .auth-card .auth-head > *, .auth-card .auth-form > *,
   .auth-card > .auth-or, .auth-card > .auth-switch, .auth-error, .auth-shell .dropzone-box.over .dz-icon,
-  #onboard-progress-fill, .m-ripple, .auth-glow::after, .as-wrap, .as-halo, .as-burst, .auth-logo-sun .rays, .as-wrap .sunny .s-rays,
-  .as-wrap .sunny .s-eye, .as-chip, .as-chip > span, .as-bubble, .auth-sun .s-body { animation: none !important; }
-  .as-chip, .auth-glow::before { transform: none !important; transition: none !important; }
+  #onboard-progress-fill, .m-ripple, .as-wrap, .as-halo, .as-burst, .auth-logo:hover .auth-logo-sun .rays, .auth-sun.cheer .s-rays, .as-chip, .as-chip > span, .as-bubble, .auth-sun .s-body { animation: none !important; }
+  .as-chip, .auth-glow::before, .as-wrap .sunny .s-eye { transform: none !important; transition: none !important; }
   .jcard:hover, .jcard:active, .jcard.dragging, .sidebar .nl:hover, .sidebar .logo:hover img, .pg-kpi:hover,
   .btn:active, .auth-btn:active, .fj-go:active, .bs-go:active, .fu-btn:active, .fj-co-add:active,
   .auth-shell .auth-input:focus, .auth-shell .dropzone-box:hover, .auth-shell .dropzone-box.over,
