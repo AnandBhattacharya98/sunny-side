@@ -2267,16 +2267,81 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     .cl-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
     .cl-btn.stop { background: var(--bad-txt); border-color: var(--bad-txt); color: #fff; }
     .cl-btn[disabled] { opacity: .55; cursor: default; }
-    .cl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .cl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; align-items: start; }
+    .cl-wrap { container-type: inline-size; }
+    @container (min-width: 1300px) { .cl-grid .cl-wide { grid-column: span 2; } }
+    .cl-grid .cl-api { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); }
+    @media (min-width: 900px) {
+      .cl-grid .cl-api { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: 22px; }
+      .cl-grid .cl-api > :not(.cl-code) { grid-column: 1; }
+      .cl-grid .cl-api > .cl-code { grid-column: 2; grid-row: 1 / span 6; align-self: start; }
+    }
+    .cl-code { overflow-x: auto; }
+    .int-setup > #int-job, .int-setup > #int-target { flex: 1 1 100%; }
+    .int-setup > #int-type, .int-setup > #int-length { flex: 1 1 180px; }
+    .int-setup > #int-start { margin-left: auto; }
+    .cl-card h3 { display: flex; align-items: center; gap: 10px; }
+
+    /* Playful bits. Everything here is switched off for reduced motion further down */
+    .cl-grid > .cl-card { animation: clRise .55s cubic-bezier(.2, .9, .3, 1.2) both; transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+    .cl-grid > .cl-card:nth-child(2) { animation-delay: .07s; }
+    .cl-grid > .cl-card:nth-child(3) { animation-delay: .14s; }
+    .cl-grid > .cl-card:nth-child(4) { animation-delay: .21s; }
+    .cl-grid > .cl-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--yolk) 55%, var(--bdr)); box-shadow: 0 14px 30px -18px color-mix(in srgb, var(--yolk) 70%, transparent); }
+    @keyframes clRise { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+    .cl-ico { width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+      background: color-mix(in srgb, var(--yolk) 18%, transparent); color: var(--yolk); }
+    .cl-ico svg { width: 16px; height: 16px; fill: currentColor; }
+    .cl-card:hover .cl-ico.ring svg { animation: clRing .9s ease-in-out; }
+    @keyframes clRing { 0%, 100% { transform: rotate(0); } 15%, 45%, 75% { transform: rotate(-16deg); } 30%, 60%, 90% { transform: rotate(16deg); } }
+    .cl-ico.talk i { width: 3px; border-radius: 3px; background: currentColor; height: 6px; animation: clBar 1.1s ease-in-out infinite; }
+    .cl-ico.talk i:nth-child(2) { animation-delay: -.2s; } .cl-ico.talk i:nth-child(3) { animation-delay: -.45s; }
+    .cl-ico.talk i:nth-child(4) { animation-delay: -.7s; } .cl-ico.talk i:nth-child(5) { animation-delay: -.9s; }
+    .cl-ico.term { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+    .cl-ico.term b { animation: clBlink 1.1s steps(1) infinite; }
+    @keyframes clBar { 0%, 100% { height: 5px; } 50% { height: 15px; } }
+    @keyframes clBlink { 50% { opacity: 0; } }
+    .cl-btn { transition: transform .15s ease, box-shadow .2s ease; position: relative; overflow: hidden; }
+    .cl-btn:not(.ghost):not([disabled]):hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px var(--yolk); }
+    .cl-btn:not([disabled]):active { transform: scale(.95); }
+    .cl-btn:not(.ghost):not(.stop)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%); transform: translateX(-120%); }
+    .cl-btn:not(.ghost):not(.stop):not([disabled]):hover::after { animation: clShine .7s ease; }
+    @keyframes clShine { to { transform: translateX(120%); } }
+    .cl-live.on { animation: clRise .35s ease both; }
+    .ir-q { animation: clRise .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+    .ir-q:nth-of-type(2) { animation-delay: .08s; } .ir-q:nth-of-type(3) { animation-delay: .16s; } .ir-q:nth-of-type(4) { animation-delay: .24s; }
+    .ir-q:nth-of-type(5) { animation-delay: .32s; } .ir-q:nth-of-type(n+6) { animation-delay: .4s; }
+    .ir-dots i.on { animation: clPop .35s cubic-bezier(.3, 1.6, .5, 1) both; }
+    .ir-dots i:nth-child(2) { animation-delay: .06s; } .ir-dots i:nth-child(3) { animation-delay: .12s; }
+    .ir-dots i:nth-child(4) { animation-delay: .18s; } .ir-dots i:nth-child(5) { animation-delay: .24s; }
+    @keyframes clPop { from { transform: scale(0); } }
+    .ir-head { position: relative; }
+    .ir-confetti { position: absolute; left: 34px; top: 12px; width: 0; height: 0; pointer-events: none; }
+    .ir-confetti i { position: absolute; width: 7px; height: 10px; border-radius: 2px; opacity: 0; animation: clBurst 1.1s cubic-bezier(.2, .7, .3, 1) forwards; }
+    @keyframes clBurst { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)); } }
+    @media (prefers-reduced-motion: reduce) {
+      .cl-grid > .cl-card, .cl-live.on, .ir-q, .ir-dots i.on, .cl-ico i, .cl-ico b, .cl-ico svg, .cl-btn::after { animation: none !important; }
+      .cl-grid > .cl-card:hover, .cl-btn:hover { transform: none !important; }
+      .ir-confetti { display: none; }
+    }
     .cl-live { display: none; flex-direction: column; gap: 10px; }
     .cl-live.on { display: flex; }
     .cl-state { font-family: var(--font-mono); font-size: 11px; color: var(--mut); display: flex; align-items: center; gap: 8px; }
-    .cl-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--hin); flex-shrink: 0; }
-    .cl-dot.listening { background: var(--ok-txt); }
-    .cl-dot.speaking { background: var(--yolk); animation: clPulse 1s ease-in-out infinite; }
-    .cl-dot.thinking { background: var(--pur, var(--yolk)); animation: clPulse .6s ease-in-out infinite; }
-    @keyframes clPulse { 50% { opacity: .35; } }
-    @media (prefers-reduced-motion: reduce) { .cl-dot { animation: none !important; } }
+    /* The state "dot" is a tiny equaliser: still while waiting, breathing while listening, dancing while the recruiter talks */
+    .cl-dot { height: 16px; display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: var(--hin); }
+    .cl-dot i { width: 3px; height: 4px; border-radius: 3px; background: currentColor; transition: height .2s ease; }
+    .cl-dot.listening { color: var(--ok-txt); }
+    .cl-dot.listening i { animation: clBreath 1.6s ease-in-out infinite; }
+    .cl-dot.listening i:nth-child(2), .cl-dot.listening i:nth-child(3) { animation-delay: -.4s; }
+    .cl-dot.speaking { color: var(--yolk); }
+    .cl-dot.speaking i { animation: clBar .55s ease-in-out infinite; }
+    .cl-dot.speaking i:nth-child(2) { animation-delay: -.15s; } .cl-dot.speaking i:nth-child(3) { animation-delay: -.3s; } .cl-dot.speaking i:nth-child(4) { animation-delay: -.42s; }
+    .cl-dot.thinking { color: var(--pur, var(--yolk)); }
+    .cl-dot.thinking i { animation: clThink .9s ease-in-out infinite; }
+    .cl-dot.thinking i:nth-child(2) { animation-delay: .15s; } .cl-dot.thinking i:nth-child(3) { animation-delay: .3s; } .cl-dot.thinking i:nth-child(4) { animation-delay: .45s; }
+    @keyframes clBreath { 50% { height: 9px; } }
+    @keyframes clThink { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+    @media (prefers-reduced-motion: reduce) { .cl-dot i { animation: none !important; } .cl-dot.speaking i { height: 10px; } }
     .cl-captions { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
     .cl-captions:empty::before { content: "The recruiter will greet you in a moment."; color: var(--hin); font-size: 12px; }
     .cl-cap b { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-right: 6px; }
@@ -2326,7 +2391,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
     <div class="cl-grid">
       <section class="cl-card" aria-labelledby="cl-practice-h">
-        <h3 id="cl-practice-h">Practice recruiter screen</h3>
+        <h3 id="cl-practice-h"><span class="cl-ico ring" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></span>Practice recruiter screen</h3>
         <p>A two-to-three minute voice call. The recruiter asks about your background, why this role and your notice period, and you can talk over it like a real call. When you hang up, the call is saved below with a summary and one tip.</p>
         {% if practice_ready %}
         <div class="cl-row" id="cl-setup">
@@ -2335,7 +2400,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         </div>
         <div class="cl-live" id="cl-live" aria-live="polite">
           <div class="cl-row" style="justify-content:space-between;">
-            <span class="cl-state"><span class="cl-dot" id="cl-dot"></span><span id="cl-state-text">Connecting…</span> · <span id="cl-timer">0:00</span></span>
+            <span class="cl-state"><span class="cl-dot" id="cl-dot" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="cl-state-text">Connecting…</span> · <span id="cl-timer">0:00</span></span>
             <span class="cl-row">
               <button type="button" class="cl-btn ghost" id="cl-mute" onclick="togglePracticeMute()">Mute</button>
               <button type="button" class="cl-btn stop" onclick="endPracticeCall()">Hang up</button>
@@ -2350,13 +2415,13 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       </section>
 
       {% if practice_ready %}
-      <section class="cl-card" aria-labelledby="cl-int-h">
-        <h3 id="cl-int-h">Mock interview and recruiter calls</h3>
+      <section class="cl-card cl-wide" aria-labelledby="cl-int-h">
+        <h3 id="cl-int-h"><span class="cl-ico talk" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Mock interview and recruiter calls</h3>
         <p>Maya interviews you for one of your jobs, using its posting and your resume, or plays the recruiter so you can rehearse a salary negotiation or a follow-up call. Afterwards you get a score out of 5 with what worked and what to sharpen, the result goes on the job's Timeline, and you can replay the call on this device.</p>
         {% if interview_jobs %}
-        <div class="cl-row" id="int-setup">
+        <div class="cl-row int-setup" id="int-setup">
           <select id="int-job" aria-label="Job to interview for">
-            {% for j in interview_jobs %}<option value="{{ j.job_id }}"{% if j.job_id == interview_job %} selected{% endif %}>{{ j.title }} · {{ j.company }}</option>{% endfor %}
+            {% for j in interview_jobs %}<option value="{{ j.job_id }}" title="{{ j.title }} · {{ j.company }}"{% if j.job_id == interview_job %} selected{% endif %}>{{ j.title }} · {{ j.company }}</option>{% endfor %}
           </select>
           <select id="int-type" aria-label="Type of call" onchange="interviewTypeChanged()">
             <option value="interview">Mock interview</option>
@@ -2372,7 +2437,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         </div>
         <div class="cl-live" id="int-live" aria-live="polite">
           <div class="cl-row" style="justify-content:space-between;">
-            <span class="cl-state"><span class="cl-dot" id="int-dot"></span><span id="int-state-text">Connecting…</span> · <span id="int-timer">0:00</span><span id="int-rec" class="cl-recdot" hidden title="Recording on this device">REC</span></span>
+            <span class="cl-state"><span class="cl-dot" id="int-dot" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="int-state-text">Connecting…</span> · <span id="int-timer">0:00</span><span id="int-rec" class="cl-recdot" hidden title="Recording on this device">REC</span></span>
             <span class="cl-row">
               <button type="button" class="cl-btn ghost" id="int-mute" onclick="toggleInterviewMute()">Mute</button>
               <button type="button" class="cl-btn stop" id="int-end" onclick="endInterview()">End interview</button>
@@ -2389,7 +2454,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
       {% if phone_number or call_me_ready %}
       <section class="cl-card" aria-labelledby="cl-phone-h">
-        <h3 id="cl-phone-h">Practise on your phone</h3>
+        <h3 id="cl-phone-h"><span class="cl-ico ring" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm4 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM8 4v11h8V4z"/></svg></span>Practise on your phone</h3>
         <p>The same recruiter screen on a real phone call, so you can practise with the phone at your ear, away from the laptop. It's logged below when you hang up.</p>
         {% if phone_number %}
         <div class="cl-phone-step">
@@ -2416,8 +2481,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       </section>
       {% endif %}
 
-      <section class="cl-card" aria-labelledby="cl-api-h">
-        <h3 id="cl-api-h">Add calls from curl or Postman</h3>
+      <section class="cl-card cl-api" aria-labelledby="cl-api-h">
+        <h3 id="cl-api-h"><span class="cl-ico term" aria-hidden="true">&gt;<b>_</b></span>Add calls from curl or Postman</h3>
         <p>Make a personal API key, then send <code>POST /api/calls</code> with it in an <code>X-API-Key</code> header. Keep the key private: anyone with it can read and add to your call log.</p>
         <div class="cl-row">
           <span class="cl-meta" id="cl-key-status">{% if api_key_hint %}You have a key ending in …{{ api_key_hint }}{% else %}No key yet{% endif %}</span>
@@ -7799,6 +7864,15 @@ async function recordingGet(id) {
 }
 
 const IR_URLS = {};
+const IR_CHEERED = new Set();  // confetti once per report, not on every refresh
+function irConfetti() {
+  const colors = ['var(--yolk)', 'var(--ok-txt)', '#ff7a59', '#7c9cff', '#f5c400'];
+  const bits = Array.from({ length: 22 }, (_, i) => {
+    const a = (i / 22) * Math.PI * 2, d = 50 + Math.random() * 60;
+    return `<i style="background:${colors[i % colors.length]};--x:${Math.round(Math.cos(a) * d)}px;--y:${Math.round(Math.sin(a) * d - 20)}px;--r:${Math.round(Math.random() * 540 - 270)}deg;animation-delay:${(Math.random() * .12).toFixed(2)}s"></i>`;
+  }).join('');
+  return `<span class="ir-confetti" aria-hidden="true">${bits}</span>`;
+}
 function irDots(n) { return `<span class="ir-dots" aria-label="${n} out of 5">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`; }
 function irTime(t) { return t == null ? '' : clDuration(t); }
 
@@ -7816,7 +7890,7 @@ async function renderInterviewReport(el, call) {
   if (!r) head = `<div class="cl-meta">${rehearsal ? 'Scoring your call…' : 'Scoring your answers…'}</div>`;
   else if (r.error) head = `<div class="cl-meta">${esc(r.error)}</div>`;
   else head = `
-    <div class="ir-head"><span class="ir-big">${r.overall} / 5</span>${irDots(r.overall)}</div>
+    <div class="ir-head"><span class="ir-big">${r.overall} / 5</span>${irDots(r.overall)}${r.overall >= 4 && !IR_CHEERED.has(call.id) ? irConfetti() : ''}</div>
     ${r.summary ? `<div>${esc(r.summary)}</div>` : ''}
     ${r.questions.map((q, i) => `
       <div class="ir-q">
@@ -7826,6 +7900,7 @@ async function renderInterviewReport(el, call) {
         ${q.stronger ? `<div><span class="ir-lbl">Stronger</span>${esc(q.stronger)}</div>` : ''}
         ${play(q.t)}
       </div>`).join('')}`;
+  if (r && !r.error && r.overall >= 4) IR_CHEERED.add(call.id);
   el.innerHTML = `${head}${audio}
     <div class="cl-transcript ir-tr">${tr.map(t => `<div class="cl-cap ${t.role === 'user' ? 'user' : ''}"${blob && t.t != null ? ` data-t="${Number(t.t)}" onclick="irSeek(${call.id}, ${Number(t.t)})"` : ''}>${t.t != null ? `<time>${irTime(t.t)}</time>` : ''}<b>${t.role === 'user' ? 'You' : 'Maya'}</b>${esc(t.text)}</div>`).join('')}</div>`;
 }
