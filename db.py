@@ -345,12 +345,35 @@ def migrate_db(conn) -> None:
     """)
     conn.commit()
 
+    # Call log (calls.py): phone calls logged over the API, and practice recruiter-screen voice calls
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            caller_name TEXT NOT NULL,
+            phone_number TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            summary TEXT,
+            kind TEXT NOT NULL DEFAULT 'logged',
+            transcript TEXT,
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_calls_user_created ON calls (user_id, created_at)")
+    conn.commit()
+    user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    for col in ("calls_api_key_hash", "calls_api_key_hint"):
+        if col not in user_cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
+            conn.commit()
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
 
     if IS_POSTGRES:
-        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep"]
+        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls"]
         for t in seq_tables:
             try:
                 conn.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE(max(id), 1)) FROM {t}")
@@ -577,6 +600,7 @@ def delete_user_data(conn, user_id: int) -> None:
     conn.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM user_company_boards WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM calls WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
 

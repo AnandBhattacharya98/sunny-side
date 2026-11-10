@@ -42,6 +42,8 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `GEMINI_TTS_MODEL` / `GEMINI_TTS_VOICE` | Optional | Gemini text-to-speech model and voice for the assistant (defaults `gemini-2.5-flash-preview-tts` / `Puck`) |
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Optional | A LiveKit Cloud project's API key and secret. Turns on [LiveKit Inference TTS](https://docs.livekit.io/agents/models/tts/) for Sunny's voice and STT for its mic, tried before Gemini (and the browser voice after that). No provider key is needed; usage is billed to the LiveKit project |
 | `LIVEKIT_TTS_MODEL` / `LIVEKIT_TTS_VOICE` | Optional | LiveKit Inference model and voice id (defaults `cartesia/sonic-3` / `9626c31c-bec5-4cca-baa8-f8ba9e84c8bc`, which speaks all 11 of Sunny's languages). `provider/model:voice` in `LIVEKIT_TTS_MODEL` works too |
+| `LIVEKIT_URL` | Optional | The LiveKit project's `wss://...livekit.cloud` URL. With the key and secret above, turns on practice recruiter calls on the Calls page; the agent in `voice_agent/` must be running |
+| `LIVEKIT_AGENT_NAME` | Optional | The agent practice calls dispatch (default `sunny-screener`, matching `voice_agent/agent.py`) |
 | `LIVEKIT_STT_MODEL` | Optional | With the LiveKit keys set, Sunny's mic and Quiz Mode answers are transcribed by [LiveKit Inference STT](https://docs.livekit.io/agents/models/stt/) first, then Gemini. Defaults to `deepgram/nova-3` for English, Hindi, Spanish, French and German and `cartesia/ink-whisper` for the other languages; set this to use one model for all |
 | `FOLLOWUP_DAYS` | Optional | Days without activity before an applied or interviewing job shows in "Worth a follow-up" (default 7) |
 | `WEEKLY_SUMMARY_WEEKDAY` | Optional | Day the weekly recap email goes out with the daily cron, 0 = Monday (default 0). Only users with daily recommendations on get it |
@@ -98,6 +100,10 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 - A tab inside each job card reskins the modal to an accent-purple theme for active interview prep.
 - Provides interactive flashcards (quick-fire outline prompts) and accordion lists (deeper model answer guidelines).
 - Allows typing or speaking behavioral answers to receive critiques and rephrased model answers.
+
+### 4. Calls: practice recruiter screens and a call log
+- **Practice recruiter screen**: a real-time voice call in the browser with Maya, an AI recruiter (a LiveKit agent in [`voice_agent/`](voice_agent/README.md)). She asks about your background, why the role, an achievement, notice period and pay. You can talk over her like a real call, and captions show as you go. When you hang up, the call is saved with a transcript and a Gemini summary with one tip.
+- **Call log**: `GET /api/calls` and `POST /api/calls` (fields `caller_name`, `phone_number`, `status`, `duration_seconds`, `summary`). Make a personal API key on the Calls page and send it as `X-API-Key` to add calls from curl or Postman; they appear on the page within 5 seconds. Only a hash of the key is stored.
 
 ---
 
