@@ -38,7 +38,6 @@ def test_homepage_is_animated_but_respects_reduce_motion():
     html = _get("/").get_data(as_text=True)
     assert "/static/vendor/sunny-anim.min.js" in html
     assert "prefers-reduced-motion: reduce" in html
-    assert "@view-transition { navigation: none; }" in html
     # The headline is still read whole by screen readers while its words animate
     assert 'aria-label="Every job you apply to, tracked in one place."' in html
 
@@ -46,8 +45,7 @@ def test_homepage_is_animated_but_respects_reduce_motion():
 def test_motion_css_turns_everything_off_for_reduce_motion():
     css = open(os.path.join(ROOT, "static/motion/app-motion.css"), encoding="utf-8").read()
     reduce_block = css[css.index("@media (prefers-reduced-motion: reduce)"):]
-    assert "@view-transition { navigation: none; }" in reduce_block
-    for sel in (".jcard", ".modal-backdrop .modal", ".auth-shell::before", ".pg-wbar"):
+    for sel in (".jcard.m-deal", ".modal-backdrop .modal", ".auth-shell::before", ".pg-wbar"):
         assert sel in reduce_block, sel
 
 
@@ -92,3 +90,25 @@ def test_sign_in_and_sign_up_have_sunny():
     css = open(os.path.join(ROOT, "static/motion/app-motion.css"), encoding="utf-8").read()
     reduce_block = css[css.index("@media (prefers-reduced-motion: reduce)"):]
     assert ".as-wrap" in reduce_block and ".as-chip" in reduce_block
+
+
+def test_motion_stays_light_on_big_boards_and_phones():
+    """The site got slow after the animation update; keep the heavy parts out."""
+    css = open(os.path.join(ROOT, "static/motion/app-motion.css"), encoding="utf-8").read()
+    js = open(os.path.join(ROOT, "static/motion/app-motion.js"), encoding="utf-8").read()
+    landing = _get("/").get_data(as_text=True)
+    # No cross-page transition: every click waited for a snapshot and an animation
+    assert "navigation: auto" not in css and "navigation: auto" not in landing
+    # AutoAnimate polls every card every two seconds, so it is not attached to lists
+    assert "A.autoAnimate(" not in js
+    # Only the first cards of each column deal in, and the column counts don't count up
+    assert ".slice(0, 6)" in js and "m-deal" in js
+    assert "$all('.col-ct, .pg-kpi-n')" not in js
+    # Nothing animates layout or paint forever (height, background-position, box-shadow, blur)
+    for needle in ("ssDots", "ssStripe", "ssSunPulse", "blur(40px)", "ssBlink"):
+        assert needle not in css, needle
+    for needle in ("lenis.min.js", "drift 40s", "animation: blink", "{ height: 46px; }"):
+        assert needle not in landing, needle
+    # Off-screen sections pause, and phones skip the frosted nav
+    assert "animation-play-state: paused" in landing
+    assert "backdrop-filter: none" in landing

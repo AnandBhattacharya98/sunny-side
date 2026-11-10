@@ -21,9 +21,12 @@
   function stagger() {
     $all('.board > .col').forEach(function (col, ci) {
       col.style.setProperty('--ci', Math.min(ci, 7));
-      $all('.jcard', col).forEach(function (card, i) {
+      // Only the first few cards of each column deal in. Animating every card on a
+      // board with hundreds of jobs kept the page busy for seconds after it loaded.
+      $all('.jcard', col).slice(0, 6).forEach(function (card, i) {
         card.style.setProperty('--ci', Math.min(ci, 7));
-        card.style.setProperty('--i', Math.min(i, 8));
+        card.style.setProperty('--i', i);
+        card.classList.add('m-deal');
       });
     });
     number('.mcard-feed', 12);
@@ -163,12 +166,8 @@
       window.sunnyReactToMove.mWrapped = true;
     }
     // Sorting and newly added cards glide into place
-    var A = lib();
-    if (A && A.autoAnimate && !calm()) {
-      $all('.col-cards, #fj-list, #fu-body, .fj-co-list').forEach(function (el) {
-        try { glides.push(A.autoAnimate(el, { duration: 260, easing: 'cubic-bezier(.2,.7,.2,1)' })); } catch (e) {}
-      });
-    }
+    // (AutoAnimate is not used here: it polls the position of every card every
+    // two seconds, which kept the board busy and made big boards sluggish.)
   }
 
   function resumeGlides() {
@@ -405,12 +404,28 @@
     }
   }
 
+  /* ---------- The voice mascot blinks now and then (see .sunny in dashboard.html) ---------- */
+  function blinkMascots() {
+    if (!document.querySelector('.sunny')) return;
+    // The class goes on each mascot, not on <html>: a class on <html> restyles the whole page.
+    (function next() {
+      setTimeout(function () {
+        if (!document.hidden && !calm()) {
+          var faces = $all('.sunny');
+          faces.forEach(function (f) { f.classList.add('m-blink'); });
+          setTimeout(function () { faces.forEach(function (f) { f.classList.remove('m-blink'); }); }, 140);
+        }
+        next();
+      }, 3800 + Math.random() * 2600);
+    })();
+  }
+
   function init() {
     document.documentElement.classList.add('m-ready');
     stagger();
-    // Count the numbers that summarise a page (columns, progress tiles)
+    // Count up the numbers on the Progress tiles
     setTimeout(function () {
-      $all('.col-ct, .pg-kpi-n').forEach(function (el) { countUp(el, 900); });
+      $all('.pg-kpi-n').forEach(function (el) { countUp(el, 900); });
     }, 250);
     watchCounts();
     watchLists();
@@ -419,6 +434,7 @@
     hookOnboarding();
     hookLogout();
     hookAuthSun();
+    blinkMascots();
     document.addEventListener('pointerdown', ripple, { passive: true });
   }
 
