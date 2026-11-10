@@ -58,6 +58,15 @@ On the Calls page, **Mock interview** sends Maya in as a hiring manager for one 
 
 The browser records the call (your mic and Maya mixed) into IndexedDB on that device, with timed captions. When it ends, the website scores every main answer from the transcript (Gemini, then LiveKit's LLM), writes a 1 to 5 score with what worked, what to sharpen and a stronger answer, and adds the overall score to the job's Timeline. In the call log, **Show report and replay** shows the report, plays the recording from each answer, and lets you click any transcript line to jump there. Recordings never leave the browser.
 
+### Recruiter call rehearsals
+
+The same card can switch Maya into a recruiter for two calls (`scenario` in the metadata, `target` for your goal):
+
+- **Salary negotiation.** She makes a verbal offer below your goal, pushes back on budget, has a little room beyond base (joining bonus, review date, start date) and asks about your notice period.
+- **Recruiter follow-up.** You ring a busy recruiter a week after your interview. She stays vague until you ask clearly for a timeline, next steps and feedback.
+
+Afterwards the call is scored 1 to 5 against a short rubric for that call (anchoring, justifying, handling pushback, beyond base and closing for salary; opening, timeline, feedback, interest and tone for follow-up), and the job's Timeline gets a line such as "Salary negotiation rehearsal: 3/5. Next time: ask when you'll get the revised offer in writing." These show in the call log as **rehearsal**, with the same report and replay.
+
 ## Phone practice (LiveKit SIP)
 
 The same recruiter can take a real phone call, two ways. Both log the call on the Calls page when it ends: the agent posts the transcript to the website, signed with a shared secret.

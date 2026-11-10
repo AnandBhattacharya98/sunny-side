@@ -2382,16 +2382,19 @@ def api_interview_start():
         return jsonify({"ok": False, "error": "Pick a job from your board."}), 404
     job = {"title": shorten_title(row[1]), "company": clean_company(row[2]), "description": row[3], "key_reqs": row[4]}
     length = body.get("length") if body.get("length") in mock_interview.LENGTHS else "short"
+    scenario = body.get("scenario") if body.get("scenario") in mock_interview.SCENARIOS else "interview"
     identity = f"user-{uid}"
     meta = mock_interview.interview_brief(job, length=length, resume=settings.get("resume_text") or "",
-                                          name=settings.get("name") or "", lang=ve.reply_lang(body.get("lang")))
+                                          name=settings.get("name") or "", lang=ve.reply_lang(body.get("lang")),
+                                          scenario=scenario, target=str(body.get("target") or ""))
     meta["identity"] = identity
     room = f"interview-{uid}-{secrets.token_hex(6)}"
     url, key, secret = call_log.livekit_settings()
     token = call_log.room_token(key, secret, identity=identity, name=meta["candidate_name"] or "Candidate",
                                 room=room, agent_metadata=meta, ttl=3600)
     return jsonify({"ok": True, "url": url, "token": token, "room": room, "job_id": str(row[0]),
-                    "role": job["title"], "company": job["company"], "questions": meta["questions"]})
+                    "role": job["title"], "company": job["company"], "questions": meta["questions"],
+                    "scenario": scenario, "target": meta["target"]})
 
 
 @app.route("/api/calls/interview/end", methods=["POST"])
@@ -2405,6 +2408,9 @@ def api_interview_end():
     if not ve.rate_limiter.allow(uid, "interview_end", 10, window=600):
         return jsonify({"ok": False, "error": "Too many interviews logged. Wait a few minutes."}), 429
     transcript = mock_interview.clean_timed_transcript(body.get("transcript"))
+    scenario = body.get("scenario") if body.get("scenario") in mock_interview.SCENARIOS else "interview"
+    target = " ".join(str(body.get("target") or "").split())[:mock_interview.MAX_TARGET]
+    label = mock_interview.SCENARIOS[scenario]["label"]
     try:
         duration = max(0, min(int(body.get("duration_seconds") or 0), call_log.MAX_DURATION))
     except (TypeError, ValueError):
@@ -2418,25 +2424,25 @@ def api_interview_end():
         posting = (row[3] or "") if row else ""
         job_id = str(row[0]) if row else None
         answered = sum(1 for t in transcript if t["role"] == "user") >= 2
-        title = f"Mock interview · {role}{' at ' + company if company else ''}" if role else "Mock interview"
+        title = f"{label} · {role}{' at ' + company if company else ''}" if role else label
         saved = call_log.add_call(conn, uid, {
             "caller_name": title[:call_log.MAX_NAME], "phone_number": "Browser call",
             "status": "completed" if answered else "missed", "duration_seconds": duration,
             "summary": "Scoring your answers…" if answered else "Too short to score. Try answering a few questions.",
-        }, kind="interview", transcript=transcript, job_id=job_id)
+        }, kind="interview" if scenario == "interview" else "rehearsal", transcript=transcript, job_id=job_id)
         gemini_key = get_user_settings(conn, uid).get("gemini_api_key") or None
     finally:
         conn.close()
 
     if answered:
         def work():
-            report = mock_interview.score_interview(transcript, role, company, posting, gemini_key)
+            report = mock_interview.score_interview(transcript, role, company, posting, gemini_key,
+                                                    scenario=scenario, target=target)
             c = get_conn(DB_PATH)
             try:
-                call_log.set_report(c, uid, saved["id"], report, mock_interview.summary_line(report, role))
+                call_log.set_report(c, uid, saved["id"], report, mock_interview.summary_line(report, role, scenario))
                 if job_id and not report.get("error"):
-                    add_timeline(c, job_id, f"Mock interview: {report['overall']}/5 across "
-                                            f"{len(report['questions'])} questions")
+                    add_timeline(c, job_id, mock_interview.timeline_event(report, scenario))
             finally:
                 c.close()
         run_in_background(("interview_score", uid, saved["id"]), work)

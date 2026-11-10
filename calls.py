@@ -23,7 +23,7 @@ import db
 log = logging.getLogger("calls")
 
 STATUSES = ("completed", "missed", "voicemail", "failed")
-KINDS = ("logged", "practice", "phone", "interview")
+KINDS = ("logged", "practice", "phone", "interview", "rehearsal")
 API_KEY_PREFIX = "ss_"
 MAX_NAME = 200
 MAX_PHONE = 30

@@ -79,7 +79,7 @@ def test_start_needs_livekit(conn, monkeypatch):
 
 def test_end_logs_scores_and_adds_to_timeline(conn, monkeypatch):
     monkeypatch.setattr(interview, "score_interview",
-                        lambda tr, role, company, posting, key: interview.parse_report(REPLY, tr))
+                        lambda tr, role, company, posting, key, **k: interview.parse_report(REPLY, tr))
     r = _client().post("/api/calls/interview/end", json={"room": f"interview-{U1}-abc", "job_id": "int-j1",
                                                           "duration_seconds": 300, "transcript": TRANSCRIPT})
     assert r.status_code == 201
@@ -98,7 +98,7 @@ def test_end_logs_scores_and_adds_to_timeline(conn, monkeypatch):
 
 
 def test_end_too_short_is_not_scored(conn, monkeypatch):
-    monkeypatch.setattr(interview, "score_interview", lambda *a: pytest.fail("should not score"))
+    monkeypatch.setattr(interview, "score_interview", lambda *a, **k: pytest.fail("should not score"))
     r = _client().post("/api/calls/interview/end", json={"room": f"interview-{U1}-x", "job_id": "int-j1",
                                                           "transcript": TRANSCRIPT[:2]})
     assert r.json["call"]["status"] == "missed" and "Too short" in r.json["call"]["summary"]
@@ -110,7 +110,7 @@ def test_end_rejects_someone_elses_room(conn):
 
 
 def test_scoring_failure_is_reported(conn, monkeypatch):
-    monkeypatch.setattr(interview, "score_interview", lambda *a: {"error": "Couldn't score this one."})
+    monkeypatch.setattr(interview, "score_interview", lambda *a, **k: {"error": "Couldn't score this one."})
     r = _client().post("/api/calls/interview/end", json={"room": f"interview-{U1}-y", "job_id": "int-j1",
                                                           "transcript": TRANSCRIPT})
     call = _client().get(f"/api/calls/{r.json['call']['id']}").json["call"]
@@ -155,3 +155,71 @@ def test_clean_timed_transcript():
 def test_calls_page_has_interview_card(conn):
     html = _client().get("/calls?interview=int-j1").get_data(as_text=True)
     assert "Mock interview" in html and 'value="int-j1" selected' in html and "Zepto" not in html
+
+
+# ── Recruiter call rehearsals: salary negotiation and follow-up ──
+
+SALARY_TRANSCRIPT = [
+    {"role": "agent", "text": "Good news, we'd like to offer you the role at 26 lakh fixed.", "t": 0},
+    {"role": "user", "text": "Thank you. I was looking for 32, given the payments scope.", "t": 5},
+    {"role": "agent", "text": "That's above our band. What's your notice period?", "t": 12},
+    {"role": "user", "text": "Sixty days. Could a joining bonus bridge the gap?", "t": 16},
+]
+SALARY_REPLY = json.dumps({"overall": 3, "summary": "Good anchor. Close with a date.", "questions": [
+    {"question": "Anchoring and the number you asked for", "line": 1, "score": 4, "worked": "Named 32 early",
+     "sharpen": "Back it with a market number", "stronger": "Similar roles pay 30 to 34."},
+    {"question": "Closing with clear next steps", "line": -1, "score": 2, "worked": "Polite",
+     "sharpen": "Ask when you'll get the revised offer in writing", "stronger": "Can I expect it by Friday?"},
+]})
+
+
+def test_rehearsal_start_sends_scenario_and_goal(conn):
+    r = _client().post("/api/calls/interview/start",
+                       json={"job_id": "int-j1", "scenario": "salary", "target": "  32 LPA   fixed "})
+    assert r.status_code == 200 and r.json["scenario"] == "salary"
+    meta = json.loads(_decode(r.json["token"], "s" * 40)["roomConfig"]["agents"][0]["metadata"])
+    assert meta["mode"] == "interview" and meta["scenario"] == "salary" and meta["target"] == "32 LPA fixed"
+    r = _client().post("/api/calls/interview/start", json={"job_id": "int-j1", "scenario": "bogus"})
+    assert r.json["scenario"] == "interview"
+
+
+def test_rehearsal_is_scored_and_saved_to_timeline(conn, monkeypatch):
+    seen = {}
+
+    def fake(tr, role, company, posting, key, scenario="interview", target=""):
+        seen.update(scenario=scenario, target=target)
+        return interview.parse_report(SALARY_REPLY, tr)
+    monkeypatch.setattr(interview, "score_interview", fake)
+    r = _client().post("/api/calls/interview/end", json={
+        "room": f"interview-{U1}-sal", "job_id": "int-j1", "scenario": "salary", "target": "32 LPA",
+        "transcript": SALARY_TRANSCRIPT})
+    call = _client().get(f"/api/calls/{r.json['call']['id']}").json["call"]
+    assert seen == {"scenario": "salary", "target": "32 LPA"}
+    assert call["kind"] == "rehearsal" and call["caller_name"] == "Salary negotiation · Product Manager at Razorpay"
+    assert call["summary"].startswith("Salary negotiation for Product Manager: 3/5.")
+    assert [q["t"] for q in call["report"]["questions"]] == [5, None]
+    events = [r[0] for r in conn.execute("SELECT event FROM application_timeline WHERE job_id = 'int-j1'")]
+    assert events == ["Salary negotiation rehearsal: 3/5. Next time: Ask when you'll get the revised offer in writing."]
+
+
+def test_rehearsal_prompt_uses_rubric_and_goal():
+    tr = interview.clean_timed_transcript(SALARY_TRANSCRIPT)
+    p = interview.rehearsal_prompt(tr, "followup", "PM", "Razorpay", "final round on 3 Nov")
+    assert "recruiter follow-up" in p and "Getting a clear timeline and next step" in p
+    assert "final round on 3 Nov" in p and "[1] Candidate:" in p
+
+
+def test_agent_plays_the_recruiter_for_rehearsals():
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "voice_agent"))
+    interviewer = pytest.importorskip("interviewer")
+    d = interviewer.interview_details({"scenario": "salary", "target": "32 LPA", "role": "PM", "company": "Razorpay"})
+    text = interviewer.instructions_for(d)
+    assert "recruiter" in text and "32 LPA" in text and "Ask exactly" not in text
+    d = interviewer.interview_details({"scenario": "nope", "questions": 5})
+    assert d["scenario"] == "interview" and "Ask exactly 5 main questions" in interviewer.instructions_for(d)
+
+
+def test_calls_page_offers_rehearsals(conn):
+    html = _client().get("/calls").get_data(as_text=True)
+    assert 'value="salary"' in html and 'value="followup"' in html
