@@ -2721,7 +2721,8 @@ const VA = {
   listening: false,
   mode: null,              // 'server' (record + Gemini) or 'browser' (Web Speech API)
   serverVoice: false,
-  serverTts: false,   // the server can speak (LiveKit or Gemini), separate from transcribing
+  serverTts: false,
+  sttWav: false,      // send recordings as 16 kHz WAV, which LiveKit's speech-to-text needs   // the server can speak (LiveKit or Gemini), separate from transcribing
   recognition: null,
   recorder: null,
   stream: null,
@@ -2962,6 +2963,7 @@ function loadAssistantWelcome(first) {
       VA.welcome = res;
       VA.serverVoice = !!res.server_voice;
       VA.serverTts = res.server_tts === undefined ? VA.serverVoice : !!res.server_tts;
+      VA.sttWav = !!res.stt_wav;
       renderStarter();
       setDigestBadge(res.digest_count);
       if (first) scheduleAssistantHint();
@@ -3364,17 +3366,62 @@ function cancelListening() {
   setListeningUI(false);
 }
 
+// The upload for /api/voice/transcribe. With LiveKit on, the recording goes as 16 kHz mono WAV,
+// which its speech-to-text needs; if the browser can't decode it, the original goes to Gemini.
+async function vaRecordingForm(blob, name) {
+  const form = new FormData();
+  let wav = null;
+  if (VA.sttWav) {
+    try { wav = await vaToWav16k(blob); } catch (e) { wav = null; }
+  }
+  if (wav) form.append('file', wav, name + '.wav');
+  else form.append('file', blob, name + '.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'));
+  form.append('lang', VA.lang);
+  return form;
+}
+
+async function vaToWav16k(blob) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!AC || !OAC) return null;
+  const bytes = await blob.arrayBuffer();
+  const ctx = new AC();
+  try {
+    const decoded = await new Promise((resolve, reject) => {
+      const p = ctx.decodeAudioData(bytes, resolve, reject);
+      if (p && p.then) p.then(resolve, reject);
+    });
+    const rate = 16000;
+    const offline = new OAC(1, Math.max(1, Math.ceil(decoded.duration * rate)), rate);
+    const src = offline.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offline.destination);
+    src.start();
+    const samples = (await offline.startRendering()).getChannelData(0);
+    const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); out.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+    str(36, 'data'); out.setUint32(40, samples.length * 2, true);
+    for (let i = 0; i < samples.length; i++) {
+      const v = Math.max(-1, Math.min(1, samples[i]));
+      out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+    }
+    return new Blob([out.buffer], { type: 'audio/wav' });
+  } finally {
+    if (ctx.close) ctx.close().catch(() => {});
+  }
+}
+
 async function submitRecording(blob) {
   if (!VA.heardSpeech || blob.size < 1500) {
     addAssistantNote(vaT("I didn't catch anything that time. Tap the mic and try again?", 'इस बार मुझे कुछ सुनाई नहीं दिया। माइक टैप करके फिर से कोशिश करें?'));
     return;
   }
   setAssistantStatus('thinking', vaT('Transcribing…', 'समझ रही हूँ…'));
-  const ext = (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm');
-  const form = new FormData();
-  form.append('file', blob, 'recording.' + ext);
-  form.append('lang', VA.lang);
   try {
+    const form = await vaRecordingForm(blob, 'recording');
     const res = await vaFetch('/api/voice/transcribe', { method: 'POST', body: form });
     const data = await res.json();
     if (data.ok && data.transcript) {
@@ -5931,10 +5978,8 @@ async function quizRecord(jobId) {
     const box = qzEl(jobId)?.querySelector('.qz-answer');
     const timer = qzEl(jobId)?.querySelector('.qz-timer');
     if (timer) timer.textContent = vaT('Transcribing…', 'समझ रही हूँ…');
-    const form = new FormData();
-    form.append('file', blob, 'answer.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'));
-    form.append('lang', VA.lang);
     try {
+      const form = await vaRecordingForm(blob, 'answer');
       const data = await (await vaFetch('/api/voice/transcribe', { method: 'POST', body: form })).json();
       if (data.ok && data.transcript && box) box.value = (box.value.trim() + ' ' + data.transcript).trim();
       else if (data.error) toast(data.error);

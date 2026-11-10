@@ -145,7 +145,7 @@ def test_synthesize_route_uses_livekit_without_a_gemini_key(livekit, client, mon
     assert base64.b64decode(data["audio_base64"])[:4] == b"RIFF"
     assert livekit["calls"][0]["ws"].sent[0]["language"] == "hi"
     welcome = client.get("/api/voice/welcome?lang=en").get_json()
-    assert welcome["server_tts"] is True and welcome["server_voice"] is False
+    assert welcome["server_tts"] is True
 
 
 def test_synthesize_route_without_any_provider(client, monkeypatch):
@@ -153,4 +153,94 @@ def test_synthesize_route_without_any_provider(client, monkeypatch):
     monkeypatch.delenv("LIVEKIT_API_SECRET", raising=False)
     monkeypatch.setattr(dashboard, "_voice_api_key", lambda conn, uid: None)
     res = client.post("/api/voice/synthesize", json={"text": "Hello"})
+    assert res.status_code == 400 and res.get_json()["provider_fallback"] is True
+
+
+# ── Speech-to-text ──────────────────────────────────────────────────────
+
+import livekit_stt  # noqa: E402
+
+
+def wav_bytes(pcm, rate=16000):
+    return ve.pcm_to_wav(pcm, sample_rate=rate)
+
+
+def test_wav_to_pcm_accepts_only_16bit_mono_wav():
+    pcm = b"\x01\x00" * 100
+    assert livekit_stt.wav_to_pcm(wav_bytes(pcm)) == (pcm, 16000)
+    assert livekit_stt.wav_to_pcm(b"\x1aE\xdf\xa3webm...") is None
+    assert livekit_stt.wav_to_pcm(ve.pcm_to_wav(pcm, num_channels=2)) is None
+
+
+def test_model_per_language(monkeypatch):
+    monkeypatch.delenv("LIVEKIT_STT_MODEL", raising=False)
+    assert livekit_stt.model_for("en") == "deepgram/nova-3"
+    assert livekit_stt.model_for("hi") == "deepgram/nova-3"
+    assert livekit_stt.model_for("ta") == "cartesia/ink-whisper"
+    monkeypatch.setenv("LIVEKIT_STT_MODEL", "assemblyai/universal-streaming")
+    assert livekit_stt.model_for("ta") == "assemblyai/universal-streaming"
+
+
+@pytest.fixture
+def stt(livekit, monkeypatch):
+    monkeypatch.setattr(ve, "_livekit_stt_down_until", 0.0)
+    livekit["replies"][:] = [
+        {"type": "session.created"},
+        {"type": "final_transcript", "transcript": "move swiggy"},
+        {"type": "final_transcript", "transcript": "to applied"},
+        {"type": "session.closed"},
+    ]
+    return livekit
+
+
+def test_transcribe_streams_pcm_and_joins_finals(stt):
+    pcm = b"\x00\x01" * 4000  # 0.25 s at 16 kHz
+    assert livekit_stt.transcribe_pcm(pcm, 16000, lang="hi") == "move swiggy to applied"
+    call = stt["calls"][0]
+    assert call["url"] == "wss://agent-gateway.livekit.cloud/v1/stt?model=deepgram%2Fnova-3"
+    sent = call["ws"].sent
+    assert sent[0]["type"] == "session.create" and sent[0]["settings"]["language"] == "hi"
+    assert sent[0]["settings"]["sample_rate"] == "16000"
+    frames = [m for m in sent if m["type"] == "input_audio"]
+    assert len(frames) == 5 and b"".join(base64.b64decode(f["audio"]) for f in frames) == pcm
+    assert [m["type"] for m in sent[-2:]] == ["session.finalize", "session.close"]
+
+
+def test_transcribe_stops_waiting_after_the_finalize_is_answered(stt, monkeypatch):
+    class Timeout(Exception):
+        pass
+    Timeout.__name__ = "WebSocketTimeoutException"
+    stt["replies"][:] = [{"type": "final_transcript", "transcript": "hello"}, {"type": "session.finalized"}]
+
+    def connect(url, headers, timeout):
+        ws = FakeWS(stt["replies"])
+        recv = ws.recv
+        ws.recv = lambda: recv() if ws.replies else (_ for _ in ()).throw(Timeout("timed out"))
+        return ws
+    monkeypatch.setattr(livekit_tts, "_connect", connect)
+    assert livekit_stt.transcribe_pcm(b"\x00\x00" * 1600, 16000) == "hello"
+
+
+def test_transcribe_falls_back_to_gemini_for_non_wav_and_errors(stt, monkeypatch):
+    monkeypatch.setattr(ve, "transcribe_audio", lambda audio, mime, key, lang="en": "from gemini")
+    assert ve.transcribe(b"webm-bytes", "audio/webm", "key") == ("from gemini", "gemini")
+    assert stt["calls"] == []
+    stt["replies"][:] = [{"type": "error", "code": 401}]
+    assert ve.transcribe(wav_bytes(b"\x00\x00" * 800), "audio/wav", "key") == ("from gemini", "gemini")
+    assert len(stt["calls"]) == 1
+
+
+def test_transcribe_route_uses_livekit_without_a_gemini_key(stt, client, monkeypatch):
+    import io
+    monkeypatch.setattr(dashboard, "_voice_api_key", lambda conn, uid: None)
+    data = {"file": (io.BytesIO(wav_bytes(b"\x00\x00" * 3200)), "recording.wav", "audio/wav"), "lang": "en"}
+    res = client.post("/api/voice/transcribe", data=data, content_type="multipart/form-data")
+    body = res.get_json()
+    assert res.status_code == 200, body
+    assert body["transcript"] == "move swiggy to applied" and body["provider"] == "livekit"
+    welcome = client.get("/api/voice/welcome?lang=en").get_json()
+    assert welcome["server_voice"] is True and welcome["stt_wav"] is True
+    # A webm with no Gemini key has nobody to hear it, so the browser's recognizer takes over
+    data = {"file": (io.BytesIO(b"\x1aE\xdf\xa3" * 500), "recording.webm", "audio/webm")}
+    res = client.post("/api/voice/transcribe", data=data, content_type="multipart/form-data")
     assert res.status_code == 400 and res.get_json()["provider_fallback"] is True
