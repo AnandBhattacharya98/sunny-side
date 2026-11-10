@@ -6,6 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets, delete_user_data
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
+import livekit_tts
 import quiz_coach
 import followups
 import jobmeta
@@ -2193,10 +2194,10 @@ def voice_synthesize():
         api_key = _voice_api_key(conn, uid)
     finally:
         conn.close()
-    if not api_key:
+    if not api_key and not livekit_tts.is_configured():
         return jsonify({"ok": False, "error": "Voice playback isn't set up.", "provider_fallback": True}), 400
     try:
-        wav_bytes = ve.synthesize_speech(text, api_key)
+        wav_bytes, provider = ve.speak(text, api_key, lang=ve.reply_lang(d.get("lang"), text))
     except ve.TTSQuotaError:
         return jsonify({"ok": False, "error": "Gemini's voice quota is used up for now.", "provider_fallback": True,
                         "reason": "quota"}), 429
@@ -2204,7 +2205,7 @@ def voice_synthesize():
         app.logger.warning("Voice synthesis failed for user %s: %s", uid, e)
         return jsonify({"ok": False, "error": "Voice playback is unavailable right now.", "provider_fallback": True,
                         "reason": "error"}), 502
-    return jsonify({"ok": True, "audio_base64": base64.b64encode(wav_bytes).decode("ascii")})
+    return jsonify({"ok": True, "provider": provider, "audio_base64": base64.b64encode(wav_bytes).decode("ascii")})
 
 
 def shorten_title(title):
@@ -2716,6 +2717,7 @@ def voice_welcome():
         "digest_count": digest_count,
         "has_jobs": bool(snapshot),
         "server_voice": has_key,
+        "server_tts": has_key or livekit_tts.is_configured(),
     })
 
 

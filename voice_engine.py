@@ -21,6 +21,7 @@ from datetime import datetime
 import requests
 
 from ai_engine import get_fallback_gemini_key
+import livekit_tts
 
 log = logging.getLogger("voice")
 
@@ -347,6 +348,40 @@ def synthesize_speech(text: str, api_key: str) -> bytes:
     wav = pcm_to_wav(pcm, sample_rate=rate)
     _tts_cache.put(key, wav)
     return wav
+
+
+# After a LiveKit failure, go straight to Gemini for a little while instead of waiting on it again.
+LIVEKIT_RETRY_AFTER = 60  # seconds
+_livekit_down_until = 0.0
+
+
+def speak(text: str, api_key: str | None, lang: str = "en") -> tuple[bytes, str]:
+    """Sunny's spoken reply as WAV, plus which voice made it ("livekit" or "gemini").
+
+    LiveKit Inference is tried first when it's configured, then Gemini with the user's key.
+    Raises TTSQuotaError / GeminiError when neither can speak, so the browser voice takes over.
+    """
+    global _livekit_down_until
+    text = re.sub(r"\s+", " ", text or "").strip()[:MAX_TTS_CHARS]
+    if not text:
+        raise GeminiError("No text to speak")
+    if livekit_tts.is_configured() and time.time() >= _livekit_down_until:
+        model, voice = livekit_tts.model_and_voice()
+        key = hashlib.sha256(f"livekit|{model}|{voice}|{lang}|{text}".encode()).hexdigest()
+        cached = _tts_cache.get(key)
+        if cached:
+            return cached, "livekit"
+        try:
+            pcm, rate = livekit_tts.synthesize_pcm(text, lang=lang)
+            wav = pcm_to_wav(pcm, sample_rate=rate)
+            _tts_cache.put(key, wav)
+            return wav, "livekit"
+        except livekit_tts.LiveKitTTSError as e:
+            log.warning("LiveKit voice failed, falling back to Gemini: %s", e)
+            _livekit_down_until = time.time() + LIVEKIT_RETRY_AFTER
+    if not api_key:
+        raise GeminiError("No voice provider is available")
+    return synthesize_speech(text, api_key), "gemini"
 
 
 def pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, num_channels: int = 1, bits_per_sample: int = 16) -> bytes:
