@@ -58,3 +58,25 @@ def test_motion_js_checks_reduce_motion_and_never_blocks_a_move():
     # The original move and Sunny's reaction still run even if the animation throws
     assert "return react.apply(this, arguments);" in js
     assert "return orig.apply(this, arguments);" in js
+
+
+def test_logout_skips_the_page_transition_and_clears_cached_pages():
+    js = open(os.path.join(ROOT, "static/motion/app-motion.js"), encoding="utf-8").read()
+    assert 'a[href="/logout"]' in js and "skipTransition" in js
+    with dashboard.app.test_client() as c:
+        with c.session_transaction() as s:
+            s["user_id"] = 1
+            s["username"] = "admin"
+        res = c.get("/logout")
+        assert res.status_code == 302
+        assert res.headers["Cache-Control"] == "no-store"
+        assert res.headers["Clear-Site-Data"] == '"cache"'
+
+
+def test_signed_in_pages_are_not_cached():
+    with dashboard.app.test_client() as c:
+        with c.session_transaction() as s:
+            s["user_id"] = 1
+            s["username"] = "admin"
+        res = c.get("/progress")
+        assert res.headers.get("Cache-Control") == "no-store"
