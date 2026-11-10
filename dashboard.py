@@ -1775,7 +1775,7 @@ def interview_prep_feedback(job_id):
         conn.close()
     result = quiz_coach.grade_answer(question, d.get("hints") or "", d.get("answer") or "",
                                      title=job[0] or "", company=job[1] or "", api_key=api_key, lang=g.voice_lang,
-                                     resume=resume)
+                                     resume=resume, avoid=d.get("avoid") if isinstance(d.get("avoid"), list) else None)
     return jsonify({"ok": True, "lang": g.voice_lang, **result})
 
 
