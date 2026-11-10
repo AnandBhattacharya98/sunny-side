@@ -23,7 +23,8 @@ NOVA_LANGS = {"en", "hi", "es", "fr", "de"}
 NOVA_MODEL = "deepgram/nova-3"
 WHISPER_MODEL = "cartesia/ink-whisper"
 TIMEOUT = 15            # seconds for the whole transcription
-TRAILING_WAIT = 1.2     # seconds to wait for more text once the gateway has answered the finalize
+TRAILING_WAIT = 0.3     # seconds to wait for stray text once the gateway confirms the finalize
+IDLE_WAIT = 1.5         # without that confirmation, how long a quiet gap must be before we stop
 FRAME_MS = 50
 
 
@@ -95,19 +96,29 @@ def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
         for i in range(0, len(pcm), step):
             ws.send(json.dumps({"type": "input_audio", "audio": base64.b64encode(pcm[i:i + step]).decode("ascii")}))
         ws.send(json.dumps({"type": "session.finalize"}))
-        answered = False  # the gateway has acknowledged the finalize or sent text since
+        # Providers can transcribe slower than we upload, so a final for the first words can come
+        # well before the rest. Stop soon after the gateway confirms the finalize; failing that,
+        # once there's text and a quiet gap after the audio could have been fully heard.
+        heard_by = time.monotonic() + len(pcm) / (2 * sample_rate)
+        finalized = False
         while True:
             now = time.monotonic()
             remaining = deadline - now
             if remaining <= 0:
-                if answered:
+                if finals:
                     break
                 raise LiveKitSTTError("LiveKit Inference timed out")
-            ws.settimeout(min(remaining, TRAILING_WAIT) if answered else remaining)
+            if finalized:
+                wait = max(TRAILING_WAIT, heard_by - now)
+            elif finals:
+                wait = max(IDLE_WAIT, heard_by - now)
+            else:
+                wait = remaining
+            ws.settimeout(min(remaining, wait))
             try:
                 raw = ws.recv()
             except Exception as e:
-                if answered and _is_timeout(e):
+                if (finalized or finals) and _is_timeout(e):
                     break  # nothing more is coming
                 raise
             if not raw:
@@ -120,9 +131,8 @@ def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
                 text = (msg.get("transcript") or "").strip()
                 if text:
                     finals.append(text)
-                answered = True
             elif kind == "session.finalized":
-                answered = True
+                finalized = True
             elif kind == "session.closed":
                 break
             elif kind == "error":

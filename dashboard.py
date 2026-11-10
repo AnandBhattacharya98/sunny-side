@@ -1,7 +1,7 @@
 import os, re, json, sqlite3, hmac, secrets, threading, time, base64, logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g, Response, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
 from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets, delete_user_data
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
@@ -2178,6 +2178,27 @@ def voice_transcribe():
     return jsonify({"ok": True, "transcript": transcript, "provider": provider})
 
 
+@app.route("/api/voice/speak-stream", methods=["POST"])
+def voice_speak_stream():
+    """Sunny's LiveKit voice as raw 16-bit PCM, sent while it is being made, so the board can
+    start playing after the first chunk instead of waiting for the whole clip."""
+    uid = get_user_id()
+    limited = _voice_rate_limited(uid, "synthesize", 30)
+    if limited:
+        return limited
+    d = request.get_json(silent=True) or {}
+    text = str(d.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "No text provided"}), 400
+    try:
+        rate, chunks = ve.speak_stream(text, lang=ve.reply_lang(d.get("lang"), text))
+    except livekit_tts.LiveKitTTSError:
+        return jsonify({"ok": False, "error": "Streaming voice is unavailable right now.", "provider_fallback": True}), 503
+    headers = {"X-Sample-Rate": str(rate), "X-Voice-Provider": "livekit", "Cache-Control": "no-store",
+               "X-Accel-Buffering": "no"}
+    return Response(stream_with_context(chunks), mimetype="audio/L16", headers=headers)
+
+
 @app.route("/api/voice/synthesize", methods=["POST"])
 def voice_synthesize():
     uid = get_user_id()
@@ -2720,6 +2741,7 @@ def voice_welcome():
         "server_tts": has_key or livekit_tts.is_configured(),
         # LiveKit hears 16-bit PCM, so the board converts recordings to WAV before sending them
         "stt_wav": livekit_tts.is_configured(),
+        "tts_stream": livekit_tts.is_configured(),
     })
 
 
@@ -2828,6 +2850,23 @@ def _spoken_time(value, lang="en", tz=None):
 # a voice or quiz route returns is translated on its way out, in one Gemini call.
 _TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer", "interview_reminder")
 _TRANSLATED_LISTS = ("suggestions", "strengths", "improve")
+
+
+@app.before_request
+def _voice_timer_start():
+    if request.path.startswith("/api/voice/"):
+        g.voice_started = time.perf_counter()
+
+
+@app.after_request
+def _voice_server_timing(response):
+    """Server-Timing on voice routes, so slow steps show up in the browser's network panel."""
+    started = getattr(g, "voice_started", None)
+    if started is not None:
+        parts = [f"{name};dur={ms:.0f}" for name, ms in (getattr(g, "timings", None) or {}).items()]
+        parts.append(f"total;dur={(time.perf_counter() - started) * 1000:.0f}")
+        response.headers["Server-Timing"] = ", ".join(parts)
+    return response
 
 
 @app.after_request

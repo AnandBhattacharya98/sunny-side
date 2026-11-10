@@ -244,3 +244,44 @@ def test_transcribe_route_uses_livekit_without_a_gemini_key(stt, client, monkeyp
     data = {"file": (io.BytesIO(b"\x1aE\xdf\xa3" * 500), "recording.webm", "audio/webm")}
     res = client.post("/api/voice/transcribe", data=data, content_type="multipart/form-data")
     assert res.status_code == 400 and res.get_json()["provider_fallback"] is True
+
+
+# ── Streaming voice ─────────────────────────────────────────────────────
+
+def test_speak_stream_route_sends_pcm_as_it_arrives(livekit, client, monkeypatch):
+    res = client.post("/api/voice/speak-stream", json={"text": "Hello there", "lang": "en"})
+    assert res.status_code == 200 and res.mimetype == "audio/L16"
+    assert res.headers["X-Sample-Rate"] == "24000"
+    assert res.get_data() == b"\x01\x00" * 10 + b"\x02\x00" * 5
+    assert "total;dur=" in res.headers["Server-Timing"]
+    # The finished clip is cached, so the same line plays again without LiveKit
+    livekit["replies"][:] = []
+    again = client.post("/api/voice/speak-stream", json={"text": "Hello there", "lang": "en"})
+    assert again.get_data() == b"\x01\x00" * 10 + b"\x02\x00" * 5 and len(livekit["calls"]) == 1
+
+
+def test_speak_stream_route_falls_back_when_livekit_fails(livekit, client):
+    livekit["replies"][:] = [{"type": "error", "message": "nope"}]
+    res = client.post("/api/voice/speak-stream", json={"text": "Hi"})
+    assert res.status_code == 503 and res.get_json()["provider_fallback"] is True
+
+
+def test_transcribe_waits_for_words_that_come_after_the_first_final(stt, monkeypatch):
+    class Timeout(Exception):
+        pass
+    Timeout.__name__ = "WebSocketTimeoutException"
+    waits = []
+    stt["replies"][:] = [{"type": "final_transcript", "transcript": "okay"},
+                         {"type": "final_transcript", "transcript": "move it to applied"},
+                         {"type": "session.finalized"}]
+
+    def connect(url, headers, timeout):
+        ws = FakeWS(stt["replies"])
+        ws.settimeout = waits.append
+        recv = ws.recv
+        ws.recv = lambda: recv() if ws.replies else (_ for _ in ()).throw(Timeout("timed out"))
+        return ws
+    monkeypatch.setattr(livekit_tts, "_connect", connect)
+    assert livekit_stt.transcribe_pcm(b"\x00\x00" * 32000, 16000) == "okay move it to applied"
+    # after the first final it kept listening for at least the clip's own length (2 s)
+    assert waits[1] >= 1.5

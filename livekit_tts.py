@@ -99,8 +99,11 @@ def _connect(url: str, headers: list[str], timeout: float):
     return websocket.create_connection(url, header=headers, timeout=timeout)
 
 
-def synthesize_pcm(text: str, lang: str = "en") -> tuple[bytes, int]:
-    """Speak `text` and return (16-bit mono PCM, sample rate). Raises LiveKitTTSError."""
+def stream_pcm(text: str, lang: str = "en"):
+    """Yield 16-bit mono PCM chunks (at SAMPLE_RATE) as LiveKit produces them.
+
+    Raises LiveKitTTSError, before the first chunk if the request can't start at all.
+    """
     key, secret = credentials()
     if not (key and secret):
         raise LiveKitTTSError("LiveKit isn't configured")
@@ -121,7 +124,7 @@ def synthesize_pcm(text: str, lang: str = "en") -> tuple[bytes, int]:
         ws = _connect(_ws_url(model), [f"Authorization: Bearer {access_token(key, secret)}"], TIMEOUT)
     except Exception as e:  # handshake errors carry the HTTP status, never our secret
         raise LiveKitTTSError(f"Couldn't reach LiveKit Inference: {type(e).__name__}: {e}") from e
-    audio = bytearray()
+    got_audio = False
     try:
         ws.send(json.dumps(session))
         ws.send(json.dumps({"type": "input_transcript", "transcript": text + " ",
@@ -140,12 +143,15 @@ def synthesize_pcm(text: str, lang: str = "en") -> tuple[bytes, int]:
             msg = json.loads(raw)
             kind = msg.get("type")
             if kind == "output_audio" and msg.get("audio"):
-                audio.extend(base64.b64decode(msg["audio"]))
+                got_audio = True
+                yield base64.b64decode(msg["audio"])
             elif kind == "done":
                 break
             elif kind == "error":
                 raise LiveKitTTSError(f"LiveKit Inference error: {str(msg.get('message') or msg)[:300]}")
     except LiveKitTTSError:
+        raise
+    except GeneratorExit:
         raise
     except Exception as e:
         raise LiveKitTTSError(f"LiveKit Inference failed: {type(e).__name__}: {e}") from e
@@ -154,6 +160,10 @@ def synthesize_pcm(text: str, lang: str = "en") -> tuple[bytes, int]:
             ws.close()
         except Exception:
             pass
-    if not audio:
+    if not got_audio:
         raise LiveKitTTSError("LiveKit Inference returned no audio")
-    return bytes(audio), SAMPLE_RATE
+
+
+def synthesize_pcm(text: str, lang: str = "en") -> tuple[bytes, int]:
+    """Speak `text` and return (16-bit mono PCM, sample rate). Raises LiveKitTTSError."""
+    return b"".join(stream_pcm(text, lang)), SAMPLE_RATE
