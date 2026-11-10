@@ -225,6 +225,24 @@
     });
   }
 
+  /* ---------- Log out without a page transition ----------
+     /logout answers with a redirect, and some browsers can stall a page transition
+     across a redirect. Turn the transition off just for this navigation. */
+  var leavingForLogout = false;
+  function hookLogout() {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href="/logout"]');
+      if (!a) return;
+      leavingForLogout = true;
+      var off = document.createElement('style');
+      off.textContent = '@view-transition { navigation: none; }';
+      document.head.appendChild(off);
+    }, true);
+    window.addEventListener('pageswap', function (e) {
+      if (leavingForLogout && e.viewTransition) { try { e.viewTransition.skipTransition(); } catch (err) {} }
+    });
+  }
+
   function init() {
     document.documentElement.classList.add('m-ready');
     stagger();
@@ -237,6 +255,7 @@
     hookBoard();
     hookTheme();
     hookOnboarding();
+    hookLogout();
     document.addEventListener('pointerdown', ripple, { passive: true });
   }
 

@@ -708,7 +708,19 @@ def reset_password(token):
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("index"))
+    resp = redirect(url_for("index"))
+    # Drop cached signed-in pages so Back can't show the board again after logging out
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Clear-Site-Data"] = '"cache"'
+    return resp
+
+
+@app.after_request
+def _no_store_signed_in_pages(response):
+    """A signed-in page holds one person's jobs: never keep it in the browser's cache or back/forward cache."""
+    if session.get("user_id") and response.mimetype == "text/html" and "Cache-Control" not in response.headers:
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 @app.route("/api/profile", methods=["POST"])
 def update_profile():
