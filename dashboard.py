@@ -11,6 +11,7 @@ import quiz_coach
 import followups
 import jobmeta
 import progress
+import calls as call_log
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
@@ -103,6 +104,27 @@ def _viewer_tz():
         return None
 
 
+# Endpoints curl and Postman may call with a personal API key (X-API-Key) instead of a login.
+API_KEY_ENDPOINTS = {"api_calls_list", "api_calls_create"}
+
+
+def _api_key_user():
+    """The user a valid X-API-Key header belongs to, on API-key endpoints only. Cached per request."""
+    if request.endpoint not in API_KEY_ENDPOINTS:
+        return None
+    if "api_key_user" not in g:
+        key = (request.headers.get("X-API-Key") or "").strip()
+        uid = None
+        if key:
+            conn = get_conn(DB_PATH)
+            try:
+                uid = call_log.user_for_api_key(conn, key)
+            finally:
+                conn.close()
+        g.api_key_user = uid
+    return g.api_key_user
+
+
 @app.context_processor
 def _inject_csrf():
     return {"csrf_token": csrf_token}
@@ -114,6 +136,8 @@ def check_csrf():
         return
     if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
         return
+    if request.endpoint in API_KEY_ENDPOINTS and request.headers.get("X-API-Key"):
+        return  # authenticated by the key (require_login rejects a bad one), not a cookie, so nothing to forge
     expected = session.get("csrf_token", "")
     sent = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
     if expected and sent and hmac.compare_digest(expected, sent):
@@ -214,6 +238,10 @@ def _check_oauth_state():
 @app.before_request
 def require_login():
     allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
+    if request.endpoint in API_KEY_ENDPOINTS and request.headers.get("X-API-Key"):
+        if _api_key_user() is None:
+            return jsonify({"ok": False, "error": "That API key isn't valid. Make a new one on the Calls page."}), 401
+        return
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -1220,6 +1248,9 @@ def export_account():
                 "contacts": for_jobs("SELECT job_id, name, title, linkedin_url, email FROM contacts WHERE user_id = ?"),
                 "followed_companies": [dict(r) for r in conn.execute(
                     "SELECT company, ats, board FROM user_company_boards WHERE user_id = ?", (uid,)).fetchall()],
+                "calls": [dict(r) for r in conn.execute(
+                    "SELECT caller_name, phone_number, status, duration_seconds, summary, kind, transcript, created_at "
+                    "FROM calls WHERE user_id = ? ORDER BY created_at", (uid,)).fetchall()],
             }
             body, mimetype, ext = json.dumps(data, indent=2, default=str), "application/json", "json"
         else:
@@ -2142,6 +2173,160 @@ def career_switch_jobs():
         results.append(r)
     return jsonify({"ok": True, "query": query, "location": location, "current_role": current,
                     "results": results, "failed": found["failed"], "hidden": hidden})
+
+
+# ── Call log (calls.py) ────────────────────────────────────────────────────
+
+def _calls_user() -> int:
+    """Whoever this request is for: the API key's owner, or the signed-in user."""
+    return _api_key_user() or get_user_id()
+
+
+@app.route("/calls")
+def calls_view():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        items = call_log.list_calls(conn, uid)
+        key_hint = call_log.api_key_hint(conn, uid)
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="calls", stats=stats, settings=settings, calls=items,
+                           api_key_hint=key_hint, practice_ready=call_log.practice_configured(),
+                           api_base=request.host_url.rstrip("/"))
+
+
+@app.route("/api/calls", methods=["GET"])
+def api_calls_list():
+    conn = get_conn(DB_PATH)
+    try:
+        items = call_log.list_calls(conn, _calls_user())
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "calls": items})
+
+
+@app.route("/api/calls", methods=["POST"])
+def api_calls_create():
+    uid = _calls_user()
+    if not ve.rate_limiter.allow(uid, "calls_create", 30):
+        return jsonify({"ok": False, "error": "Too many calls added in a minute. Wait a little and try again."}), 429
+    try:
+        call = call_log.validate(request.get_json(silent=True))
+    except call_log.CallError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        saved = call_log.add_call(conn, uid, call)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "call": saved}), 201
+
+
+@app.route("/api/calls/<int:call_id>", methods=["GET"])
+def api_call_detail(call_id):
+    conn = get_conn(DB_PATH)
+    try:
+        found = call_log.get_call(conn, get_user_id(), call_id)
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"ok": False, "error": "Call not found"}), 404
+    return jsonify({"ok": True, "call": found})
+
+
+@app.route("/api/calls/api-key", methods=["POST"])
+def api_calls_new_key():
+    uid = get_user_id()
+    if not ve.rate_limiter.allow(uid, "calls_api_key", 5):
+        return jsonify({"ok": False, "error": "Give it a minute before making another key."}), 429
+    conn = get_conn(DB_PATH)
+    try:
+        key = call_log.new_api_key(conn, uid)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "api_key": key, "hint": key[-4:]})
+
+
+@app.route("/api/calls/api-key/revoke", methods=["POST"])
+def api_calls_revoke_key():
+    conn = get_conn(DB_PATH)
+    try:
+        call_log.revoke_api_key(conn, get_user_id())
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/calls/practice/start", methods=["POST"])
+def api_practice_start():
+    """A LiveKit room token that also sends the recruiter agent into the room."""
+    uid = get_user_id()
+    if not call_log.practice_configured():
+        return jsonify({"ok": False, "error": "Practice calls aren't set up on this server yet."}), 503
+    if not ve.rate_limiter.allow(uid, "practice_call", 6, window=600):
+        return jsonify({"ok": False, "error": "That's a lot of practice calls. Take a ten-minute break."}), 429
+    body = request.get_json(silent=True) or {}
+    conn = get_conn(DB_PATH)
+    try:
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+    finally:
+        conn.close()
+    role = " ".join(str(body.get("role") or settings.get("designation") or "").split())[:80]
+    company = " ".join(str(body.get("company") or "").split())[:80]
+    name = (settings.get("name") or "").strip()[:60]
+    room = f"practice-{uid}-{secrets.token_hex(6)}"
+    url, key, secret = call_log.livekit_settings()
+    token = call_log.room_token(
+        key, secret, identity=f"user-{uid}", name=name or "Candidate", room=room,
+        agent_metadata={"candidate_name": name, "role": role, "company": company,
+                        "resume": (settings.get("resume_text") or "")[:1500]},
+    )
+    return jsonify({"ok": True, "url": url, "token": token, "room": room, "role": role})
+
+
+@app.route("/api/calls/practice/end", methods=["POST"])
+def api_practice_end():
+    """Logs a finished practice call, then writes its summary in the background."""
+    uid = get_user_id()
+    body = request.get_json(silent=True) or {}
+    room = str(body.get("room") or "")
+    if not room.startswith(f"practice-{uid}-"):
+        return jsonify({"ok": False, "error": "Unknown practice call"}), 400
+    if not ve.rate_limiter.allow(uid, "practice_end", 10, window=600):
+        return jsonify({"ok": False, "error": "Too many calls logged. Wait a few minutes."}), 429
+    transcript = call_log.clean_transcript(body.get("transcript"))
+    role = " ".join(str(body.get("role") or "").split())[:80]
+    try:
+        duration = max(0, min(int(body.get("duration_seconds") or 0), call_log.MAX_DURATION))
+    except (TypeError, ValueError):
+        duration = 0
+    answered = any(t["role"] == "user" for t in transcript)
+    conn = get_conn(DB_PATH)
+    try:
+        saved = call_log.add_call(conn, uid, {
+            "caller_name": f"Practice screen{(' · ' + role) if role else ''}"[:call_log.MAX_NAME],
+            "phone_number": "Browser call",
+            "status": "completed" if answered else "missed",
+            "duration_seconds": duration,
+            "summary": "Writing a summary…" if answered else call_log.fallback_summary(transcript, role),
+        }, kind="practice", transcript=transcript)
+        gemini_key = get_user_settings(conn, uid).get("gemini_api_key") or None
+    finally:
+        conn.close()
+
+    if answered:
+        def work():
+            text = call_log.summarize_practice(transcript, role, gemini_key)
+            c = get_conn(DB_PATH)
+            try:
+                call_log.set_summary(c, uid, saved["id"], text)
+            finally:
+                c.close()
+        run_in_background(("practice_summary", uid, saved["id"]), work)
+    return jsonify({"ok": True, "call": saved}), 201
 
 
 # ── Board Assistant (voice + chat) ─────────────────────────────────────────

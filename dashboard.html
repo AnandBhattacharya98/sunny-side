@@ -1697,6 +1697,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
     Career Switch
   </a>
+  <a class="nl {% if view_mode=='calls' %}on{% endif %}" href="/calls" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+    Calls
+  </a>
   <a class="nl" href="javascript:void(0)" onclick="openSettingsModal()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     Profile Settings
@@ -2221,6 +2225,125 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       </div>
       <div class="wr-list" id="cs-list"></div>
       <div class="wr-foot" id="cs-foot"></div>
+    </section>
+  </div>
+  {% elif view_mode == 'calls' %}
+  <style>
+    .cl-wrap { flex: 1; overflow-y: auto; min-height: 0; padding-right: 8px; display: flex; flex-direction: column; gap: 18px; }
+    .cl-intro { font-size: 13.5px; color: var(--mut); line-height: 1.55; max-width: 720px; margin: 0; }
+    .cl-card { border: 1px solid var(--bdr); background: var(--sur); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+    .cl-card h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; color: var(--txt); }
+    .cl-card p { margin: 0; font-size: 12.5px; color: var(--mut); line-height: 1.5; }
+    .cl-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .cl-row input { flex: 1 1 200px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); background: var(--field, var(--sur)); color: var(--txt); font-size: 13px; outline: none; }
+    .cl-row input:focus { border-color: var(--yolk); }
+    .cl-btn { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--yolk); background: var(--yolk); color: var(--ink); white-space: nowrap; }
+    .cl-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
+    .cl-btn.stop { background: var(--bad-txt); border-color: var(--bad-txt); color: #fff; }
+    .cl-btn[disabled] { opacity: .55; cursor: default; }
+    .cl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .cl-live { display: none; flex-direction: column; gap: 10px; }
+    .cl-live.on { display: flex; }
+    .cl-state { font-family: var(--font-mono); font-size: 11px; color: var(--mut); display: flex; align-items: center; gap: 8px; }
+    .cl-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--hin); flex-shrink: 0; }
+    .cl-dot.listening { background: var(--ok-txt); }
+    .cl-dot.speaking { background: var(--yolk); animation: clPulse 1s ease-in-out infinite; }
+    .cl-dot.thinking { background: var(--pur, var(--yolk)); animation: clPulse .6s ease-in-out infinite; }
+    @keyframes clPulse { 50% { opacity: .35; } }
+    @media (prefers-reduced-motion: reduce) { .cl-dot { animation: none !important; } }
+    .cl-captions { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+    .cl-captions:empty::before { content: "The recruiter will greet you in a moment."; color: var(--hin); font-size: 12px; }
+    .cl-cap b { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-right: 6px; }
+    .cl-cap.user b { color: var(--yolk); }
+    .cl-code { font-family: var(--font-mono); font-size: 11px; background: var(--bg, var(--sur)); border: 1px solid var(--bdr); border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; word-break: break-all; color: var(--txt); margin: 0; }
+    .cl-key { font-family: var(--font-mono); font-size: 12px; word-break: break-all; background: var(--bg, var(--sur)); border: 1px dashed var(--yolk); border-radius: 10px; padding: 8px 10px; }
+    .cl-warn { font-size: 12px; color: var(--bad-txt); }
+    .cl-list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .cl-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); }
+    .cl-table-wrap { overflow-x: auto; border: 1px solid var(--bdr); border-radius: 14px; background: var(--sur); }
+    .cl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cl-table th, .cl-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--bdr); vertical-align: top; color: var(--txt); }
+    .cl-table th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); font-weight: 700; white-space: nowrap; }
+    .cl-table tr:last-child td { border-bottom: none; }
+    .cl-table td.nw { white-space: nowrap; }
+    .cl-table td.sum { min-width: 240px; color: var(--mut); line-height: 1.45; }
+    .cl-table tr.fresh td { animation: clFresh 2s ease-out; }
+    @keyframes clFresh { from { background: color-mix(in srgb, var(--yolk) 22%, transparent); } }
+    .cl-status { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; text-transform: capitalize; }
+    .cl-status.completed { color: var(--ok-txt); }
+    .cl-status.missed, .cl-status.voicemail { color: var(--mut); }
+    .cl-status.failed { color: var(--bad-txt); }
+    .cl-kind { font-family: var(--font-mono); font-size: 9.5px; border: 1px solid var(--bdr-strong); border-radius: 999px; padding: 1px 7px; margin-left: 6px; color: var(--mut); white-space: nowrap; }
+    .cl-link { background: none; border: none; padding: 0; color: var(--txt); text-decoration: underline; cursor: pointer; font: inherit; font-size: 11.5px; }
+    .cl-transcript { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--txt); }
+    .cl-empty { text-align: center; padding: 40px 16px; color: var(--mut); font-size: 13px; }
+    @media (max-width: 640px) {
+      .cl-table thead { display: none; }
+      .cl-table, .cl-table tbody, .cl-table tr, .cl-table td { display: block; width: 100%; }
+      .cl-table tr { border-bottom: 1px solid var(--bdr); padding: 10px 12px; }
+      .cl-table tr:last-child { border-bottom: none; }
+      .cl-table td { border: none; padding: 2px 0; }
+      .cl-table td.sum { min-width: 0; margin-top: 4px; }
+      .cl-table td[data-l]::before { content: attr(data-l) " "; font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--hin); }
+      .cl-table td.idc { display: none; }
+    }
+  </style>
+  <div class="board-header">
+    <h2 class="board-title">Calls</h2>
+  </div>
+  <div class="cl-wrap">
+    <p class="cl-intro">Practise a recruiter screening call out loud with an AI recruiter, and keep a log of your calls. Calls you add from curl or Postman show up here within a few seconds.</p>
+
+    <div class="cl-grid">
+      <section class="cl-card" aria-labelledby="cl-practice-h">
+        <h3 id="cl-practice-h">Practice recruiter screen</h3>
+        <p>A two-to-three minute voice call. The recruiter asks about your background, why this role and your notice period, and you can talk over it like a real call. When you hang up, the call is saved below with a summary and one tip.</p>
+        {% if practice_ready %}
+        <div class="cl-row" id="cl-setup">
+          <input type="text" id="cl-role" maxlength="80" placeholder="Role you're practising for" aria-label="Role you're practising for" value="{{ settings.designation or '' }}">
+          <button type="button" class="cl-btn" id="cl-start" onclick="startPracticeCall()">Start call</button>
+        </div>
+        <div class="cl-live" id="cl-live" aria-live="polite">
+          <div class="cl-row" style="justify-content:space-between;">
+            <span class="cl-state"><span class="cl-dot" id="cl-dot"></span><span id="cl-state-text">Connecting…</span> · <span id="cl-timer">0:00</span></span>
+            <span class="cl-row">
+              <button type="button" class="cl-btn ghost" id="cl-mute" onclick="togglePracticeMute()">Mute</button>
+              <button type="button" class="cl-btn stop" onclick="endPracticeCall()">Hang up</button>
+            </span>
+          </div>
+          <div class="cl-captions" id="cl-captions"></div>
+        </div>
+        <div class="cl-warn" id="cl-practice-err" role="alert"></div>
+        {% else %}
+        <p class="cl-warn">Practice calls need LiveKit. Set <code>LIVEKIT_URL</code>, <code>LIVEKIT_API_KEY</code> and <code>LIVEKIT_API_SECRET</code> on the server, and deploy the recruiter agent in <code>voice_agent/</code>.</p>
+        {% endif %}
+      </section>
+
+      <section class="cl-card" aria-labelledby="cl-api-h">
+        <h3 id="cl-api-h">Add calls from curl or Postman</h3>
+        <p>Make a personal API key, then send <code>POST /api/calls</code> with it in an <code>X-API-Key</code> header. Keep the key private: anyone with it can read and add to your call log.</p>
+        <div class="cl-row">
+          <span class="cl-meta" id="cl-key-status">{% if api_key_hint %}You have a key ending in …{{ api_key_hint }}{% else %}No key yet{% endif %}</span>
+        </div>
+        <div class="cl-key" id="cl-key" hidden></div>
+        <div class="cl-row">
+          <button type="button" class="cl-btn" id="cl-key-new" onclick="newCallsKey()">{% if api_key_hint %}Replace key{% else %}Make a key{% endif %}</button>
+          <button type="button" class="cl-btn ghost" id="cl-key-revoke" onclick="revokeCallsKey()" {% if not api_key_hint %}hidden{% endif %}>Turn off key</button>
+        </div>
+        <pre class="cl-code" id="cl-curl">curl -X POST {{ api_base }}/api/calls \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_KEY" \
+  -d '{"caller_name":"Priya at Acme","phone_number":"+91 98765 43210","status":"completed","duration_seconds":420,"summary":"Recruiter screen, next round Friday"}'</pre>
+        <p>Fields: <code>caller_name</code> and <code>phone_number</code> are required; <code>status</code> is completed, missed, voicemail or failed; <code>duration_seconds</code> and <code>summary</code> are optional. <code>GET /api/calls</code> with the same header lists your calls.</p>
+      </section>
+    </div>
+
+    <section aria-labelledby="cl-list-h" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="cl-list-head">
+        <div class="cs-kicker" id="cl-list-h" style="font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Call log</div>
+        <span class="cl-meta"><span id="cl-count">{{ calls|length }}</span> · updates every 5s</span>
+      </div>
+      <div id="cl-list"></div>
     </section>
   </div>
   {% elif view_mode == 'progress' %}
@@ -6674,6 +6797,279 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 </div>
+{% endif %}
+
+{% if view_mode == 'calls' %}
+<script>
+// ── Calls: live call log, personal API key, practice recruiter screen ──
+const CALLS = { items: {{ calls|tojson }}, seen: new Set(), open: new Set(), timer: null };
+CALLS.items.forEach(c => CALLS.seen.add(c.id));
+
+function clDuration(s) {
+  s = Math.max(0, Math.round(s || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function renderCalls() {
+  const box = document.getElementById('cl-list');
+  document.getElementById('cl-count').textContent = `${CALLS.items.length} call${CALLS.items.length === 1 ? '' : 's'}`;
+  if (!CALLS.items.length) {
+    box.innerHTML = '<div class="cl-table-wrap"><div class="cl-empty">No calls yet. Start a practice call, or add one with the curl command above.</div></div>';
+    return;
+  }
+  const rows = CALLS.items.map(c => {
+    const fresh = !CALLS.seen.has(c.id);
+    const kind = c.kind === 'practice' ? '<span class="cl-kind">practice</span>' : '';
+    const more = c.has_transcript
+      ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide transcript' : 'Show transcript'}</button></div><div class="cl-transcript" id="cl-tr-${c.id}"></div>`
+      : '';
+    return `<tr class="${fresh ? 'fresh' : ''}" data-id="${c.id}">
+      <td class="idc">${c.id}</td>
+      <td>${esc(c.caller_name)}${kind}</td>
+      <td class="nw" data-l="Phone">${esc(c.phone_number)}</td>
+      <td data-l="Status"><span class="cl-status ${esc(c.status)}">${esc(c.status)}</span></td>
+      <td class="nw" data-l="Length">${clDuration(c.duration_seconds)}</td>
+      <td class="sum">${esc(c.summary || '—')}${more}</td>
+      <td class="nw" data-l="When"><time class="local-time" data-fmt="ymd-hm" datetime="${esc(c.created_at)}">${esc((c.created_at || '').slice(0, 16).replace('T', ' '))}</time></td>
+    </tr>`;
+  }).join('');
+  box.innerHTML = `<div class="cl-table-wrap"><table class="cl-table"><thead><tr><th>#</th><th>Caller</th><th>Phone</th><th>Status</th><th>Length</th><th>Summary</th><th>When</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  CALLS.items.forEach(c => CALLS.seen.add(c.id));
+  formatLocalTimes(box);
+  CALLS.open.forEach(id => loadCallTranscript(id));
+}
+
+async function refreshCalls() {
+  if (document.hidden) return;
+  try {
+    const res = await fetch('/api/calls');
+    const data = await res.json();
+    if (!data.ok) return;
+    const before = JSON.stringify(CALLS.items);
+    CALLS.items = data.calls;
+    if (JSON.stringify(CALLS.items) !== before) renderCalls();
+  } catch (e) { /* offline for a moment; the next tick retries */ }
+}
+
+async function loadCallTranscript(id) {
+  const el = document.getElementById(`cl-tr-${id}`);
+  if (!el) return;
+  try {
+    const res = await fetch(`/api/calls/${id}`);
+    const data = await res.json();
+    if (!data.ok) return;
+    el.innerHTML = (data.call.transcript || []).map(t =>
+      `<div class="cl-cap ${t.role === 'user' ? 'user' : ''}"><b>${t.role === 'user' ? 'You' : 'Recruiter'}</b>${esc(t.text)}</div>`).join('');
+  } catch (e) {}
+}
+
+function toggleCallTranscript(id) {
+  if (CALLS.open.has(id)) CALLS.open.delete(id); else CALLS.open.add(id);
+  renderCalls();
+}
+
+// ── Personal API key ──
+function showCallsKey(key, hint) {
+  const box = document.getElementById('cl-key');
+  box.hidden = !key;
+  box.textContent = key ? `${key}\n\nCopy it now. It won't be shown again.` : '';
+  box.style.whiteSpace = 'pre-wrap';
+  document.getElementById('cl-key-status').textContent = hint ? `You have a key ending in …${hint}` : 'No key yet';
+  document.getElementById('cl-key-new').textContent = hint ? 'Replace key' : 'Make a key';
+  document.getElementById('cl-key-revoke').hidden = !hint;
+  const curl = document.getElementById('cl-curl');
+  curl.textContent = curl.textContent.replace(/X-API-Key: [^"]*/, `X-API-Key: ${key || 'YOUR_KEY'}`);
+}
+
+async function newCallsKey() {
+  const btn = document.getElementById('cl-key-new');
+  if (btn.textContent.startsWith('Replace') && !confirmReplaceKey()) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/calls/api-key', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not make a key');
+    showCallsKey(data.api_key, data.hint);
+  } catch (e) { toast(e.message); }
+  btn.disabled = false;
+}
+
+// Replacing a key breaks anything using the old one; the second click confirms.
+let clReplaceArmed = 0;
+function confirmReplaceKey() {
+  if (Date.now() - clReplaceArmed < 4000) return true;
+  clReplaceArmed = Date.now();
+  toast('The old key will stop working. Click again to replace it.');
+  return false;
+}
+
+async function revokeCallsKey() {
+  try {
+    const res = await fetch('/api/calls/api-key/revoke', { method: 'POST' });
+    if (!(await res.json()).ok) throw new Error();
+    showCallsKey('', '');
+    toast('Key turned off');
+  } catch (e) { toast('Could not turn the key off. Try again.'); }
+}
+
+// ── Practice recruiter screen (LiveKit) ──
+const LK_CLIENT_SRC = 'https://cdn.jsdelivr.net/npm/livekit-client@2.15.3/dist/livekit-client.umd.min.js';
+const PRACTICE = { room: null, name: '', role: '', started: 0, tick: null, segments: new Map(), order: [], muted: false, ending: false };
+
+function loadLiveKitClient() {
+  if (window.LivekitClient) return Promise.resolve(window.LivekitClient);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = LK_CLIENT_SRC;
+    s.onload = () => window.LivekitClient ? resolve(window.LivekitClient) : reject(new Error('LiveKit did not load'));
+    s.onerror = () => reject(new Error("Couldn't load the call library. Check your connection."));
+    document.head.appendChild(s);
+  });
+}
+
+function practiceState(state, text) {
+  document.getElementById('cl-dot').className = `cl-dot ${state}`;
+  document.getElementById('cl-state-text').textContent = text;
+}
+
+function practiceError(msg) {
+  document.getElementById('cl-practice-err').textContent = msg || '';
+}
+
+function renderCaptions() {
+  const box = document.getElementById('cl-captions');
+  box.innerHTML = PRACTICE.order.map(id => {
+    const seg = PRACTICE.segments.get(id);
+    return `<div class="cl-cap ${seg.role}"><b>${seg.role === 'user' ? 'You' : 'Recruiter'}</b>${esc(seg.text)}</div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function startPracticeCall() {
+  const btn = document.getElementById('cl-start');
+  practiceError('');
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+  try {
+    const role = document.getElementById('cl-role').value.trim();
+    const [LK, res] = await Promise.all([
+      loadLiveKitClient(),
+      fetch('/api/calls/practice/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }),
+    ]);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not start the call');
+
+    const room = new LK.Room({ adaptiveStream: true, dynacast: true });
+    Object.assign(PRACTICE, { room, name: data.room, role: data.role || role, segments: new Map(), order: [], muted: false, ending: false });
+
+    // Live captions. The agent sends each transcript segment on the lk.transcription text stream:
+    // the recruiter's words as they're spoken, and yours as the speech-to-text hears them.
+    room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
+      const attrs = reader.info.attributes || {};
+      const id = attrs['lk.segment_id'] || reader.info.id;
+      const role = participant.identity === room.localParticipant.identity ? 'user' : 'agent';
+      if (!PRACTICE.segments.has(id)) { PRACTICE.segments.set(id, { role, text: '' }); PRACTICE.order.push(id); }
+      let text = '';
+      for await (const chunk of reader) {
+        text += chunk;
+        PRACTICE.segments.get(id).text = text;
+        renderCaptions();
+      }
+    });
+
+    room.on(LK.RoomEvent.TrackSubscribed, track => {
+      if (track.kind === 'audio') {
+        const el = track.attach();
+        el.dataset.practice = '1';
+        document.body.appendChild(el);
+      }
+    });
+    room.on(LK.RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
+      if (participant.isLocal || !('lk.agent.state' in changed)) return;
+      const st = changed['lk.agent.state'];
+      if (st === 'speaking') practiceState('speaking', 'Recruiter is speaking');
+      else if (st === 'thinking') practiceState('thinking', 'Thinking…');
+      else if (st === 'listening') practiceState('listening', PRACTICE.muted ? 'You are muted' : 'Listening');
+      else practiceState('', 'Waiting for the recruiter…');
+    });
+    room.on(LK.RoomEvent.Disconnected, () => { if (!PRACTICE.ending) endPracticeCall(); });
+
+    document.getElementById('cl-setup').style.display = 'none';
+    document.getElementById('cl-live').classList.add('on');
+    renderCaptions();
+    practiceState('', 'Waiting for the recruiter…');
+
+    await room.connect(data.url, data.token);
+    await room.localParticipant.setMicrophoneEnabled(true);
+    PRACTICE.started = Date.now();
+    PRACTICE.tick = setInterval(() => {
+      document.getElementById('cl-timer').textContent = clDuration((Date.now() - PRACTICE.started) / 1000);
+    }, 500);
+  } catch (e) {
+    const denied = e && (e.name === 'NotAllowedError' || /permission/i.test(e.message || ''));
+    practiceError(denied ? 'Allow microphone access for this site, then try again.' : (e.message || 'Could not start the call'));
+    await teardownPractice();
+    resetPracticeUi();
+  }
+}
+
+function togglePracticeMute() {
+  if (!PRACTICE.room) return;
+  PRACTICE.muted = !PRACTICE.muted;
+  PRACTICE.room.localParticipant.setMicrophoneEnabled(!PRACTICE.muted);
+  document.getElementById('cl-mute').textContent = PRACTICE.muted ? 'Unmute' : 'Mute';
+  if (PRACTICE.muted) practiceState('', 'You are muted');
+}
+
+async function teardownPractice() {
+  clearInterval(PRACTICE.tick);
+  PRACTICE.tick = null;
+  const room = PRACTICE.room;
+  PRACTICE.room = null;
+  if (room) { try { await room.disconnect(); } catch (e) {} }
+  document.querySelectorAll('audio[data-practice]').forEach(el => el.remove());
+}
+
+function resetPracticeUi() {
+  const btn = document.getElementById('cl-start');
+  btn.disabled = false;
+  btn.textContent = 'Start call';
+  document.getElementById('cl-setup').style.display = '';
+  document.getElementById('cl-live').classList.remove('on');
+  document.getElementById('cl-timer').textContent = '0:00';
+  document.getElementById('cl-mute').textContent = 'Mute';
+}
+
+async function endPracticeCall() {
+  if (PRACTICE.ending) return;
+  PRACTICE.ending = true;
+  const duration = PRACTICE.started ? Math.round((Date.now() - PRACTICE.started) / 1000) : 0;
+  const transcript = PRACTICE.order.map(id => PRACTICE.segments.get(id)).filter(s => s.text.trim());
+  const name = PRACTICE.name;
+  PRACTICE.started = 0;
+  await teardownPractice();
+  resetPracticeUi();
+  if (!name) return;
+  try {
+    const res = await fetch('/api/calls/practice/end', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: name, duration_seconds: duration, transcript, role: PRACTICE.role }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    toast('Call saved. The summary appears in a few seconds.');
+    refreshCalls();
+  } catch (e) { practiceError("The call ended but couldn't be saved."); }
+}
+
+window.addEventListener('pagehide', () => { if (PRACTICE.room) PRACTICE.room.disconnect(); });
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderCalls();
+  CALLS.timer = setInterval(refreshCalls, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCalls(); });
+});
+</script>
 {% endif %}
 
 {% if view_mode == 'career' %}
