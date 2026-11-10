@@ -2721,6 +2721,7 @@ const VA = {
   listening: false,
   mode: null,              // 'server' (record + Gemini) or 'browser' (Web Speech API)
   serverVoice: false,
+  serverTts: false,   // the server can speak (LiveKit or Gemini), separate from transcribing
   recognition: null,
   recorder: null,
   stream: null,
@@ -2960,6 +2961,7 @@ function loadAssistantWelcome(first) {
       if (!res || !res.ok) return;
       VA.welcome = res;
       VA.serverVoice = !!res.server_voice;
+      VA.serverTts = res.server_tts === undefined ? VA.serverVoice : !!res.server_tts;
       renderStarter();
       setDigestBadge(res.digest_count);
       if (first) scheduleAssistantHint();
@@ -3612,9 +3614,9 @@ function speakResponse(text, onDone) {
   const myToken = ++VA.speakToken;
   if (!VA.speechOn || !text) { setAssistantStatus('ready'); onDone && onDone(); return; }
   setAssistantStatus('speaking');
-  if (!VA.serverVoice) { VA.voiceSource = 'browser'; updateVoiceToggleUI(); vaVoiceNote('nokey'); speakWithBrowser(text, done, myToken); return; }
+  if (!VA.serverTts) { VA.voiceSource = 'browser'; updateVoiceToggleUI(); vaVoiceNote('nokey'); speakWithBrowser(text, done, myToken); return; }
 
-  // Gemini's voice sounds nicer but can be slow. If it isn't back quickly and the browser has a
+  // The server voice (LiveKit, else Gemini) sounds nicer but can be slow. If it isn't back quickly and the browser has a
   // voice of its own, that answers instead. Without one, we wait longer for Gemini rather than
   // staying silent.
   let settled = false;
@@ -3650,7 +3652,7 @@ function speakResponse(text, onDone) {
     }
     settled = true;
     clearTimeout(timer);
-    VA.voiceSource = 'gemini';
+    VA.voiceSource = data.provider === 'livekit' ? 'livekit' : 'gemini';
     updateVoiceToggleUI();
     vaPlayAudio('data:audio/wav;base64,' + data.audio_base64, done, myToken, () => { settled = false; fallback(); });
   })
@@ -3746,6 +3748,7 @@ function pickBrowserVoice(voices, lang, avoid) {
 }
 
 function vaVoiceLabel() {
+  if (VA.voiceSource === 'livekit') return vaT("Sunny's natural voice (LiveKit)", 'Sunny की नैचुरल आवाज़ (LiveKit)');
   if (VA.voiceSource === 'gemini') return vaT("Sunny's natural voice (Gemini)", 'Sunny की नैचुरल आवाज़ (Gemini)');
   if (VA.voiceSource === 'browser') return vaT("your browser's voice", 'आपके ब्राउज़र की आवाज़');
   return '';
