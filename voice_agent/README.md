@@ -44,6 +44,30 @@ Leave it running and start a practice call on the Calls page. The live site disp
 
 You can also talk to it in a terminal with `python agent.py console`.
 
+## Phone practice (LiveKit SIP)
+
+The same recruiter can take a real phone call, two ways. Both log the call on the Calls page when it ends: the agent posts the transcript to the website, signed with a shared secret.
+
+**1. Shared secret (needed for both).** Make a long random string (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) and set it as `SUNNY_AGENT_SECRET` on Render and on the agent (`lk agent update-secrets --secrets SUNNY_AGENT_SECRET=... --secrets SUNNY_SITE_URL=https://pm-job-hunter-qfva.onrender.com`).
+
+**2a. Dial in.** In LiveKit Cloud, open Telephony, buy a phone number, then create a dispatch rule for it:
+
+```json
+{
+  "dispatch_rule": {
+    "name": "Sunny-Side practice line",
+    "rule": { "dispatchRuleIndividual": { "roomPrefix": "phone-in-" } },
+    "roomConfig": { "agents": [{ "agentName": "sunny-screener" }] }
+  }
+}
+```
+
+(`lk sip dispatch create rule.json` does the same from the CLI.) Set `LIVEKIT_SIP_NUMBER` on Render to the number as you want it shown. On the Calls page, **Get my code** gives a six-digit code that works once for ten minutes; the caller types it on the keypad or says it, and gets three tries per call. The room prefix matters: the agent treats `phone-in-` rooms as dial-in calls.
+
+**2b. Call me.** Create an outbound trunk with a SIP provider that can call your country (Twilio, Telnyx, Plivo and Exotel all work with LiveKit; LiveKit's own numbers are US only), then `lk sip outbound create trunk.json`. Set the trunk id (`ST_...`) as `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` on Render. The user types their number on the Calls page, the server starts a room with the agent, and the agent rings them. It's limited to three calls an hour per user and to the country codes in `PHONE_PRACTICE_COUNTRIES` (default `+91,+1,+44`), because every call costs money.
+
+On a phone call the agent uses LiveKit's telephony noise cancellation and can hang up after saying goodbye.
+
 ## Settings to experiment with
 
 Change one at a time, restart, have the same short conversation, and write what happened in [`EXPERIMENTS.md`](EXPERIMENTS.md). The agent logs the active settings at the start of each call.

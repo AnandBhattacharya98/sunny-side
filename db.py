@@ -362,6 +362,17 @@ def migrate_db(conn) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_calls_user_created ON calls (user_id, created_at)")
     conn.commit()
+    # Phone practice (phone_practice.py): one-time codes a caller types to say who they are
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phone_codes (
+            code_hash TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            role TEXT,
+            company TEXT,
+            expires_at TEXT NOT NULL
+        );
+    """)
+    conn.commit()
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
     for col in ("calls_api_key_hash", "calls_api_key_hint"):
         if col not in user_cols:
@@ -601,6 +612,7 @@ def delete_user_data(conn, user_id: int) -> None:
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM user_company_boards WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM calls WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM phone_codes WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
 
