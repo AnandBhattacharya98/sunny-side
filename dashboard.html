@@ -606,6 +606,7 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .va-mic.pulse::after, .va-mic.listening::after { content: ""; position: absolute; inset: -6px; border-radius: 50%;
   border: 2px solid var(--yolk); animation: vaRing 1.6s ease-out infinite; }
 .va-mic.listening::after { border-color: var(--rd); }
+.va-mic.convo:not(.listening) { box-shadow: 0 0 0 3px var(--rd) inset; }
 #voice-text-input { flex: 1; border: 1px solid var(--bdr-strong); border-radius: 999px; padding: 11px 16px; font-size: 13.5px;
   color: var(--txt); background: var(--bg); outline: none; min-width: 0; }
 #voice-text-input:focus { border-color: var(--yolk); }
@@ -3107,7 +3108,54 @@ function toggleVoiceSpeech() {
 function toggleVoiceAssistant() {
   if (!VA.ready) return;
   if (document.body.classList.contains('va-panel-open')) closeVoiceAssistant();
-  else openVoiceAssistant();
+  else { VA.convoOnOpen = true; openVoiceAssistant(); }
+}
+
+// ── Conversation mode ──
+// Talking to Sunny is a back-and-forth: once you've spoken (or opened the panel with the mic
+// allowed), the mic reopens by itself after each spoken reply. It pauses when you tap the mic,
+// type, close the panel, say goodbye, or stay quiet twice in a row.
+const VA_BYE = /^(stop|stop listening|that's all|that is all|that's it|bye|bye bye|goodbye|good bye|thanks bye|thank you bye|ok bye|okay bye|see you|i'm done|im done|we're done|बस|बाय|अलविदा|बस इतना ही|रुको|बंद करो|ठीक है बाय)$/u;
+
+function vaConvoStart() {
+  VA.convo = true;
+  VA.convoMisses = 0;
+  updateConvoUI();
+}
+
+function vaConvoEnd(note) {
+  if (!VA.convo) return;
+  VA.convo = false;
+  updateConvoUI();
+  if (note) addAssistantNote(note);
+}
+
+function updateConvoUI() {
+  const mic = document.getElementById('voice-action-mic');
+  if (mic) mic.classList.toggle('convo', !!VA.convo);
+  const input = document.getElementById('voice-text-input');
+  if (input && !VA.listening) input.placeholder = VA.convo ? vaT("Just talk, I'm listening between replies", 'बस बोलिए, मैं हर जवाब के बाद सुनूँगी') : vaT('Ask me anything, or tap the mic', 'कुछ भी पूछें, या माइक टैप करें');
+}
+
+// After Sunny finishes a spoken reply: listen again if we're mid-conversation
+function vaConvoContinue() {
+  if (!VA.convo || VA.listening || !document.body.classList.contains('va-panel-open')) return;
+  if (vaGet('localStorage', 'mic_consent_accepted') !== 'true') return;
+  setTimeout(() => {
+    if (VA.convo && !VA.listening && document.body.classList.contains('va-panel-open') && document.getElementById('va-status')?.dataset.state !== 'speaking') startListening();
+  }, 250);
+}
+
+// Nothing was heard: try once more quietly, then pause the conversation
+function vaConvoMissed() {
+  if (!VA.convo) return false;
+  VA.convoMisses = (VA.convoMisses || 0) + 1;
+  if (VA.convoMisses >= 2) {
+    vaConvoEnd(vaT("I'll stop listening for now. Tap the mic whenever you want to talk again.", 'अभी के लिए सुनना रोक रही हूँ। जब बात करनी हो, माइक टैप कर दीजिए।'));
+    return true;
+  }
+  vaConvoContinue();
+  return true;
 }
 
 function openVoiceAssistant() {
@@ -3138,10 +3186,18 @@ function openVoiceAssistant() {
       return;
     }
   }
+  const startConvo = VA.convoOnOpen && vaGet('localStorage', 'mic_consent_accepted') === 'true';
+  VA.convoOnOpen = false;
+  if (startConvo) vaConvoStart();
   if (!VA.messages.length && !vaGet('sessionStorage', 'va_said_hi')) {
     vaSet('sessionStorage', 'va_said_hi', '1');
     vaUnlockAudio();
-    speakResponse(vaT("Hi! I'm Sunny. Tap the mic and ask me anything.", 'नमस्ते! मैं Sunny हूँ। माइक टैप करें और कुछ भी पूछें।'));
+    speakResponse(startConvo
+      ? vaT("Hi! I'm Sunny. What can I help you with?", 'नमस्ते! मैं Sunny हूँ। बताइए, क्या मदद करूँ?')
+      : vaT("Hi! I'm Sunny. Tap the mic once and we can just talk.", 'नमस्ते! मैं Sunny हूँ। एक बार माइक टैप करें, फिर हम बस बात करेंगे।'), vaConvoContinue);
+  } else if (startConvo) {
+    vaUnlockAudio();
+    vaConvoContinue();
   }
   scheduleIdleNudge();
   if (window.matchMedia('(min-width: 769px)').matches) {
@@ -3150,6 +3206,7 @@ function openVoiceAssistant() {
 }
 
 function closeVoiceAssistant() {
+  VA.convo = false;
   stopSpeaking();
   cancelListening();
   clearTimeout(VA.nudgeTimer);
@@ -3207,12 +3264,14 @@ function setAssistantStatus(state, label) {
 // ── Listening ──
 function toggleVoiceListening() {
   hideNudge();
-  if (VA.listening) { stopListening(); return; }
+  if (VA.listening) { vaConvoEnd(); cancelListening(); return; }
+  if (VA.convo && document.getElementById('va-status')?.dataset.state === 'speaking') { vaConvoEnd(); stopSpeaking(); return; }
   if (vaGet('localStorage', 'mic_consent_accepted') !== 'true') {
     document.getElementById('mic-consent-modal').style.display = 'flex';
     return;
   }
   if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
+  vaConvoStart();
   startListening();
 }
 
@@ -3221,6 +3280,7 @@ function acceptMicConsent() {
   document.getElementById('mic-consent-modal').style.display = 'none';
   if (VA.afterConsent) { const next = VA.afterConsent; VA.afterConsent = null; next(); return; }
   if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
+  vaConvoStart();
   startListening();
 }
 
@@ -3418,6 +3478,7 @@ async function vaToWav16k(blob) {
 
 async function submitRecording(blob) {
   if (!VA.heardSpeech || blob.size < 1500) {
+    if (vaConvoMissed()) { setAssistantStatus('ready'); return; }
     addAssistantNote(vaT("I didn't catch anything that time. Tap the mic and try again?", 'इस बार मुझे कुछ सुनाई नहीं दिया। माइक टैप करके फिर से कोशिश करें?'));
     return;
   }
@@ -3431,6 +3492,7 @@ async function submitRecording(blob) {
       return;
     }
     if (data.ok) {
+      if (vaConvoMissed()) { setAssistantStatus('ready'); return; }
       addAssistantNote(vaT("Hmm, I couldn't make that out. Mind saying it again?", 'मैं समझ नहीं पाई। एक बार फिर बोलेंगे?'));
       return;
     }
@@ -3467,6 +3529,7 @@ function startBrowserRecognition(SpeechRecognition) {
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
       toast(vaT('I need microphone access to hear you. You can allow it in your browser settings, or type instead.', 'आपको सुनने के लिए मुझे माइक्रोफ़ोन की अनुमति चाहिए। ब्राउज़र सेटिंग्स में अनुमति दें, या टाइप करें।'));
     } else if (event.error === 'no-speech') {
+      if (vaConvoMissed()) return;
       addAssistantNote(vaT("I didn't hear anything. Tap the mic and try again?", 'मुझे कुछ सुनाई नहीं दिया। माइक टैप करके फिर कोशिश करें?'));
     } else if (event.error !== 'aborted') {
       console.error('Speech recognition error:', event.error);
@@ -3504,6 +3567,7 @@ function sendTextInput() {
   const text = input.value.trim();
   if (!text) { toggleVoiceListening(); return; }
   input.value = '';
+  vaConvoEnd();
   handleUserText(text, false);
 }
 
@@ -3513,6 +3577,16 @@ function handleUserText(text, spoken) {
   hideNudge();
   clearTimeout(VA.nudgeTimer);
   VA.lastInputSpoken = spoken;
+  if (spoken) VA.convoMisses = 0;
+  if (spoken && VA.convo && VA_BYE.test(quizCommandText(text))) {
+    addMessageBubble(text, 'user', spoken);
+    VA.convo = false;
+    updateConvoUI();
+    const bye = vaT('Okay! Tap me whenever you want to talk again.', 'ठीक है! जब बात करनी हो, मुझे टैप कर दीजिए।');
+    addMessageBubble(bye, 'assistant');
+    speakResponse(bye);
+    return;
+  }
   addMessageBubble(text, 'user', spoken);
 
   if (VA.pendingToken) {
@@ -3572,6 +3646,7 @@ function handleAssistantReply(res) {
   speakResponse(res.reply_text, () => {
     if (res.celebrate) celebrateSunny();
     if (listenAfter && VA.pendingToken && !VA.listening) startListening();
+    else vaConvoContinue();
   });
 
   if (res.action && res.action.type === 'open_quiz' && res.action.job_id) openQuizFor(res.action.job_id);
@@ -6000,11 +6075,14 @@ const QZ_NEXT = /^(next|next one|next question|skip|skip it|pass|move on|अग�
 const QZ_REPEAT = /^(repeat|repeat that|repeat the question|say (it|that) again|again please|what was the question|दोबारा|दोबारा बोलो|फिर से बोलो|மீண்டும் சொல்லு|మళ్ళీ చెప్పు|আবার বলো|पुन्हा सांग|ಮತ್ತೆ ಹೇಳಿ|repite|repítelo|repite la pregunta|répète|répétez|répète la question|wiederholen|wiederhole die frage|كرر|أعد السؤال)$/u;
 const QZ_STOP = /^(stop|stop practice|end practice|exit|quit|बंद करो|रुको|खत्म करो|நிறுத்து|ఆపు|থামো|থামাও|थांबा|ನಿಲ್ಲಿಸು|parar|detener|salir|arrête|arrêter|stopp|beenden|aufhören|توقف)$/u;
 const QZ_RETRY = /^(try again|again|retry|let me try again|redo|फिर से कोशिश|दोबारा कोशिश|மீண்டும் முயற்சி|మళ్ళీ ప్రయత్నిస్తా|আবার চেষ্টা|पुन्हा प्रयत्न|ಮತ್ತೆ ಪ್ರಯತ್ನಿಸು|otra vez|intentar de nuevo|réessayer|encore|nochmal|noch einmal|حاول مرة أخرى)$/u;
-// "done" alone, or a clear sign-off at the end ("...and that's my answer"), sends the answer
-const QZ_DONE_LONG = "that's my answer|that is my answer|i'm done|i am done|i'm finished|बस इतना ही|मेरा जवाब हो गया|இதுதான் என் பதில்|ఇదే నా సమాధానం|এটাই আমার উত্তর|हेच माझं उत्तर|ಇದೇ ನನ್ನ ಉತ್ತರ|esa es mi respuesta|he terminado|c'est ma réponse|j'ai fini|das ist meine antwort|ich bin fertig|هذه إجابتي";
-const QZ_DONE_SHORT = 'done|submit|send it|बस|हो गया|முடிந்தது|అయిపోయింది|হয়ে গেছে|শেষ|झालं|झाले|ಮುಗಿಯಿತು|listo|terminé|fini|fertig|انتهيت';
-const QZ_DONE = new RegExp(`(^(${QZ_DONE_SHORT})$)|((${QZ_DONE_LONG})$)`, 'u');
-const QZ_DONE_STRIP = new RegExp(`[\\s.,!?।،؟]*(${QZ_DONE_LONG}|${QZ_DONE_SHORT})[\\s.!?।؟]*$`, 'iu');
+// After feedback Sunny just talks with you: a short reply that mentions next / again / repeat / stop
+// anywhere ("okay, let's move on") is understood, and anything longer is taken as a fresh answer.
+const qzLoose = (re) => new RegExp(re.source.replace(/^\^/, '(?:^|\\s)').replace(/\$$/, '(?:\\s|$)'), 'u');
+const QZ_NEXT_LOOSE = qzLoose(QZ_NEXT), QZ_REPEAT_LOOSE = qzLoose(QZ_REPEAT);
+const QZ_STOP_LOOSE = qzLoose(QZ_STOP), QZ_RETRY_LOOSE = qzLoose(QZ_RETRY);
+const QZ_MOVE_ON = /(?:^|\s)(move on|go on|go ahead|keep going|continue|let's go|lets go|next please|चलो|आगे बढ़ो)(?:\s|$)/u;
+const QZ_ANSWER_WORDS = 7;  // a reply this long is an answer, not a command
+const QZ_PAUSE_MS = 2500;   // a natural pause this long sends the answer
 
 function quizHandsFree() { return !!QZ_SR && vaGet('localStorage', 'qz_handsfree') !== 'false'; }
 
@@ -6064,14 +6142,22 @@ function quizListen(jobId, mode, auto) {
       if (QZ_STOP.test(cmd)) { finish(() => endPractice(jobId)); return; }
       if (QZ_REPEAT.test(cmd)) { finish(() => quizSpeakQuestion(jobId)); return; }
       if (mode === 'command') {
-        if (QZ_RETRY.test(cmd)) { finish(() => { quizRetry(jobId); quizListen(jobId, 'answer', true); }); return; }
-        continue;  // chatter while waiting for a command is ignored
-      }
-      if (QZ_DONE.test(cmd) && (base + finalText + chunk.replace(QZ_DONE_STRIP, '')).trim()) {
-        finalText += chunk.replace(QZ_DONE_STRIP, ' ');
-        if (box) box.value = (base + finalText).replace(/\s+/g, ' ').trim();
-        finish(() => quizSubmit(jobId));
-        return;
+        const words = cmd.split(' ').filter(Boolean).length;
+        if (words >= QZ_ANSWER_WORDS) {  // they just started answering again
+          finish(() => { quizRetry(jobId); if (box) box.value = chunk.trim(); quizListen(jobId, 'answer', true); });
+          return;
+        }
+        if (QZ_STOP_LOOSE.test(cmd)) { finish(() => endPractice(jobId)); return; }
+        if (QZ_REPEAT_LOOSE.test(cmd)) { finish(() => quizSpeakQuestion(jobId)); return; }
+        if (QZ_RETRY_LOOSE.test(cmd)) { finish(() => { quizRetry(jobId); quizListen(jobId, 'answer', true); }); return; }
+        if (QZ_NEXT_LOOSE.test(cmd) || QZ_MOVE_ON.test(cmd)) { finish(() => quizNext(jobId)); return; }
+        if (!st.clarified) {  // something short we didn't catch: ask once, like a person would
+          st.clarified = true;
+          finish(() => speakResponse(vaT('Sorry, did you want to try that one again, or move on to the next question?', 'माफ़ कीजिए, क्या आप फिर से कोशिश करना चाहेंगे, या अगले सवाल पर चलें?'),
+            () => quizListen(jobId, 'command', true)));
+          return;
+        }
+        continue;
       }
       finalText += chunk + ' ';
     }
@@ -6079,7 +6165,7 @@ function quizListen(jobId, mode, auto) {
     // Hands-free: a long pause after you've said something sends the answer
     clearTimeout(pauseTimer);
     if (mode === 'answer' && quizHandsFree() && (base + finalText).trim() && !interim) {
-      pauseTimer = setTimeout(() => { if (st.rec === rec) finish(() => quizSubmit(jobId)); }, 5000);
+      pauseTimer = setTimeout(() => { if (st.rec === rec) finish(() => quizSubmit(jobId)); }, QZ_PAUSE_MS);
     }
   };
   rec.onerror = (event) => {
@@ -6091,7 +6177,7 @@ function quizListen(jobId, mode, auto) {
   st.rec = rec;
   st.mode = mode;
   try { rec.start(); quizMicUI(jobId, true, mode); } catch (e) { st.rec = null; }
-  if (mode === 'command') setTimeout(() => { if (st.rec === rec) quizStopMic(jobId); }, 15000);
+  if (mode === 'command') setTimeout(() => { if (st.rec === rec) quizStopMic(jobId); }, 20000);
 }
 
 async function quizRecord(jobId) {
@@ -6138,8 +6224,8 @@ function quizMicUI(jobId, on, mode) {
   if (label) label.textContent = on ? vaT('Stop', 'रोकें') : vaT('Answer out loud', 'बोलकर जवाब दें');
   const say = el?.querySelector('.qz-say');
   if (say) say.textContent = on && mode === 'command'
-    ? vaT('Listening… say "next", "try again" or "stop"', 'सुन रही हूँ… "अगला", "फिर से कोशिश" या "रुको" बोलें')
-    : on ? vaT('Listening… pause for a few seconds or say "done" to send', 'सुन रही हूँ… भेजने के लिए कुछ सेकंड रुकें या "हो गया" बोलें') : '';
+    ? vaT("I'm listening. Tell me if you want another go or the next question.", 'सुन रही हूँ। बताइए, फिर से कोशिश करनी है या अगला सवाल?')
+    : on ? vaT("I'm listening. Take your time; I'll pick it up when you pause.", 'सुन रही हूँ। आराम से बोलिए, आप रुकेंगे तो मैं समझ जाऊँगी।') : '';
   clearInterval(st.timer);
   if (on) {
     const started = Date.now();
@@ -6203,6 +6289,7 @@ async function quizSubmit(jobId) {
     </div>
     ${res.strengths && res.strengths.length ? `<div><div class="qz-label">${vaT('What worked', 'क्या अच्छा रहा')}</div>${list(res.strengths)}</div>` : ''}
     ${res.improve && res.improve.length ? `<div><div class="qz-label">${vaT('To sharpen', 'क्या सुधारें')}</div>${list(res.improve)}</div>` : ''}
+    ${res.resume_example ? `<div><div class="qz-label">${vaT('Use this from your resume', 'अपने रेज़्यूमे से यह इस्तेमाल करें')}</div><div class="qz-better">${esc(res.resume_example)}</div></div>` : ''}
     ${res.better_answer ? `<div><div class="qz-label">${res.source === 'ai' ? vaT('A stronger answer', 'बेहतर जवाब') : vaT('What a strong answer covers', 'एक मज़बूत जवाब में क्या होता है')}</div><div class="qz-better">${esc(res.better_answer)}</div></div>` : ''}
     <div class="qz-actions">
       <button class="qz-btn" type="button" onclick="quizRetry(${a})">${vaT('Try again', 'फिर से कोशिश करें')}</button>
@@ -6210,10 +6297,10 @@ async function quizSubmit(jobId) {
       <button class="qz-btn primary" type="button" onclick="quizNext(${a})">${last ? vaT('See how I did', 'मेरा नतीजा देखें') : vaT('Next question →', 'अगला सवाल →')}</button>
     </div>`;
   if (res.score >= 4) celebrateSunny();
-  const tip = res.improve && res.improve[0] ? ' ' + res.improve[0] : '';
   const token = st.token = (st.token || 0) + 1;
-  const prompt = quizHandsFree() ? ' ' + (last ? vaT('Say next to see how you did.', 'नतीजा देखने के लिए "अगला" बोलें।') : vaT('Say next, or try again.', '"अगला" बोलें, या "फिर से कोशिश"।')) : '';
-  speakResponse(res.verdict + tip + prompt, () => { if (token === st.token && quizHandsFree()) quizListen(jobId, 'command', true); });
+  st.clarified = false;
+  const spoken = res.spoken || [res.verdict, ...(res.improve || []).slice(0, 2)].filter(Boolean).join(' ');
+  speakResponse(spoken, () => { if (token === st.token && quizHandsFree()) quizListen(jobId, 'command', true); });
 }
 
 function quizRetry(jobId) {

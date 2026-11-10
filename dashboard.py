@@ -1738,10 +1738,13 @@ def interview_prep_feedback(job_id):
         if not job:
             return jsonify({"ok": False, "error": "Job not found"}), 404
         api_key = _voice_api_key(conn, uid)
+        row = conn.execute("SELECT resume_text FROM users WHERE id = ?", (uid,)).fetchone()
+        resume = (row[0] if row else "") or ""
     finally:
         conn.close()
     result = quiz_coach.grade_answer(question, d.get("hints") or "", d.get("answer") or "",
-                                     title=job[0] or "", company=job[1] or "", api_key=api_key, lang=g.voice_lang)
+                                     title=job[0] or "", company=job[1] or "", api_key=api_key, lang=g.voice_lang,
+                                     resume=resume)
     return jsonify({"ok": True, "lang": g.voice_lang, **result})
 
 
@@ -2848,7 +2851,8 @@ def _spoken_time(value, lang="en", tz=None):
 
 # Replies are written in English and Hindi. For any other language Sunny supports, the JSON
 # a voice or quiz route returns is translated on its way out, in one Gemini call.
-_TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer", "interview_reminder")
+_TRANSLATED_FIELDS = ("reply_text", "error", "greeting", "verdict", "better_answer", "interview_reminder",
+                      "spoken", "resume_example")
 _TRANSLATED_LISTS = ("suggestions", "strengths", "improve")
 
 
