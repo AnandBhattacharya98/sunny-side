@@ -1,0 +1,17 @@
+{
+  "name": "sunny-anim-bundle",
+  "private": true,
+  "description": "Builds static/vendor/sunny-anim.min.js, the one animation file the site loads.",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --minify --format=iife --target=es2019 --legal-comments=inline --outfile=../../static/vendor/sunny-anim.min.js && cp node_modules/lenis/dist/lenis.min.js ../../static/vendor/lenis.min.js"
+  },
+  "dependencies": {
+    "@formkit/auto-animate": "0.10.2",
+    "animejs": "4.5.0",
+    "canvas-confetti": "1.9.4",
+    "lenis": "1.3.27"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
