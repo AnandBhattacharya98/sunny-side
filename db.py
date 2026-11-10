@@ -362,6 +362,12 @@ def migrate_db(conn) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_calls_user_created ON calls (user_id, created_at)")
     conn.commit()
+    # Mock interviews (interview.py): the scored report, and which job a call was about
+    call_cols = [row[1] for row in conn.execute("PRAGMA table_info(calls)").fetchall()]
+    for col in ("report", "job_id"):
+        if col not in call_cols:
+            conn.execute(f"ALTER TABLE calls ADD COLUMN {col} TEXT;")
+            conn.commit()
     # Phone practice (phone_practice.py): one-time codes a caller types to say who they are
     conn.execute("""
         CREATE TABLE IF NOT EXISTS phone_codes (

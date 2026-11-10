@@ -12,6 +12,7 @@ import followups
 import jobmeta
 import progress
 import calls as call_log
+import interview as mock_interview
 import phone_practice as phone
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
@@ -2196,6 +2197,7 @@ def calls_view():
     try:
         items = call_log.list_calls(conn, uid)
         key_hint = call_log.api_key_hint(conn, uid)
+        interview_jobs = _interview_jobs(conn, uid)
         settings = get_user_settings(conn, uid, mask_secrets=True)
         stats = _stats(conn)
     finally:
@@ -2203,7 +2205,8 @@ def calls_view():
     return render_template("dashboard.html", view_mode="calls", stats=stats, settings=settings, calls=items,
                            api_key_hint=key_hint, practice_ready=call_log.practice_configured(),
                            phone_number=phone.dial_in_number() if phone.dial_in_ready() else "",
-                           call_me_ready=phone.call_me_ready(),
+                           call_me_ready=phone.call_me_ready(), interview_jobs=interview_jobs,
+                           interview_job=request.args.get("interview", ""),
                            api_base=request.host_url.rstrip("/"))
 
 
@@ -2343,6 +2346,101 @@ def _log_practice_call(uid: int, transcript: list, role: str, duration: int, *, 
                 c.close()
         run_in_background(("practice_summary", uid, saved["id"]), work)
     return saved
+
+
+# ── Mock interviews (interview.py): Maya interviews you for one job, then each answer is scored ──
+
+_INTERVIEW_ORDER = {"interviewing": 0, "applied": 1, "shortlisted": 2, "offer": 3}
+
+
+def _interview_jobs(conn, uid: int) -> list[dict]:
+    rows = conn.execute("SELECT job_id, title, company, status FROM jobs WHERE user_id = ? "
+                        "AND status NOT IN ('archived', 'rejected') ORDER BY scraped_at DESC LIMIT 200", (uid,)).fetchall()
+    jobs = [{"job_id": str(r[0]), "title": shorten_title(r[1]), "company": clean_company(r[2]), "status": r[3]}
+            for r in rows]
+    jobs.sort(key=lambda j: _INTERVIEW_ORDER.get(j["status"], 9))
+    return jobs[:80]
+
+
+@app.route("/api/calls/interview/start", methods=["POST"])
+def api_interview_start():
+    """A LiveKit room token that sends Maya in to interview the user for one of their jobs."""
+    uid = get_user_id()
+    if not call_log.practice_configured():
+        return jsonify({"ok": False, "error": "Mock interviews aren't set up on this server yet."}), 503
+    if not ve.rate_limiter.allow(uid, "interview_start", 6, window=600):
+        return jsonify({"ok": False, "error": "That's a lot of interviews. Take a ten-minute break."}), 429
+    body = request.get_json(silent=True) or {}
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT job_id, title, company, description, key_reqs FROM jobs WHERE job_id = ? AND user_id = ?",
+                           (str(body.get("job_id") or ""), uid)).fetchone()
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"ok": False, "error": "Pick a job from your board."}), 404
+    job = {"title": shorten_title(row[1]), "company": clean_company(row[2]), "description": row[3], "key_reqs": row[4]}
+    length = body.get("length") if body.get("length") in mock_interview.LENGTHS else "short"
+    identity = f"user-{uid}"
+    meta = mock_interview.interview_brief(job, length=length, resume=settings.get("resume_text") or "",
+                                          name=settings.get("name") or "", lang=ve.reply_lang(body.get("lang")))
+    meta["identity"] = identity
+    room = f"interview-{uid}-{secrets.token_hex(6)}"
+    url, key, secret = call_log.livekit_settings()
+    token = call_log.room_token(key, secret, identity=identity, name=meta["candidate_name"] or "Candidate",
+                                room=room, agent_metadata=meta, ttl=3600)
+    return jsonify({"ok": True, "url": url, "token": token, "room": room, "job_id": str(row[0]),
+                    "role": job["title"], "company": job["company"], "questions": meta["questions"]})
+
+
+@app.route("/api/calls/interview/end", methods=["POST"])
+def api_interview_end():
+    """Logs a finished mock interview, then scores every answer in the background."""
+    uid = get_user_id()
+    body = request.get_json(silent=True) or {}
+    room = str(body.get("room") or "")
+    if not room.startswith(f"interview-{uid}-"):
+        return jsonify({"ok": False, "error": "Unknown interview"}), 400
+    if not ve.rate_limiter.allow(uid, "interview_end", 10, window=600):
+        return jsonify({"ok": False, "error": "Too many interviews logged. Wait a few minutes."}), 429
+    transcript = mock_interview.clean_timed_transcript(body.get("transcript"))
+    try:
+        duration = max(0, min(int(body.get("duration_seconds") or 0), call_log.MAX_DURATION))
+    except (TypeError, ValueError):
+        duration = 0
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT job_id, title, company, description FROM jobs WHERE job_id = ? AND user_id = ?",
+                           (str(body.get("job_id") or ""), uid)).fetchone()
+        role = shorten_title(row[1]) if row else _clean_field(body, "role")
+        company = clean_company(row[2]) if row else ""
+        posting = (row[3] or "") if row else ""
+        job_id = str(row[0]) if row else None
+        answered = sum(1 for t in transcript if t["role"] == "user") >= 2
+        title = f"Mock interview · {role}{' at ' + company if company else ''}" if role else "Mock interview"
+        saved = call_log.add_call(conn, uid, {
+            "caller_name": title[:call_log.MAX_NAME], "phone_number": "Browser call",
+            "status": "completed" if answered else "missed", "duration_seconds": duration,
+            "summary": "Scoring your answers…" if answered else "Too short to score. Try answering a few questions.",
+        }, kind="interview", transcript=transcript, job_id=job_id)
+        gemini_key = get_user_settings(conn, uid).get("gemini_api_key") or None
+    finally:
+        conn.close()
+
+    if answered:
+        def work():
+            report = mock_interview.score_interview(transcript, role, company, posting, gemini_key)
+            c = get_conn(DB_PATH)
+            try:
+                call_log.set_report(c, uid, saved["id"], report, mock_interview.summary_line(report, role))
+                if job_id and not report.get("error"):
+                    add_timeline(c, job_id, f"Mock interview: {report['overall']}/5 across "
+                                            f"{len(report['questions'])} questions")
+            finally:
+                c.close()
+        run_in_background(("interview_score", uid, saved["id"]), work)
+    return jsonify({"ok": True, "call": saved}), 201
 
 
 # ── Phone practice (phone_practice.py): dial in with a code, or have the agent ring you ──

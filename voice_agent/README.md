@@ -52,6 +52,12 @@ Sunny never touches the database. When she needs something done, such as moving 
 
 Sunny speaks with the site's voice (`SUNNY_TTS_VOICE`, Cartesia Sonic 3) in the user's chosen language. Speech-to-text is Deepgram Nova 3 `multi` for English, Hindi, Spanish, French and German, and Cartesia Ink Whisper for the others (`SUNNY_STT_MODEL` overrides it). The quiz coach waits longer before replying (`QUIZ_MIN_ENDPOINTING_DELAY` 1.0 s, `QUIZ_MAX_ENDPOINTING_DELAY` 5.0 s), so thinking pauses don't cut an answer off.
 
+## Mock interviews
+
+On the Calls page, **Mock interview** sends Maya in as a hiring manager for one job on the user's board (metadata `mode: "interview"`, code in [`interviewer.py`](interviewer.py)). She plans 4 or 7 main questions from the posting, its key requirements and the resume, asks at most one follow-up per answer, gives no feedback during the call, and hangs up after closing.
+
+The browser records the call (your mic and Maya mixed) into IndexedDB on that device, with timed captions. When it ends, the website scores every main answer from the transcript (Gemini, then LiveKit's LLM), writes a 1 to 5 score with what worked, what to sharpen and a stronger answer, and adds the overall score to the job's Timeline. In the call log, **Show report and replay** shows the report, plays the recording from each answer, and lets you click any transcript line to jump there. Recordings never leave the browser.
+
 ## Phone practice (LiveKit SIP)
 
 The same recruiter can take a real phone call, two ways. Both log the call on the Calls page when it ends: the agent posts the transcript to the website, signed with a shared secret.
