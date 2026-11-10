@@ -2722,7 +2722,8 @@ const VA = {
   mode: null,              // 'server' (record + Gemini) or 'browser' (Web Speech API)
   serverVoice: false,
   serverTts: false,
-  sttWav: false,      // send recordings as 16 kHz WAV, which LiveKit's speech-to-text needs   // the server can speak (LiveKit or Gemini), separate from transcribing
+  sttWav: false,
+  ttsStream: false,   // the server can stream LiveKit's voice as it's made      // send recordings as 16 kHz WAV, which LiveKit's speech-to-text needs   // the server can speak (LiveKit or Gemini), separate from transcribing
   recognition: null,
   recorder: null,
   stream: null,
@@ -2964,6 +2965,7 @@ function loadAssistantWelcome(first) {
       VA.serverVoice = !!res.server_voice;
       VA.serverTts = res.server_tts === undefined ? VA.serverVoice : !!res.server_tts;
       VA.sttWav = !!res.stt_wav;
+      VA.ttsStream = !!res.tts_stream;
       renderStarter();
       setDigestBadge(res.digest_count);
       if (first) scheduleAssistantHint();
@@ -3322,7 +3324,7 @@ function startLevelMeter(stream) {
       if (rms > 0.035) { VA.heardSpeech = true; VA.silenceSince = now; }
       const quietFor = now - VA.silenceSince;
       const elapsed = now - VA.listenStartedAt;
-      if ((VA.heardSpeech && quietFor > 1400) || (!VA.heardSpeech && elapsed > 7000) || elapsed > 20000) {
+      if ((VA.heardSpeech && quietFor > 1000) || (!VA.heardSpeech && elapsed > 7000) || elapsed > 20000) {
         stopListening();
         return;
       }
@@ -3646,7 +3648,7 @@ function scheduleBoardReload() {
   clearTimeout(VA.reloadTimer);
   const started = Date.now();
   const go = () => {
-    const speaking = !!VA.webSource || (VA.player && !VA.player.paused && !VA.player.ended && VA.player.src !== VA_SILENT_WAV) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+    const speaking = !!VA.webSource || !!(VA.webSources && VA.webSources.length) || (VA.player && !VA.player.paused && !VA.player.ended && VA.player.src !== VA_SILENT_WAV) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
     if (speaking && Date.now() - started < 9000) { VA.reloadTimer = setTimeout(go, 300); return; }
     saveAssistantState(true);
     location.reload();
@@ -3679,10 +3681,44 @@ function speakResponse(text, onDone) {
   // Gemini's voice quota is spent: use the browser voice straight away until it resets
   if (VA.geminiQuietUntil > Date.now()) { fallback(); return; }
   const controller = new AbortController();
-  vaBrowserCanSpeak().then(canSpeak => {
+  VA.speakAbort = controller;
+  // LiveKit's voice streams in: playback starts with the first chunk instead of the whole clip
+  const wholeClip = () => {
     if (settled || myToken !== VA.speakToken) return;
-    timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 7000 : 15000);
-  });
+    vaBrowserCanSpeak().then(canSpeak => {
+      if (settled || myToken !== VA.speakToken) return;
+      timer = setTimeout(() => { controller.abort(); fallback(); }, canSpeak ? 7000 : 15000);
+    });
+    vaSynthesizeWhole(text, controller, data => {
+      if (settled || myToken !== VA.speakToken) return;
+      if (!data.audio_base64) {
+        if (data.reason === 'quota') { VA.geminiQuietUntil = Date.now() + 120000; vaVoiceNote('quota'); }
+        fallback();
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      VA.voiceSource = data.provider === 'livekit' ? 'livekit' : 'gemini';
+      updateVoiceToggleUI();
+      vaPlayAudio('data:audio/wav;base64,' + data.audio_base64, done, myToken, () => { settled = false; fallback(); });
+    }, fallback);
+  };
+  if (VA.ttsStream && vaAudioCtx() && window.ReadableStream) {
+    timer = setTimeout(() => { controller.abort(); fallback(); }, 8000);
+    vaStreamSpeak(text, myToken, controller, () => {
+      if (settled || myToken !== VA.speakToken) return false;
+      settled = true;
+      clearTimeout(timer);
+      VA.voiceSource = 'livekit';
+      updateVoiceToggleUI();
+      return true;
+    }, done, () => { clearTimeout(timer); timer = null; wholeClip(); });
+    return;
+  }
+  wholeClip();
+}
+
+function vaSynthesizeWhole(text, controller, onData, onError) {
   vaFetch('/api/voice/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3690,20 +3726,68 @@ function speakResponse(text, onDone) {
     signal: controller.signal
   })
   .then(r => r.json())
-  .then(data => {
-    if (settled || myToken !== VA.speakToken) return;
-    if (!data.audio_base64) {
-      if (data.reason === 'quota') { VA.geminiQuietUntil = Date.now() + 120000; vaVoiceNote('quota'); }
-      fallback();
-      return;
+  .then(onData)
+  .catch(onError);
+}
+
+// Plays /api/voice/speak-stream (raw 16-bit PCM) through Web Audio as it arrives, queueing
+// each chunk right after the one before. onStart() runs with the first sound and returns
+// false if this reply was cancelled meanwhile; onFail() runs if nothing could be played.
+async function vaStreamSpeak(text, token, controller, onStart, onDone, onFail) {
+  const ctx = vaAudioCtx();
+  let started = false;
+  try {
+    if (ctx.state !== 'running') {
+      await Promise.race([ctx.resume(), new Promise((_, reject) => setTimeout(() => reject(new Error('suspended')), 1000))]);
     }
-    settled = true;
-    clearTimeout(timer);
-    VA.voiceSource = data.provider === 'livekit' ? 'livekit' : 'gemini';
-    updateVoiceToggleUI();
-    vaPlayAudio('data:audio/wav;base64,' + data.audio_base64, done, myToken, () => { settled = false; fallback(); });
-  })
-  .catch(() => fallback());
+    const res = await vaFetch('/api/voice/speak-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: VA.lang }),
+      signal: controller.signal
+    });
+    if (!res.ok || !res.body || !(res.headers.get('Content-Type') || '').startsWith('audio/L16')) throw new Error('no stream');
+    const rate = parseInt(res.headers.get('X-Sample-Rate'), 10) || 24000;
+    const reader = res.body.getReader();
+    let carry = null;  // an odd byte left over from the previous chunk
+    let at = 0;        // when the next chunk should start, in the context's clock
+    let last = null;
+    VA.webSources = [];
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (token !== VA.speakToken) { controller.abort(); return; }
+      let bytes = value;
+      if (carry) { const joined = new Uint8Array(carry.length + bytes.length); joined.set(carry); joined.set(bytes, carry.length); bytes = joined; carry = null; }
+      if (bytes.length % 2) { carry = bytes.slice(-1); bytes = bytes.slice(0, -1); }
+      if (!bytes.length) continue;
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+      const n = bytes.length / 2;
+      const buffer = ctx.createBuffer(1, n, rate);
+      const ch = buffer.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = view.getInt16(i * 2, true) / 32768;
+      if (!started) {
+        if (!onStart()) { controller.abort(); return; }
+        started = true;
+        at = ctx.currentTime + 0.12;  // a little headroom so the next chunk can arrive in time
+      }
+      if (at < ctx.currentTime + 0.02) at = ctx.currentTime + 0.05;  // the network fell behind
+      const node = ctx.createBufferSource();
+      node.buffer = buffer;
+      node.connect(ctx.destination);
+      node.start(at);
+      at += buffer.duration;
+      VA.webSources.push(node);
+      last = node;
+    }
+    if (!started) throw new Error('empty stream');
+    if (token !== VA.speakToken) return;
+    last.onended = () => { if (token === VA.speakToken) { VA.webSources = []; onDone(); } };
+  } catch (e) {
+    if (token !== VA.speakToken) return;
+    if (!started) onFail();
+    else onDone();
+  }
 }
 
 // Plays Gemini's audio, and hands over to the browser voice if it errors, is blocked, or simply
@@ -3923,6 +4007,8 @@ function stopSpeaking() {
   clearInterval(VA.keepAlive);
   if (VA.player) { VA.player.onended = null; VA.player.onerror = null; VA.player.pause(); }
   if (VA.webSource) { const node = VA.webSource; VA.webSource = null; node.onended = null; try { node.stop(); } catch (e) {} }
+  if (VA.webSources && VA.webSources.length) { VA.webSources.forEach(node => { node.onended = null; try { node.stop(); } catch (e) {} }); VA.webSources = []; }
+  if (VA.speakAbort) { try { VA.speakAbort.abort(); } catch (e) {} VA.speakAbort = null; }
   if ('speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   if (document.getElementById('va-status')?.dataset.state === 'speaking') setAssistantStatus('ready');
 }

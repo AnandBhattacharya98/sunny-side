@@ -16,6 +16,7 @@ import difflib
 import logging
 import threading
 from collections import deque, OrderedDict
+from contextlib import contextmanager
 from datetime import datetime
 
 import requests
@@ -216,8 +217,30 @@ class GeminiError(Exception):
     """Raised with a message that is safe to log and show (never contains the API key)."""
 
 
+@contextmanager
+def timed(name: str):
+    """Adds how long the block took to the request's Server-Timing header (see dashboard.py)."""
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        try:
+            from flask import g, has_request_context
+            if has_request_context():
+                timings = g.setdefault("timings", {})
+                timings[name] = timings.get(name, 0.0) + (time.perf_counter() - start) * 1000
+        except Exception:
+            pass
+
+
 def gemini_generate(api_key: str, parts: list, model: str = VOICE_MODEL, generation_config: dict = None,
                     timeout: float = 12, retries: int = 1) -> dict:
+    with timed("gemini"):
+        return _gemini_generate(api_key, parts, model, generation_config, timeout, retries)
+
+
+def _gemini_generate(api_key: str, parts: list, model: str = VOICE_MODEL, generation_config: dict = None,
+                     timeout: float = 12, retries: int = 1) -> dict:
     if not api_key:
         raise GeminiError("No Gemini key configured")
     url = f"{GEMINI_BASE_URL}/{model}:generateContent"
@@ -289,7 +312,9 @@ def transcribe(audio_bytes: bytes, mime_type: str, api_key: str | None, lang: st
         decoded = livekit_stt.wav_to_pcm(audio_bytes)
         if decoded:
             try:
-                return sanitize_transcript(livekit_stt.transcribe_pcm(*decoded, lang=lang)), "livekit"
+                with timed("livekit_stt"):
+                    text = livekit_stt.transcribe_pcm(*decoded, lang=lang)
+                return sanitize_transcript(text), "livekit"
             except livekit_stt.LiveKitSTTError as e:
                 log.warning("LiveKit transcription failed, falling back to Gemini: %s", e)
                 _livekit_stt_down_until = time.time() + LIVEKIT_RETRY_AFTER
@@ -396,7 +421,8 @@ def speak(text: str, api_key: str | None, lang: str = "en") -> tuple[bytes, str]
         if cached:
             return cached, "livekit"
         try:
-            pcm, rate = livekit_tts.synthesize_pcm(text, lang=lang)
+            with timed("livekit_tts"):
+                pcm, rate = livekit_tts.synthesize_pcm(text, lang=lang)
             wav = pcm_to_wav(pcm, sample_rate=rate)
             _tts_cache.put(key, wav)
             return wav, "livekit"
@@ -406,6 +432,46 @@ def speak(text: str, api_key: str | None, lang: str = "en") -> tuple[bytes, str]
     if not api_key:
         raise GeminiError("No voice provider is available")
     return synthesize_speech(text, api_key), "gemini"
+
+
+def speak_stream(text: str, lang: str = "en"):
+    """LiveKit's voice as a stream of 16-bit mono PCM chunks, so playback can start right away.
+
+    Returns (sample_rate, chunks). Raises livekit_tts.LiveKitTTSError if LiveKit isn't usable
+    or fails before any audio, and the caller falls back to the whole-clip route.
+    """
+    global _livekit_down_until
+    text = re.sub(r"\s+", " ", text or "").strip()[:MAX_TTS_CHARS]
+    if not text:
+        raise livekit_tts.LiveKitTTSError("No text to speak")
+    if not livekit_tts.is_configured() or time.time() < _livekit_down_until:
+        raise livekit_tts.LiveKitTTSError("LiveKit voice isn't available")
+    model, voice = livekit_tts.model_and_voice()
+    key = hashlib.sha256(f"livekit|{model}|{voice}|{lang}|{text}".encode()).hexdigest()
+    cached = _tts_cache.get(key)
+    if cached:
+        return livekit_tts.SAMPLE_RATE, iter([cached[44:]])
+    source = livekit_tts.stream_pcm(text, lang=lang)
+    try:
+        with timed("livekit_first_audio"):
+            first = next(source)
+    except livekit_tts.LiveKitTTSError as e:
+        log.warning("LiveKit voice failed, falling back: %s", e)
+        _livekit_down_until = time.time() + LIVEKIT_RETRY_AFTER
+        raise
+
+    def chunks():
+        parts = [first]
+        yield first
+        try:
+            for chunk in source:
+                parts.append(chunk)
+                yield chunk
+        except livekit_tts.LiveKitTTSError as e:
+            log.warning("LiveKit voice stopped mid-reply: %s", e)
+            return
+        _tts_cache.put(key, pcm_to_wav(b"".join(parts), sample_rate=livekit_tts.SAMPLE_RATE))
+    return livekit_tts.SAMPLE_RATE, chunks()
 
 
 def pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, num_channels: int = 1, bits_per_sample: int = 16) -> bytes:
