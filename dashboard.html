@@ -1352,9 +1352,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 * { scrollbar-width: thin; scrollbar-color: var(--bdr-strong) transparent; }
 </style>
 <!-- Motion: Anime.js + AutoAnimate + canvas-confetti (static/vendor), house timings in static/motion -->
-<link rel="stylesheet" href="/static/motion/app-motion.css?v=1">
+<link rel="stylesheet" href="/static/motion/app-motion.css?v=2">
 <script defer src="/static/vendor/sunny-anim.min.js?v=1"></script>
-<script defer src="/static/motion/app-motion.js?v=2"></script>
+<script defer src="/static/motion/app-motion.js?v=3"></script>
 </head>
 <body data-uid="{{ session.get('user_id') or '' }}">
 
@@ -1395,7 +1395,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     {% endif %}
   </nav>
 
-  <main class="auth-main">
+  <main class="auth-main auth-main-sun">
   <div class="auth-card auth-reveal">
     {% if view_mode == 'mock_auth' %}
     <div class="auth-head">
@@ -1598,6 +1598,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     </p>
     {% endif %}
   </div>
+  {% if view_mode != 'mock_auth' %}
+  <!-- Sunny keeps you company while you sign in (filled in by static/motion/app-motion.js) -->
+  <aside class="auth-sun" id="auth-sun" aria-hidden="true" data-mode="{{ view_mode }}"></aside>
+  {% endif %}
   </main>
 </div>
 {% elif view_mode == 'onboarding' %}

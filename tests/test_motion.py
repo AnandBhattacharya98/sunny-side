@@ -80,3 +80,15 @@ def test_signed_in_pages_are_not_cached():
             s["username"] = "admin"
         res = c.get("/progress")
         assert res.headers.get("Cache-Control") == "no-store"
+
+
+def test_sign_in_and_sign_up_have_sunny():
+    for path in ("/login", "/signup", "/forgot"):
+        html = _get(path).get_data(as_text=True)
+        assert 'id="auth-sun"' in html, path
+        assert 'aria-hidden="true"' in html.split('id="auth-sun"')[1][:80], path
+    js = open(os.path.join(ROOT, "static/motion/app-motion.js"), encoding="utf-8").read()
+    assert "function hookAuthSun()" in js
+    css = open(os.path.join(ROOT, "static/motion/app-motion.css"), encoding="utf-8").read()
+    reduce_block = css[css.index("@media (prefers-reduced-motion: reduce)"):]
+    assert ".as-wrap" in reduce_block and ".as-chip" in reduce_block
