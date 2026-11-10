@@ -1720,7 +1720,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   {% if session.get('username') == 'admin' %}
   <a class="nl {% if view_mode=='users' %}on{% endif %}" href="/users" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-    User Management
+    Admin Console
   </a>
   {% endif %}
   <a class="nl" href="javascript:void(0)" onclick="toggleTheme()" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
@@ -2586,80 +2586,199 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     </section>
   </div>
   {% elif view_mode == 'users' %}
+  <style>
+    .adm { display:flex; flex-direction:column; gap:18px; flex:1; min-height:0; overflow-y:auto; padding-bottom:24px; }
+    .adm-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; }
+    .adm-tile { background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:14px 16px; }
+    .adm-tile b { display:block; font-size:22px; color:var(--txt); }
+    .adm-tile span { font-size:11px; color:var(--mut); }
+    .adm-card { background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:18px 20px; }
+    .adm-card h3 { font-size:14px; font-weight:700; color:var(--txt); margin:0 0 4px; }
+    .adm-card p.sub { font-size:11px; color:var(--mut); margin:0 0 12px; line-height:1.45; }
+    .adm-grid { display:grid; grid-template-columns:1fr 2.4fr; gap:18px; align-items:start; }
+    .adm-table { width:100%; border-collapse:collapse; font-size:12px; text-align:left; }
+    .adm-table th { padding:8px 6px; border-bottom:2px solid var(--bdr); color:var(--mut); font-weight:600; white-space:nowrap; }
+    .adm-table td { padding:9px 6px; border-bottom:1px solid var(--bdr); color:var(--txt); vertical-align:middle; }
+    .adm-table td.m { color:var(--mut); }
+    .adm-table time { white-space:nowrap; }
+    .adm-scroll { overflow-x:auto; }
+    .adm-pill { font-size:9.5px; font-weight:700; padding:2px 6px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+    .adm-pill.admin { background:var(--purl); color:var(--purt); }
+    .adm-pill.off { background:var(--rdl); color:var(--rd); }
+    .adm-pill.ok { background:var(--gnl); color:var(--gn); }
+    .adm-acts { display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap; }
+    .adm-acts .btn { font-size:10px; padding:4px 9px; }
+    .adm-acts .btn.danger { color:var(--rd); border-color:rgba(190,18,60,0.25); background:var(--rdl); }
+    .adm-form { display:flex; flex-direction:column; gap:10px; }
+    .adm-form label { font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase; }
+    .adm-form input { padding:8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none; width:100%; box-sizing:border-box; }
+    .adm-msg { padding:8px 10px; border-radius:6px; font-size:11px; }
+    .adm-msg.err { background:var(--rdl); color:var(--rd); }
+    .adm-msg.ok { background:var(--gnl); color:var(--gn); }
+    .adm a.ulink { color:inherit; text-decoration:none; border-bottom:1px dotted var(--hin); }
+    @media (max-width: 900px) {
+      .adm-grid { grid-template-columns:1fr; }
+      .adm-table.stack thead { display:none; }
+      .adm-table.stack tr { display:block; border-bottom:1px solid var(--bdr); padding:8px 0; }
+      .adm-table.stack td { display:flex; justify-content:space-between; gap:12px; border:none; padding:4px 2px; }
+      .adm-table.stack td::before { content:attr(data-l); color:var(--mut); font-weight:600; font-size:11px; }
+      .adm-acts { justify-content:flex-start; }
+    }
+  </style>
   <div class="board-header">
-    <h2 class="board-title">👥 User Management</h2>
+    <h2 class="board-title">🛡️ Admin Console</h2>
   </div>
 
-  <div style="display:grid; grid-template-columns:1fr 2fr; gap:24px; flex:1; min-height:0; overflow:hidden;">
-    <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px; height:fit-content;">
-      <h3 style="font-size:14px; font-weight:700; color:var(--txt);">Invite New User</h3>
-      <p style="font-size:11px; color:var(--mut); line-height:1.4;">Pre-register a new account for family or friends. They can log in immediately with the credentials you create.</p>
-      
-      {% if error %}
-      <div style="background:var(--rdl); color:var(--rd); padding:8px 10px; border-radius:6px; font-size:11px;">
-        ⚠️ {{ error }}
-      </div>
-      {% endif %}
-      
-      <form method="POST" action="/users" style="display:flex; flex-direction:column; gap:12px;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Username</label>
-          <input type="text" name="username" required style="padding:8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none;" placeholder="family_member">
-        </div>
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <label style="font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase;">Password</label>
-          <div style="position:relative; display:flex; align-items:center;">
-            <input type="password" id="invite-password" name="password" required style="padding:8px 30px 8px 10px; border-radius:6px; border:1px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:12px; outline:none; width:100%;" placeholder="••••••••">
-            <button type="button" onclick="togglePasswordVisibility('invite-password', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; font-size:12px; color:var(--mut); display:flex; align-items:center; justify-content:center; padding:2px;">Show</button>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-p" style="padding:9px; font-size:12px; font-weight:600; margin-top:4px;">Create Account</button>
-      </form>
+  <div class="adm" id="admin-console">
+    <div class="adm-tiles">
+      <div class="adm-tile"><b>{{ admin_stats.users }}</b><span>Accounts</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.new_week }}</b><span>New this week</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.active_week }}</b><span>Signed in this week</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.logins_day }}</b><span>Sign-ins, last 24h</span></div>
+      <div class="adm-tile"><b style="{% if admin_stats.failed_day %}color:var(--rd){% endif %}">{{ admin_stats.failed_day }}</b><span>Failed sign-ins, last 24h</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.disabled }}</b><span>Turned off</span></div>
     </div>
 
-    <div style="background:var(--sur); border:1px solid var(--bdr); border-radius:12px; padding:20px; display:flex; flex-direction:column; height:100%; overflow:hidden;">
-      <h3 style="font-size:14px; font-weight:700; color:var(--txt); margin-bottom:12px;">Registered Accounts</h3>
-      
-      <div style="flex:1; overflow-y:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--bdr); color:var(--mut); font-weight:600;">
-              <th style="padding:8px 4px;">Username</th>
-              <th style="padding:8px 4px;">Date Joined</th>
-              <th style="padding:8px 4px; text-align:center;">Jobs Tracked</th>
-              <th style="padding:8px 4px; text-align:right;">Actions</th>
-            </tr>
-          </thead>
+    <div class="adm-grid">
+      <div class="adm-card">
+        <h3>Add an account</h3>
+        <p class="sub">Create a login for someone. They can sign in straight away with what you set here.</p>
+        {% if error %}<div class="adm-msg err" style="margin-bottom:10px;">⚠️ {{ error }}</div>{% endif %}
+        {% if notice %}<div class="adm-msg ok" style="margin-bottom:10px;">✓ {{ notice }}</div>{% endif %}
+        <form method="POST" action="/users" class="adm-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="invite-username">Username</label>
+          <input type="text" id="invite-username" name="username" required placeholder="new_user" autocomplete="off">
+          <label for="invite-password">Password</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" id="invite-password" name="password" required minlength="8" placeholder="At least 8 characters" autocomplete="new-password" style="padding-right:46px;">
+            <button type="button" onclick="togglePasswordVisibility('invite-password', this)" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; font-size:11px; color:var(--mut); padding:2px;">Show</button>
+          </div>
+          <button type="submit" class="btn btn-p" style="padding:9px; font-size:12px; margin-top:4px;">Create account</button>
+        </form>
+        <p class="sub" style="margin:14px 0 0;">Passwords are stored as salted hashes, so nobody (admin included) can read them. Use <b>Reset password</b> to give someone a new temporary one.</p>
+      </div>
+
+      <div class="adm-card">
+        <h3>All accounts</h3>
+        <p class="sub">Most recently active first. Click a name to see only their sign-ins.</p>
+        <div class="adm-scroll">
+          <table class="adm-table stack">
+            <thead><tr>
+              <th>Account</th><th>Signs in with</th><th>Joined</th><th>Last sign-in</th>
+              <th style="text-align:center;">Sign-ins</th><th style="text-align:center;">Jobs</th><th style="text-align:right;">Manage</th>
+            </tr></thead>
+            <tbody>
+              {% for u in users %}
+              <tr data-uid="{{ u.id }}" data-username="{{ u.username }}">
+                <td data-l="Account">
+                  <span>
+                    <a class="ulink" href="/users?user={{ u.id }}#admin-logins"><b>{{ u.name or u.username }}</b></a>
+                    {% if u.id == 1 %}<span class="adm-pill admin">Admin</span>{% endif %}
+                    {% if u.disabled %}<span class="adm-pill off">Off</span>{% endif %}
+                    {% if u.name and u.name != u.username %}<br><span style="font-size:11px; color:var(--mut);">{{ u.username }}</span>{% endif %}
+                    {% if u.email %}<br><span style="font-size:11px; color:var(--mut);">{{ u.email }}</span>{% endif %}
+                  </span>
+                </td>
+                <td data-l="Signs in with" class="m">{{ {'google': 'Google', 'linkedin': 'LinkedIn'}.get(u.auth_provider, 'Password') }}</td>
+                <td data-l="Joined" class="m">{% if u.created_at %}<time class="local-time" data-fmt="ymd" datetime="{{ u.created_at|utc_iso }}">{{ u.created_at[:10] }}</time>{% else %}Legacy{% endif %}</td>
+                <td data-l="Last sign-in" class="m">{% if u.last_login_at %}<time class="local-time" data-fmt="ymd-hm" datetime="{{ u.last_login_at|utc_iso }}">{{ u.last_login_at[:16]|replace('T', ' ') }}</time>{% else %}Not yet recorded{% endif %}</td>
+                <td data-l="Sign-ins" style="text-align:center;">{{ u.login_count }}</td>
+                <td data-l="Jobs" style="text-align:center; font-weight:600; color:var(--purt);">{{ u.job_count }}</td>
+                <td data-l="Manage">
+                  {% if u.id != 1 %}
+                  <div class="adm-acts">
+                    {% if u.auth_provider not in ('google', 'linkedin') %}
+                    <button class="btn" onclick="adminResetPassword(this)">Reset password</button>
+                    {% endif %}
+                    <button class="btn" onclick="adminToggleDisabled(this, {{ 'false' if u.disabled else 'true' }})">{{ 'Turn on' if u.disabled else 'Turn off' }}</button>
+                    <button class="btn danger" onclick="deleteUser({{ u.id }}, this.closest('tr').dataset.username)">Delete</button>
+                  </div>
+                  {% else %}
+                  <span style="font-size:11px; color:var(--hin); font-style:italic;">You</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="adm-card" id="admin-logins">
+      <h3>Sign-in history{% if filter_user %}: {{ filter_user.name or filter_user.username }}{% endif %}</h3>
+      <p class="sub">
+        The latest 200 sign-ins and failed attempts{% if filter_user %} for this account. <a href="/users#admin-logins" style="color:var(--purt);">Show everyone</a>{% else %} across all accounts{% endif %}.
+        Kept for 180 days. History starts from when this console went live.
+      </p>
+      {% if logins %}
+      <div class="adm-scroll">
+        <table class="adm-table stack">
+          <thead><tr><th>When</th><th>Account</th><th>Result</th><th>Method</th><th>Device</th><th>IP address</th></tr></thead>
           <tbody>
-            {% for u in users %}
-            <tr style="border-bottom:1px solid var(--bdr); color:var(--txt);">
-              <td style="padding:10px 4px; font-weight:600;">
-                👤 {{ u.username }}
-                {% if u.id == 1 %}
-                <span style="font-size:9px; font-weight:600; background:var(--purl); color:var(--pur); padding:1px 5px; border-radius:4px; margin-left:4px;">Admin</span>
-                {% endif %}
-              </td>
-              <td style="padding:10px 4px; color:var(--mut);">
-                {% if u.created_at %}<time class="local-time" data-fmt="ymd" datetime="{{ u.created_at|utc_iso }}">{{ u.created_at[:10] }}</time>{% else %}Legacy{% endif %}
-              </td>
-              <td style="padding:10px 4px; text-align:center; font-weight:600; color:var(--pur);">
-                {{ u.job_count }}
-              </td>
-              <td style="padding:10px 4px; text-align:right;">
-                {% if u.id != 1 %}
-                <button class="btn" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" style="font-size:10px; color:var(--rd); border-color:rgba(220,38,38,0.25); padding:4px 8px; background:var(--rdl);">Delete Account</button>
-                {% else %}
-                <span style="font-size:11px; color:var(--hin); font-style:italic;">Protected</span>
-                {% endif %}
-              </td>
+            {% for e in logins %}
+            <tr>
+              <td data-l="When" class="m"><time class="local-time" data-fmt="ymd-hm" datetime="{{ e.created_at|utc_iso }}">{{ e.created_at[:16]|replace('T', ' ') }}</time></td>
+              <td data-l="Account">{% if e.user_id %}<a class="ulink" href="/users?user={{ e.user_id }}#admin-logins">{{ e.username }}</a>{% else %}{{ e.username }}{% endif %}</td>
+              <td data-l="Result">{% if e.success %}<span class="adm-pill ok" style="margin:0;">Signed in</span>{% else %}<span class="adm-pill off" style="margin:0;">Failed</span>{% endif %}</td>
+              <td data-l="Method" class="m">{{ e.method_label }}</td>
+              <td data-l="Device" class="m" title="{{ e.user_agent }}">{{ e.device }}</td>
+              <td data-l="IP address" class="m">{{ e.ip }}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+      {% else %}
+      <p class="sub" style="margin:0;">No sign-ins recorded yet. They'll show up here from the next one on.</p>
+      {% endif %}
     </div>
   </div>
+
+  <div class="modal-backdrop" id="admin-temp-pw-modal" style="display:none; align-items:center; justify-content:center; z-index:10000;">
+    <div class="modal-window" style="max-width:420px; padding:24px;">
+      <h3 class="modal-title" style="margin-bottom:8px;">New temporary password</h3>
+      <p style="font-size:12px; color:var(--mut); margin:0 0 12px; line-height:1.5;">Give this to <b id="admin-temp-pw-user"></b>. It's shown only once. Their old password no longer works.</p>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <code id="admin-temp-pw" style="flex:1; padding:10px; border-radius:6px; background:var(--bg); border:1px solid var(--bdr); font-size:14px; user-select:all; word-break:break-all;"></code>
+        <button class="btn" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('admin-temp-pw').textContent).then(() => toast('Copied'))">Copy</button>
+      </div>
+      <div style="text-align:right; margin-top:16px;"><button class="btn btn-p" onclick="document.getElementById('admin-temp-pw').textContent=''; document.getElementById('admin-temp-pw-modal').style.display='none'">Done</button></div>
+    </div>
+  </div>
+  <script>
+    async function adminResetPassword(btn) {
+      const row = btn.closest('tr');
+      const name = row.dataset.username;
+      if (!confirm(`Set a new temporary password for ${name}? Their current password will stop working.`)) return;
+      btn.disabled = true;
+      try {
+        const resp = await fetch(`/api/admin/users/${row.dataset.uid}/reset-password`, { method: 'POST' });
+        const data = await resp.json();
+        if (!data.ok) { toast(data.error || 'Could not reset the password'); return; }
+        document.getElementById('admin-temp-pw-user').textContent = data.username;
+        document.getElementById('admin-temp-pw').textContent = data.temporary_password;
+        document.getElementById('admin-temp-pw-modal').style.display = 'flex';
+      } catch (e) { toast('Connection error'); }
+      finally { btn.disabled = false; }
+    }
+    async function adminToggleDisabled(btn, disable) {
+      const row = btn.closest('tr');
+      const name = row.dataset.username;
+      if (disable && !confirm(`Turn off ${name}? They'll be signed out and can't sign in until you turn them back on. Their data is kept.`)) return;
+      btn.disabled = true;
+      try {
+        const resp = await fetch(`/api/admin/users/${row.dataset.uid}/disable`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disabled: disable })
+        });
+        const data = await resp.json();
+        if (!data.ok) { toast(data.error || 'Could not update the account'); btn.disabled = false; return; }
+        toast(disable ? `${name} is turned off` : `${name} is turned back on`);
+        window.location.reload();
+      } catch (e) { toast('Connection error'); btn.disabled = false; }
+    }
+  </script>
   {% endif %}
 </main>
 </div>

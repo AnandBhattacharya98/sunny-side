@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g, Response, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
-from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets, delete_user_data
+from db import get_conn, add_timeline, DB_PATH, init_db, get_user_secrets, delete_user_data, record_login
 from ai_engine import generate_cover_letter, generate_linkedin_note, score_job, get_fallback_gemini_key
 import voice_engine as ve
 import livekit_tts
@@ -125,6 +125,8 @@ def _api_key_user():
                 uid = call_log.user_for_api_key(conn, key)
             finally:
                 conn.close()
+        if uid and _account_disabled(uid):
+            uid = None
         g.api_key_user = uid
     return g.api_key_user
 
@@ -186,6 +188,36 @@ def get_user_id() -> int:
 
 def is_admin() -> bool:
     return session.get("user_id") == 1
+
+
+ACCOUNT_DISABLED = "This account has been turned off. Contact the site admin if you think that's a mistake."
+_disabled_cache = {}  # user_id -> (disabled, checked_at); short-lived so a switch-off lands within seconds
+DISABLED_CACHE_SECONDS = 20
+
+
+def _account_disabled(uid) -> bool:
+    if not uid or uid == 1:
+        return False
+    hit = _disabled_cache.get(uid)
+    if hit and time.time() - hit[1] < DISABLED_CACHE_SECONDS:
+        return hit[0]
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT disabled FROM users WHERE id = ?", (uid,)).fetchone()
+    finally:
+        conn.close()
+    # A deleted account counts as off too
+    disabled = (not row) or bool(row[0])
+    _disabled_cache[uid] = (disabled, time.time())
+    return disabled
+
+
+def _log_login(conn, user_id, username, method, success=True):
+    """Best effort: a history write must never block someone from signing in."""
+    try:
+        record_login(conn, user_id, username, method, success, _client_ip(), request.headers.get("User-Agent", ""))
+    except Exception as e:
+        app.logger.warning("Could not record sign-in for %s: %r", username, e)
 
 def get_user_settings(conn, user_id, mask_secrets=False):
     row = conn.execute("SELECT resume_text, imap_email, imap_password, gemini_api_key, linkedin_profile, name, designation, share_profile, resume_filename, weight_thumbs_up, weight_applied, weight_thumbs_down, weight_rejected FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -250,6 +282,11 @@ def require_login():
         if _api_key_user() is None:
             return jsonify({"ok": False, "error": "That API key isn't valid. Make a new one on the Calls page."}), 401
         return
+    if session.get("user_id") and request.endpoint not in ("static", "logout") and _account_disabled(session["user_id"]):
+        session.clear()
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": ACCOUNT_DISABLED}), 401
+        return render_template("dashboard.html", view_mode="login", error=ACCOUNT_DISABLED), 403
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -271,10 +308,20 @@ def login():
         if _login_locked(throttle_key):
             return render_template("dashboard.html", view_mode="login", error=TOO_MANY_ATTEMPTS), 429
         conn = get_conn(DB_PATH)
-        user = login_user(conn, username, password)
-        conn.close()
-        if not user:
-            _record_login_failure(throttle_key)
+        try:
+            user = login_user(conn, username, password)
+            if not user:
+                _record_login_failure(throttle_key)
+                known = conn.execute("SELECT id, username FROM users WHERE username = ?", (throttle_key,)).fetchone()
+                if known:  # only attempts on real accounts, so stray typing never lands in the log
+                    _log_login(conn, known[0], known[1], "password", success=False)
+            elif user.get("disabled") and user["id"] != 1:
+                _log_login(conn, user["id"], user["username"], "password", success=False)
+                return render_template("dashboard.html", view_mode="login", error=ACCOUNT_DISABLED), 403
+            else:
+                _log_login(conn, user["id"], user["username"], "password")
+        finally:
+            conn.close()
         if user:
             session.clear()
             session.permanent = True
@@ -355,6 +402,7 @@ def signup():
             # (in the background, so signup doesn't hang on the scrapers)
             if resume_text:
                 run_in_background(("sync", uid), run_user_sync, uid)
+            _log_login(conn, uid, username.strip().lower(), "signup")
 
             session.clear()
             session.permanent = True
@@ -388,6 +436,10 @@ def handle_social_login(provider, email, name):
         if row:
             uid, username = row[0], row[1]
             is_new = False
+            if _account_disabled(uid):
+                _log_login(conn, uid, username, provider, success=False)
+                conn.close()
+                return render_template("dashboard.html", view_mode="login", error=ACCOUNT_DISABLED), 403
         else:
             username = f"{email}_{provider}"
             password = secrets.token_urlsafe(24)
@@ -396,6 +448,7 @@ def handle_social_login(provider, email, name):
             conn.execute("UPDATE users SET name = ?, email = ?, auth_provider = ?, share_profile = 0 WHERE id = ?", (name, email, provider, uid))
             conn.commit()
             is_new = True
+        _log_login(conn, uid, username, provider)
 
         session.clear()
         session.permanent = True
@@ -1154,49 +1207,135 @@ def pipeline():
     return redirect("/")
 
 
+def _device_label(ua: str) -> str:
+    """A short, readable name for a browser's user agent, such as "Chrome on Android"."""
+    ua = ua or ""
+    if IN_APP_UA_MARK in ua:
+        return "Sunny-Side app" + (" (iOS)" if "iPhone" in ua or "iPad" in ua else " (Android)" if "Android" in ua else "")
+    browser = next((name for mark, name in (("Edg/", "Edge"), ("OPR/", "Opera"), ("SamsungBrowser", "Samsung Internet"),
+                                           ("Firefox/", "Firefox"), ("CriOS", "Chrome"), ("Chrome/", "Chrome"),
+                                           ("Safari/", "Safari")) if mark in ua), "")
+    system = next((name for mark, name in (("Android", "Android"), ("iPhone", "iPhone"), ("iPad", "iPad"),
+                                          ("Windows", "Windows"), ("Mac OS X", "Mac"), ("CrOS", "ChromeOS"),
+                                          ("Linux", "Linux")) if mark in ua), "")
+    if browser and system:
+        return f"{browser} on {system}"
+    return browser or system or (ua[:40] if ua else "Unknown device")
+
+
+LOGIN_METHOD_LABELS = {"password": "Password", "signup": "Sign-up", "google": "Google", "linkedin": "LinkedIn"}
+
+
 @app.route("/users", methods=["GET", "POST"])
 def admin_users():
+    """The admin console: every account, its sign-in history, and switches to manage it."""
     if not is_admin():
         return redirect("/")
-    
+    from datetime import timedelta
     conn = get_conn(DB_PATH)
-    
-    error = None
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-        if not username or not password:
-            error = "Both fields are required."
-        else:
-            existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
-            if existing:
+    error = notice = None
+    try:
+        if request.method == "POST":
+            username = request.form.get("username", "").strip().lower()
+            password = request.form.get("password", "").strip()
+            if not username or not password:
+                error = "Both fields are required."
+            elif conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
                 error = "Username already exists."
             else:
-                from datetime import datetime
-                from auth import hash_password
                 from auth import validate_new_credentials
                 try:
-                    validate_new_credentials(username.lower(), password)
-                    conn.execute(
-                        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-                        (username.lower(), hash_password(password), datetime.now().isoformat())
-                    )
+                    validate_new_credentials(username, password)
+                    conn.execute("INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                                 (username, hash_password(password), datetime.now().isoformat()))
                     conn.commit()
+                    notice = f"Created {username}. They can log in now."
                 except ValueError as e:
                     error = str(e)
-                
-    # Fetch all users and calculate their job counts
-    raw_users = conn.execute("SELECT id, username, name, created_at FROM users ORDER BY username").fetchall()
-    users = []
-    for u in raw_users:
-        u_dict = dict(u)
-        job_count = conn.execute("SELECT COUNT(*) FROM jobs WHERE user_id = ?", (u_dict["id"],)).fetchone()[0]
-        u_dict["job_count"] = job_count
-        users.append(u_dict)
-        
-    stats = _stats(conn)
-    conn.close()
-    return render_template("dashboard.html", view_mode="users", users=users, stats=stats, error=error)
+
+        now = datetime.now()
+        day_ago = (now - timedelta(days=1)).isoformat()
+        week_ago = (now - timedelta(days=7)).isoformat()
+        job_counts = {r[0]: r[1] for r in conn.execute("SELECT user_id, COUNT(*) FROM jobs GROUP BY user_id").fetchall()}
+        users = []
+        for r in conn.execute("SELECT id, username, name, email, auth_provider, created_at, last_login_at, login_count, "
+                              "disabled FROM users ORDER BY COALESCE(last_login_at, created_at, '') DESC").fetchall():
+            u = dict(r)
+            u["job_count"] = job_counts.get(u["id"], 0)
+            u["login_count"] = u.get("login_count") or 0
+            users.append(u)
+
+        filter_uid = request.args.get("user", type=int)
+        if filter_uid:
+            rows = conn.execute("SELECT * FROM login_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 200",
+                                (filter_uid,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM login_events ORDER BY created_at DESC LIMIT 200").fetchall()
+        logins = []
+        for r in rows:
+            e = dict(r)
+            e["device"] = _device_label(e.get("user_agent"))
+            e["method_label"] = LOGIN_METHOD_LABELS.get(e.get("method"), (e.get("method") or "").title())
+            logins.append(e)
+
+        def count(sql, *args):
+            return conn.execute(sql, args).fetchone()[0]
+        admin_stats = {
+            "users": len(users),
+            "new_week": sum(1 for u in users if (u.get("created_at") or "") >= week_ago),
+            "active_week": sum(1 for u in users if (u.get("last_login_at") or "") >= week_ago),
+            "logins_day": count("SELECT COUNT(*) FROM login_events WHERE success = 1 AND created_at >= ?", day_ago),
+            "failed_day": count("SELECT COUNT(*) FROM login_events WHERE success = 0 AND created_at >= ?", day_ago),
+            "disabled": sum(1 for u in users if u.get("disabled")),
+        }
+        filter_user = next((u for u in users if u["id"] == filter_uid), None)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="users", users=users, stats=stats, error=error, notice=notice,
+                           logins=logins, admin_stats=admin_stats, filter_user=filter_user)
+
+
+@app.route("/api/admin/users/<int:user_id>/disable", methods=["POST"])
+def admin_set_disabled(user_id):
+    """Turns an account off (it's signed out within seconds and can't sign back in) or back on."""
+    if not is_admin():
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    if user_id == 1:
+        return jsonify({"ok": False, "error": "The admin account can't be turned off."}), 400
+    disabled = 1 if (request.get_json(silent=True) or {}).get("disabled") else 0
+    conn = get_conn(DB_PATH)
+    try:
+        if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
+            return jsonify({"ok": False, "error": "No such account."}), 404
+        conn.execute("UPDATE users SET disabled = ? WHERE id = ?", (disabled, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    _disabled_cache.pop(user_id, None)
+    return jsonify({"ok": True, "disabled": bool(disabled)})
+
+
+@app.route("/api/admin/users/<int:user_id>/reset-password", methods=["POST"])
+def admin_reset_password(user_id):
+    """Sets a fresh temporary password and shows it to the admin once, to pass on to the user.
+    Nobody can read existing passwords: only their salted hashes are stored."""
+    if not is_admin():
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    if user_id == 1:
+        return jsonify({"ok": False, "error": "Change the admin password with the ADMIN_PASSWORD setting on the server."}), 400
+    temp = secrets.token_urlsafe(9)
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "No such account."}), 404
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(temp), user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    login_throttle.reset_key(("user", row[0]), "login_fail")
+    return jsonify({"ok": True, "username": row[0], "temporary_password": temp})
 
 
 @app.route("/api/users/<int:user_id>/delete", methods=["POST"])
@@ -1211,6 +1350,7 @@ def delete_user(user_id):
         delete_user_data(conn, user_id)
     finally:
         conn.close()
+    _disabled_cache.pop(user_id, None)
     return jsonify({"ok": True})
 
 
