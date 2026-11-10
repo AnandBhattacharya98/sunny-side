@@ -385,12 +385,33 @@ def migrate_db(conn) -> None:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT;")
             conn.commit()
 
+    # Admin console: sign-in history and the switch that turns an account off
+    for col, ctype in (("last_login_at", "TEXT"), ("login_count", "INTEGER DEFAULT 0"), ("disabled", "INTEGER DEFAULT 0")):
+        if col not in user_cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype};")
+            conn.commit()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS login_events (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER,
+            username   TEXT,
+            method     TEXT,
+            success    INTEGER,
+            ip         TEXT,
+            user_agent TEXT,
+            created_at TEXT
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_login_events_created ON login_events (created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_login_events_user ON login_events (user_id)")
+    conn.commit()
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
 
     if IS_POSTGRES:
-        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls"]
+        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls", "login_events"]
         for t in seq_tables:
             try:
                 conn.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE(max(id), 1)) FROM {t}")
@@ -619,7 +640,30 @@ def delete_user_data(conn, user_id: int) -> None:
     conn.execute("DELETE FROM user_company_boards WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM calls WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM phone_codes WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM login_events WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+
+
+LOGIN_HISTORY_DAYS = 180
+
+
+def record_login(conn, user_id, username, method, success, ip="", user_agent="") -> None:
+    """Adds a row to the sign-in history the admin console shows. A successful sign-in also
+    updates the account's last-login time and count."""
+    from datetime import datetime, timedelta
+    import random
+    now = datetime.now().isoformat()
+    conn.execute(
+        "INSERT INTO login_events (user_id, username, method, success, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, (username or "")[:120], method, 1 if success else 0, (ip or "")[:64], (user_agent or "")[:300], now),
+    )
+    if success and user_id:
+        conn.execute("UPDATE users SET last_login_at = ?, login_count = COALESCE(login_count, 0) + 1 WHERE id = ?",
+                     (now, user_id))
+    if random.random() < 0.02:
+        cutoff = (datetime.now() - timedelta(days=LOGIN_HISTORY_DAYS)).isoformat()
+        conn.execute("DELETE FROM login_events WHERE created_at < ?", (cutoff,))
     conn.commit()
 
 
