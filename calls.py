@@ -23,7 +23,7 @@ import db
 log = logging.getLogger("calls")
 
 STATUSES = ("completed", "missed", "voicemail", "failed")
-KINDS = ("logged", "practice", "phone")
+KINDS = ("logged", "practice", "phone", "interview")
 API_KEY_PREFIX = "ss_"
 MAX_NAME = 200
 MAX_PHONE = 30
@@ -94,11 +94,14 @@ def _row(r) -> dict:
         "summary": r["summary"],
         "kind": r["kind"] or "logged",
         "has_transcript": bool(r["transcript"]),
+        "has_report": bool(r["report"]),
+        "job_id": r["job_id"],
         "created_at": r["created_at"],
     }
 
 
-_COLUMNS = "id, caller_name, phone_number, status, duration_seconds, summary, kind, transcript, created_at"
+_COLUMNS = ("id, caller_name, phone_number, status, duration_seconds, summary, kind, transcript, report, job_id, "
+            "created_at")
 
 
 def list_calls(conn, user_id: int, limit: int = 200) -> list[dict]:
@@ -115,14 +118,16 @@ def get_call(conn, user_id: int, call_id: int) -> dict | None:
         return None
     out = _row(r)
     out["transcript"] = json.loads(r["transcript"]) if r["transcript"] else []
+    out["report"] = json.loads(r["report"]) if r["report"] else None
     return out
 
 
-def add_call(conn, user_id: int, call: dict, kind: str = "logged", transcript: list | None = None) -> dict:
+def add_call(conn, user_id: int, call: dict, kind: str = "logged", transcript: list | None = None,
+             job_id: str | None = None) -> dict:
     sql = ("INSERT INTO calls (user_id, caller_name, phone_number, status, duration_seconds, summary, kind, "
-           "transcript, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+           "transcript, job_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     params = (user_id, call["caller_name"], call["phone_number"], call["status"], call["duration_seconds"],
-              call.get("summary"), kind, json.dumps(transcript) if transcript else None, now_iso())
+              call.get("summary"), kind, json.dumps(transcript) if transcript else None, job_id, now_iso())
     if db.IS_POSTGRES:
         call_id = conn.execute(sql + " RETURNING id", params).fetchone()[0]
     else:
@@ -133,6 +138,12 @@ def add_call(conn, user_id: int, call: dict, kind: str = "logged", transcript: l
 
 def set_summary(conn, user_id: int, call_id: int, summary: str) -> None:
     conn.execute("UPDATE calls SET summary = ? WHERE user_id = ? AND id = ?", (summary[:MAX_SUMMARY], user_id, call_id))
+    conn.commit()
+
+
+def set_report(conn, user_id: int, call_id: int, report: dict, summary: str) -> None:
+    conn.execute("UPDATE calls SET report = ?, summary = ? WHERE user_id = ? AND id = ?",
+                 (json.dumps(report), summary[:MAX_SUMMARY], user_id, call_id))
     conn.commit()
 
 

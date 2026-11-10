@@ -10,7 +10,8 @@ Three ways a call starts:
 Phone calls are logged by the agent posting the transcript to the website (see sunny_site.py).
 
 The same worker also runs real-time Sunny (metadata mode "sunny") and the Quiz Mode coach
-(mode "quiz") for the board's assistant panel; see sunny_live.py.
+(mode "quiz") for the board's assistant panel (see sunny_live.py), and full mock interviews
+(mode "interview", see interviewer.py).
 
 Pipeline for every turn:  your voice -> STT -> LLM -> TTS -> you
 plus VAD (is anyone speaking?) and a turn detector (have they finished their thought?).
@@ -37,6 +38,7 @@ from livekit.agents import (Agent, AgentServer, AgentSession, JobContext, JobPro
 from livekit.agents.beta.tools import EndCallTool
 from livekit.plugins import silero
 
+import interviewer
 import sunny_live
 import sunny_site
 
@@ -293,6 +295,9 @@ async def entrypoint(ctx: JobContext) -> None:
     if raw.get("mode") in ("sunny", "quiz"):
         await run_live_sunny(ctx, sunny_live.live_details(raw))
         return
+    if raw.get("mode") == "interview":
+        await run_interview(ctx, interviewer.interview_details(raw))
+        return
     mode = "call-me" if details["dial_to"] else "dial-in" if ctx.room.name.startswith(PHONE_IN_PREFIX) else "browser"
     logger.info(
         "settings: mode=%s stt=%s llm=%s tts=%s voice=%s turn=%s endpointing=%.2f-%.2fs "
@@ -336,6 +341,18 @@ async def run_live_sunny(ctx: JobContext, live: dict) -> None:
     )
     await session.start(agent=sunny_live.build_live_agent(live), room=ctx.room,
                         room_options=room_options(live["identity"] or None))
+
+
+async def run_interview(ctx: JobContext, d: dict) -> None:
+    """A full mock interview in the browser; the page records it and the website scores it."""
+    logger.info("mock interview: role=%r questions=%d lang=%s", d["role"], d["questions"], d["lang"])
+    tts = None
+    if d["lang"] != "en":  # Maya's voice speaking the candidate's language
+        tts = inference.TTS(model=TTS_MODEL, voice=TTS_VOICE, language=d["lang"]) if TTS_VOICE \
+            else inference.TTS(model=TTS_MODEL, language=d["lang"])
+    session = build_session(ctx, stt=sunny_live.stt_for(d["lang"], env("SUNNY_STT_MODEL", "")), tts=tts,
+                            endpointing=QUIZ_ENDPOINTING)
+    await session.start(agent=interviewer.Interviewer(d), room=ctx.room, room_options=room_options(d["identity"] or None))
 
 
 async def ring_candidate(ctx: JobContext, session: AgentSession, details: dict) -> None:

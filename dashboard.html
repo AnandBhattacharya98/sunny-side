@@ -2244,7 +2244,25 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     .cl-card p { margin: 0; font-size: 12.5px; color: var(--mut); line-height: 1.5; }
     .cl-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .cl-row input { flex: 1 1 200px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); background: var(--field, var(--sur)); color: var(--txt); font-size: 13px; outline: none; }
-    .cl-row input:focus { border-color: var(--yolk); }
+    .cl-row input:focus, .cl-row select:focus { border-color: var(--yolk); }
+    .cl-row select { flex: 1 1 160px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); background: var(--field, var(--sur)); color: var(--txt); font-size: 13px; outline: none; }
+    .cl-recdot { margin-left: 8px; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: var(--bad-txt); }
+    .int-captions:empty::before { content: "Maya will greet you in a moment."; }
+    .ir { margin-top: 8px; display: flex; flex-direction: column; gap: 10px; color: var(--txt); }
+    .ir-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .ir-big { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .ir-dots { display: inline-flex; gap: 3px; }
+    .ir-dots i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--yolk); }
+    .ir-dots i.on { background: var(--yolk); }
+    .ir-q { border: 1px solid var(--bdr); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.45; }
+    .ir-q b { font-weight: 700; }
+    .ir-lbl { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--hin); margin-right: 6px; }
+    .ir-play { align-self: flex-start; }
+    .ir audio { width: 100%; max-width: 520px; }
+    .ir-tr .cl-cap { cursor: default; }
+    .ir-tr .cl-cap[data-t] { cursor: pointer; }
+    .ir-tr .cl-cap[data-t]:hover { text-decoration: underline; }
+    .ir-tr time { font-family: var(--font-mono); font-size: 10px; color: var(--hin); margin-right: 6px; }
     .cl-btn { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--yolk); background: var(--yolk); color: var(--ink); white-space: nowrap; }
     .cl-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
     .cl-btn.stop { background: var(--bad-txt); border-color: var(--bad-txt); color: #fff; }
@@ -2330,6 +2348,38 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         <p class="cl-warn">Practice calls need LiveKit. Set <code>LIVEKIT_URL</code>, <code>LIVEKIT_API_KEY</code> and <code>LIVEKIT_API_SECRET</code> on the server, and deploy the recruiter agent in <code>voice_agent/</code>.</p>
         {% endif %}
       </section>
+
+      {% if practice_ready %}
+      <section class="cl-card" aria-labelledby="cl-int-h">
+        <h3 id="cl-int-h">Mock interview</h3>
+        <p>Maya interviews you for one of your jobs, using its posting and your resume. Afterwards every answer gets a score out of 5 with what worked and what to sharpen, and you can replay the call on this device.</p>
+        {% if interview_jobs %}
+        <div class="cl-row" id="int-setup">
+          <select id="int-job" aria-label="Job to interview for">
+            {% for j in interview_jobs %}<option value="{{ j.job_id }}"{% if j.job_id == interview_job %} selected{% endif %}>{{ j.title }} · {{ j.company }}</option>{% endfor %}
+          </select>
+          <select id="int-length" aria-label="Interview length">
+            <option value="short">Short · 4 questions</option>
+            <option value="full">Full · 7 questions</option>
+          </select>
+          <button type="button" class="cl-btn" id="int-start" onclick="startInterview()">Start interview</button>
+        </div>
+        <div class="cl-live" id="int-live" aria-live="polite">
+          <div class="cl-row" style="justify-content:space-between;">
+            <span class="cl-state"><span class="cl-dot" id="int-dot"></span><span id="int-state-text">Connecting…</span> · <span id="int-timer">0:00</span><span id="int-rec" class="cl-recdot" hidden title="Recording on this device">REC</span></span>
+            <span class="cl-row">
+              <button type="button" class="cl-btn ghost" id="int-mute" onclick="toggleInterviewMute()">Mute</button>
+              <button type="button" class="cl-btn stop" onclick="endInterview()">End interview</button>
+            </span>
+          </div>
+          <div class="cl-captions int-captions" id="int-captions"></div>
+        </div>
+        {% else %}
+        <p class="cl-warn">Add a job to your board first, then come back to interview for it.</p>
+        {% endif %}
+        <div class="cl-warn" id="int-err" role="alert"></div>
+      </section>
+      {% endif %}
 
       {% if phone_number or call_me_ready %}
       <section class="cl-card" aria-labelledby="cl-phone-h">
@@ -6426,6 +6476,7 @@ function renderPracticeIntro(jobId) {
         <b>${vaT('Practice out loud with Sunny', 'Sunny के साथ बोलकर प्रैक्टिस करें')}</b>
         <p>${vaT(`I'll ask you ${st.qs.length} questions, one at a time. Answer by talking or typing, and I'll tell you what landed and what to sharpen.`,
                   `मैं आपसे एक-एक करके ${st.qs.length} सवाल पूछूँगी। बोलकर या टाइप करके जवाब दें, और मैं बताऊँगी क्या अच्छा रहा और क्या सुधारें।`)}</p>
+        ${VA.welcome && VA.welcome.live_voice ? `<a class="qz-link" href="/calls?interview=${encodeURIComponent(jobId)}#cl-int-h">${vaT('Or run a full mock interview with Maya →', 'या Maya के साथ पूरा मॉक इंटरव्यू करें →')}</a>` : ''}
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
         ${vaLangSelect(`quizSetLang(${a}, this.value)`, 'qz-lang')}
@@ -7200,8 +7251,11 @@ function renderCalls() {
   const rows = CALLS.items.map(c => {
     const fresh = !CALLS.seen.has(c.id);
     const kind = c.kind === 'practice' ? '<span class="cl-kind">practice</span>'
-      : c.kind === 'phone' ? '<span class="cl-kind">phone practice</span>' : '';
-    const more = c.has_transcript
+      : c.kind === 'phone' ? '<span class="cl-kind">phone practice</span>'
+      : c.kind === 'interview' ? '<span class="cl-kind">mock interview</span>' : '';
+    const more = c.kind === 'interview' && c.has_transcript
+      ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide report' : (c.has_report ? 'Show report and replay' : 'Show transcript')}</button></div><div class="ir" id="cl-tr-${c.id}"></div>`
+      : c.has_transcript
       ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide transcript' : 'Show transcript'}</button></div><div class="cl-transcript" id="cl-tr-${c.id}"></div>`
       : '';
     return `<tr class="${fresh ? 'fresh' : ''}" data-id="${c.id}">
@@ -7239,6 +7293,7 @@ async function loadCallTranscript(id) {
     const res = await fetch(`/api/calls/${id}`);
     const data = await res.json();
     if (!data.ok) return;
+    if (data.call.kind === 'interview') { renderInterviewReport(el, data.call); return; }
     el.innerHTML = (data.call.transcript || []).map(t =>
       `<div class="cl-cap ${t.role === 'user' ? 'user' : ''}"><b>${t.role === 'user' ? 'You' : 'Recruiter'}</b>${esc(t.text)}</div>`).join('');
   } catch (e) {}
@@ -7514,6 +7569,246 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('cl-phone');
   if (input) { try { input.value = localStorage.getItem('ss-practice-phone') || ''; } catch (e) {} }
 });
+
+
+// ── Mock interview (LiveKit): Maya interviews you for a job; the call is recorded on this device ──
+const INTERVIEW = { room: null, name: '', jobId: '', role: '', started: 0, tick: null, segs: new Map(), order: [], muted: false, ending: false,
+  rec: null, chunks: [], actx: null, dest: null };
+
+function interviewState(state, text) {
+  document.getElementById('int-dot').className = `cl-dot ${state}`;
+  document.getElementById('int-state-text').textContent = text;
+}
+
+function renderInterviewCaptions() {
+  const box = document.getElementById('int-captions');
+  box.innerHTML = INTERVIEW.order.map(id => {
+    const seg = INTERVIEW.segs.get(id);
+    return `<div class="cl-cap ${seg.role}"><b>${seg.role === 'user' ? 'You' : 'Maya'}</b>${esc(seg.text)}</div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+// Mixes your mic and Maya's voice into one recording that stays in this browser
+function interviewRecord(LK, room) {
+  try {
+    if (!window.MediaRecorder || !window.AudioContext) return;
+    const actx = new AudioContext();
+    const dest = actx.createMediaStreamDestination();
+    const add = track => { if (track && track.mediaStreamTrack) actx.createMediaStreamSource(new MediaStream([track.mediaStreamTrack])).connect(dest); };
+    add(room.localParticipant.getTrackPublication(LK.Track.Source.Microphone)?.track);
+    room.remoteParticipants.forEach(p => p.audioTrackPublications.forEach(pub => add(pub.track)));
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t));
+    const rec = new MediaRecorder(dest.stream, type ? { mimeType: type } : undefined);
+    rec.ondataavailable = e => { if (e.data && e.data.size) INTERVIEW.chunks.push(e.data); };
+    rec.start(1000);
+    Object.assign(INTERVIEW, { rec, actx, dest, addTrack: add, chunks: [] });
+    document.getElementById('int-rec').hidden = false;
+  } catch (e) { console.warn('Recording unavailable', e); }
+}
+
+function interviewStopRecording() {
+  const rec = INTERVIEW.rec;
+  INTERVIEW.rec = null;
+  document.getElementById('int-rec').hidden = true;
+  if (!rec || rec.state === 'inactive') return Promise.resolve(null);
+  return new Promise(resolve => {
+    rec.onstop = () => {
+      const blob = INTERVIEW.chunks.length ? new Blob(INTERVIEW.chunks, { type: rec.mimeType || 'audio/webm' }) : null;
+      try { INTERVIEW.actx && INTERVIEW.actx.close(); } catch (e) {}
+      resolve(blob);
+    };
+    rec.stop();
+  });
+}
+
+async function startInterview() {
+  const btn = document.getElementById('int-start');
+  const err = document.getElementById('int-err');
+  err.textContent = '';
+  if (PRACTICE.room) { err.textContent = 'Hang up the practice call first.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+  try {
+    const jobId = document.getElementById('int-job').value;
+    const length = document.getElementById('int-length').value;
+    const [LK, res] = await Promise.all([
+      loadLiveKitClient(),
+      fetch('/api/calls/interview/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId, length }) }),
+    ]);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not start the interview');
+    const room = new LK.Room({ adaptiveStream: true, dynacast: true });
+    Object.assign(INTERVIEW, { room, name: data.room, jobId: data.job_id, role: data.role, segs: new Map(), order: [], muted: false, ending: false, started: 0 });
+
+    room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
+      const attrs = reader.info.attributes || {};
+      const id = attrs['lk.segment_id'] || reader.info.id;
+      const role = participant.identity === room.localParticipant.identity ? 'user' : 'agent';
+      if (!INTERVIEW.segs.has(id)) {
+        INTERVIEW.segs.set(id, { role, text: '', t: INTERVIEW.started ? (Date.now() - INTERVIEW.started) / 1000 : 0 });
+        INTERVIEW.order.push(id);
+      }
+      let text = '';
+      for await (const chunk of reader) {
+        text += chunk;
+        INTERVIEW.segs.get(id).text = text;
+        renderInterviewCaptions();
+      }
+    });
+    room.on(LK.RoomEvent.TrackSubscribed, track => {
+      if (track.kind !== 'audio') return;
+      const el = track.attach();
+      el.dataset.interview = '1';
+      document.body.appendChild(el);
+      if (INTERVIEW.addTrack) INTERVIEW.addTrack(track);
+    });
+    room.on(LK.RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
+      if (participant.isLocal || !('lk.agent.state' in changed)) return;
+      const st = changed['lk.agent.state'];
+      if (st === 'speaking') interviewState('speaking', 'Maya is speaking');
+      else if (st === 'thinking') interviewState('thinking', 'Thinking…');
+      else if (st === 'listening') interviewState('listening', INTERVIEW.muted ? 'You are muted' : 'Listening');
+      else interviewState('', 'Waiting for Maya…');
+    });
+    room.on(LK.RoomEvent.Disconnected, () => { if (!INTERVIEW.ending) endInterview(); });
+
+    document.getElementById('int-setup').style.display = 'none';
+    document.getElementById('int-live').classList.add('on');
+    renderInterviewCaptions();
+    interviewState('', 'Waiting for Maya…');
+
+    await room.connect(data.url, data.token);
+    await room.localParticipant.setMicrophoneEnabled(true);
+    INTERVIEW.started = Date.now();
+    interviewRecord(LK, room);
+    INTERVIEW.tick = setInterval(() => {
+      document.getElementById('int-timer').textContent = clDuration((Date.now() - INTERVIEW.started) / 1000);
+    }, 500);
+  } catch (e) {
+    const denied = e && (e.name === 'NotAllowedError' || /permission/i.test(e.message || ''));
+    err.textContent = denied ? 'Allow microphone access for this site, then try again.' : (e.message || 'Could not start the interview');
+    await teardownInterview();
+    resetInterviewUi();
+  }
+}
+
+function toggleInterviewMute() {
+  if (!INTERVIEW.room) return;
+  INTERVIEW.muted = !INTERVIEW.muted;
+  INTERVIEW.room.localParticipant.setMicrophoneEnabled(!INTERVIEW.muted);
+  document.getElementById('int-mute').textContent = INTERVIEW.muted ? 'Unmute' : 'Mute';
+  if (INTERVIEW.muted) interviewState('', 'You are muted');
+}
+
+async function teardownInterview() {
+  clearInterval(INTERVIEW.tick);
+  INTERVIEW.tick = null;
+  const room = INTERVIEW.room;
+  INTERVIEW.room = null;
+  INTERVIEW.addTrack = null;
+  if (room) { try { await room.disconnect(); } catch (e) {} }
+  document.querySelectorAll('audio[data-interview]').forEach(el => el.remove());
+}
+
+function resetInterviewUi() {
+  const btn = document.getElementById('int-start');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.textContent = 'Start interview';
+  document.getElementById('int-setup').style.display = '';
+  document.getElementById('int-live').classList.remove('on');
+  document.getElementById('int-timer').textContent = '0:00';
+  document.getElementById('int-mute').textContent = 'Mute';
+}
+
+async function endInterview() {
+  if (INTERVIEW.ending) return;
+  INTERVIEW.ending = true;
+  const duration = INTERVIEW.started ? Math.round((Date.now() - INTERVIEW.started) / 1000) : 0;
+  const transcript = INTERVIEW.order.map(id => INTERVIEW.segs.get(id)).filter(s => s.text.trim())
+    .map(s => ({ role: s.role, text: s.text, t: Math.round(s.t * 10) / 10 }));
+  const { name, jobId, role } = INTERVIEW;
+  INTERVIEW.started = 0;
+  const recording = await interviewStopRecording();
+  await teardownInterview();
+  resetInterviewUi();
+  if (!name) return;
+  try {
+    const res = await fetch('/api/calls/interview/end', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: name, job_id: jobId, role, duration_seconds: duration, transcript }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    if (recording) await recordingPut(data.call.id, recording);
+    CALLS.open.add(data.call.id);
+    toast('Interview saved. Your scores appear in a few seconds.');
+    refreshCalls();
+  } catch (e) { document.getElementById('int-err').textContent = "The interview ended but couldn't be saved."; }
+}
+
+// Recordings stay in this browser (IndexedDB), keyed by call id
+function recordingDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('sunny-recordings', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('calls');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function recordingPut(id, blob) {
+  try {
+    const db = await recordingDb();
+    await new Promise((res, rej) => { const tx = db.transaction('calls', 'readwrite'); tx.objectStore('calls').put(blob, String(id)); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  } catch (e) { console.warn('Could not keep the recording', e); }
+}
+async function recordingGet(id) {
+  try {
+    const db = await recordingDb();
+    return await new Promise(res => { const r = db.transaction('calls').objectStore('calls').get(String(id)); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); });
+  } catch (e) { return null; }
+}
+
+const IR_URLS = {};
+function irDots(n) { return `<span class="ir-dots" aria-label="${n} out of 5">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`; }
+function irTime(t) { return t == null ? '' : clDuration(t); }
+
+async function renderInterviewReport(el, call) {
+  const r = call.report;
+  const tr = call.transcript || [];
+  const blob = await recordingGet(call.id);
+  if (IR_URLS[call.id]) URL.revokeObjectURL(IR_URLS[call.id]);
+  IR_URLS[call.id] = blob ? URL.createObjectURL(blob) : null;
+  const audio = blob ? `<audio controls preload="metadata" id="ir-audio-${call.id}" src="${IR_URLS[call.id]}"></audio>`
+    : `<span class="cl-meta">No recording on this device. Recordings stay in the browser you interviewed in.</span>`;
+  const play = t => blob && t != null ? `<button type="button" class="cl-btn ghost ir-play" onclick="irSeek(${call.id}, ${Number(t)})">▶ Play answer · ${irTime(t)}</button>` : '';
+  let head;
+  if (!r) head = `<div class="cl-meta">Scoring your answers…</div>`;
+  else if (r.error) head = `<div class="cl-meta">${esc(r.error)}</div>`;
+  else head = `
+    <div class="ir-head"><span class="ir-big">${r.overall} / 5</span>${irDots(r.overall)}</div>
+    ${r.summary ? `<div>${esc(r.summary)}</div>` : ''}
+    ${r.questions.map((q, i) => `
+      <div class="ir-q">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${irDots(q.score)}<b>${i + 1}. ${esc(q.question)}</b></div>
+        ${q.worked ? `<div><span class="ir-lbl">Worked</span>${esc(q.worked)}</div>` : ''}
+        ${q.sharpen ? `<div><span class="ir-lbl">Sharpen</span>${esc(q.sharpen)}</div>` : ''}
+        ${q.stronger ? `<div><span class="ir-lbl">Stronger</span>${esc(q.stronger)}</div>` : ''}
+        ${play(q.t)}
+      </div>`).join('')}`;
+  el.innerHTML = `${head}${audio}
+    <div class="cl-transcript ir-tr">${tr.map(t => `<div class="cl-cap ${t.role === 'user' ? 'user' : ''}"${blob && t.t != null ? ` data-t="${Number(t.t)}" onclick="irSeek(${call.id}, ${Number(t.t)})"` : ''}>${t.t != null ? `<time>${irTime(t.t)}</time>` : ''}<b>${t.role === 'user' ? 'You' : 'Maya'}</b>${esc(t.text)}</div>`).join('')}</div>`;
+}
+
+function irSeek(id, t) {
+  const a = document.getElementById(`ir-audio-${id}`);
+  if (!a) return;
+  a.currentTime = Math.max(0, t - 0.5);
+  a.play().catch(() => {});
+}
+
+window.addEventListener('pagehide', () => { if (INTERVIEW.room) INTERVIEW.room.disconnect(); });
 
 window.addEventListener('pagehide', () => { if (PRACTICE.room) PRACTICE.room.disconnect(); });
 
