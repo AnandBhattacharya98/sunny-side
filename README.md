@@ -45,6 +45,7 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `LIVEKIT_URL` | Optional | The LiveKit project's `wss://...livekit.cloud` URL. With the key and secret above, turns on practice recruiter calls on the Calls page; the agent in `voice_agent/` must be running |
 | `LIVEKIT_AGENT_NAME` | Optional | The agent practice calls dispatch (default `sunny-screener`, matching `voice_agent/agent.py`) |
 | `LIVEKIT_STT_MODEL` | Optional | With the LiveKit keys set, Sunny's mic and Quiz Mode answers are transcribed by [LiveKit Inference STT](https://docs.livekit.io/agents/models/stt/) first, then Gemini. Defaults to `deepgram/nova-3` for English, Hindi, Spanish, French and German and `cartesia/ink-whisper` for the other languages; set this to use one model for all |
+| `LIVEKIT_LLM_MODEL` | Optional | With the LiveKit keys set and no Gemini key, Quiz Mode feedback is written by a [LiveKit Inference LLM](https://docs.livekit.io/agents/models/llm/) instead of the simple built-in checks. Defaults to `openai/gpt-4.1-mini` |
 | `FOLLOWUP_DAYS` | Optional | Days without activity before an applied or interviewing job shows in "Worth a follow-up" (default 7) |
 | `WEEKLY_SUMMARY_WEEKDAY` | Optional | Day the weekly recap email goes out with the daily cron, 0 = Monday (default 0). Only users with daily recommendations on get it |
 | `PUBLIC_BASE_URL` | Optional | The site's address, e.g. `https://sunnyside.example.com`, used for the "Open your board" link in the weekly email |

@@ -6394,7 +6394,7 @@ async function quizSubmit(jobId) {
   try {
     res = await (await vaFetch(`/api/job/${encodeURIComponent(jobId)}/interview-prep/feedback`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: item.q, hints: item.hints, answer, lang: VA.lang }),
+      body: JSON.stringify({ question: item.q, hints: item.hints, answer, lang: VA.lang, avoid: (st.said || []).slice(-8) }),
     })).json();
   } catch (e) {
     res = { ok: false, error: vaT("I couldn't reach the server. Try again?", 'सर्वर से कनेक्ट नहीं हो पाया। फिर कोशिश करें?') };
@@ -6423,6 +6423,7 @@ async function quizSubmit(jobId) {
   const token = st.token = (st.token || 0) + 1;
   st.clarified = false;
   const spoken = res.spoken || [res.verdict, ...(res.improve || []).slice(0, 2)].filter(Boolean).join(' ');
+  st.said = [...(st.said || []), spoken].slice(-8);  // so the next feedback is worded differently
   speakResponse(spoken, () => { if (token === st.token && quizHandsFree()) quizListen(jobId, 'command', true); });
 }
 

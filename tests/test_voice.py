@@ -491,6 +491,113 @@ def test_feedback_route_passes_the_users_resume(client, monkeypatch):
     assert data["spoken"] and "checkout revamp" in data["resume_example"]
 
 
+PHONEPE_Q = "What do you think are the core challenges PhonePe is facing in the market?"
+PHONEPE_HINTS = ("Identify their main competitors, highlight current macro/technical shifts, and propose 1-2 ways "
+                 "a person in your role can help mitigate them.")
+RAMBLE = ("I believe the sound systems that PhonePe is building on the payment gateways, so a lot of use, and they "
+          "are looking at others such as Paytm and similar products, and these are places where the user experience")
+BROKEN_RESUME = ("Senior PM, Acme\n• Owned onboarding, driving higher KYC completions for new users; cut iteration "
+                 "cycles by 30% and accelerated delivery by\n2x across squads\n")
+
+
+def test_opinion_questions_get_question_specific_feedback_not_star_tips():
+    import random as _r
+    res = quiz_coach.local_grade(PHONEPE_Q, PHONEPE_HINTS, RAMBLE, "PhonePe", resume=BROKEN_RESUME, rng=_r.Random(1))
+    text = " ".join(res["improve"]) + res["spoken"]
+    assert '"I" rather than "we"' not in text and "Open with the situation" not in text
+    assert "macro/technical shifts" in text  # the coach-notes point they skipped
+    assert any("Paytm" in s for s in res["strengths"])
+    assert res["resume_example"] == ""  # nothing on that resume is about this question
+    assert res["score"] <= 3
+
+
+def test_resume_lines_broken_by_pdf_extraction_are_joined():
+    lines = quiz_coach._resume_lines(BROKEN_RESUME)
+    assert any(l.endswith("accelerated delivery by 2x across squads") for l in lines)
+    assert not any(l.endswith(" by") for l in lines)
+
+
+def test_feedback_is_worded_differently_each_turn():
+    import random as _r
+    rng, said = _r.Random(3), []
+    for _ in range(3):
+        res = quiz_coach.local_grade("Tell me about a launch", "", "we did a launch and it went fine", rng=rng, avoid=said)
+        said.append(res["spoken"])
+    closers = {s.rsplit(". ", 1)[-1] for s in said}
+    assert len(closers) == 3
+
+
+def test_feedback_uses_livekit_when_there_is_no_gemini_key(monkeypatch):
+    import livekit_llm
+    seen = {}
+
+    def fake(prompt, **kw):
+        seen["prompt"] = prompt
+        return '```json\n{"score": 2, "verdict": "Some good instincts", "strengths": ["Naming Paytm"], ' \
+               '"improve": ["Cover UPI market share caps"], "better_answer": "B", "resume_example": "", ' \
+               '"spoken": "You named Paytm, nice. Next, talk about the market share cap. Again or move on?"}\n```'
+    monkeypatch.setattr(livekit_llm, "is_configured", lambda: True)
+    monkeypatch.setattr(livekit_llm, "complete", fake)
+    res = quiz_coach.grade_answer(PHONEPE_Q, PHONEPE_HINTS, RAMBLE, company="PhonePe", api_key=None,
+                                  avoid=["Solid answer. A few tweaks will make it stand out."])
+    assert res["source"] == "ai" and "market share cap" in res["spoken"]
+    assert "Do NOT coach STAR" in seen["prompt"] and "Solid answer. A few tweaks" in seen["prompt"]
+
+
+def test_feedback_falls_back_to_local_when_livekit_fails(monkeypatch):
+    import livekit_llm
+
+    def fail(prompt, **kw):
+        raise livekit_llm.LiveKitLLMError("down")
+    monkeypatch.setattr(livekit_llm, "is_configured", lambda: True)
+    monkeypatch.setattr(livekit_llm, "complete", fail)
+    assert quiz_coach.grade_answer(PHONEPE_Q, PHONEPE_HINTS, RAMBLE)["source"] == "local"
+
+
+def test_livekit_llm_reads_a_streamed_reply(monkeypatch):
+    import livekit_llm
+
+    class Resp:
+        status_code = 200
+        headers = {"Content-Type": "text/event-stream"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_lines(self, decode_unicode=True):
+            yield 'data: {"choices":[{"delta":{"content":"Hel"}}]}'
+            yield ""
+            yield 'data: {"choices":[{"delta":{"content":"lo"}}]}'
+            yield "data: [DONE]"
+    sent = {}
+
+    def post(url, json=None, headers=None, **kw):
+        sent.update(url=url, body=json, auth=headers["Authorization"])
+        return Resp()
+    monkeypatch.setenv("LIVEKIT_API_KEY", "APIkey")
+    monkeypatch.setenv("LIVEKIT_API_SECRET", "secret")
+    monkeypatch.setattr(livekit_llm.requests, "post", post)
+    assert livekit_llm.complete("hi") == "Hello"
+    assert sent["url"].endswith("/v1/chat/completions") and sent["body"]["model"] == livekit_llm.DEFAULT_MODEL
+    assert sent["auth"].startswith("Bearer ") and "secret" not in sent["auth"]
+
+
+def test_feedback_route_passes_what_sunny_already_said(client, monkeypatch):
+    seen = {}
+    real = quiz_coach.grade_answer
+
+    def spy(*a, **kw):
+        seen["avoid"] = kw.get("avoid")
+        return real(*a, **kw)
+    monkeypatch.setattr(quiz_coach, "grade_answer", spy)
+    client.post("/api/job/j1/interview-prep/feedback",
+                json={"question": "q", "answer": "a", "avoid": ["Nice, you covered the core of it."]})
+    assert seen["avoid"] == ["Nice, you covered the core of it."]
+
+
 def test_tts_quota_backs_off(monkeypatch):
     calls = []
 
