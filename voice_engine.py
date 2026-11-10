@@ -233,6 +233,18 @@ def timed(name: str):
             pass
 
 
+def _note_stats(prefix: str, stats: dict):
+    """Puts counts in the Server-Timing header too, as stt_finals=2 and so on."""
+    try:
+        from flask import g, has_request_context
+        if has_request_context():
+            timings = g.setdefault("timings", {})
+            for k, v in stats.items():
+                timings[f"{prefix}_{k}"] = float(v)
+    except Exception:
+        pass
+
+
 def gemini_generate(api_key: str, parts: list, model: str = VOICE_MODEL, generation_config: dict = None,
                     timeout: float = 12, retries: int = 1) -> dict:
     with timed("gemini"):
@@ -312,8 +324,12 @@ def transcribe(audio_bytes: bytes, mime_type: str, api_key: str | None, lang: st
         decoded = livekit_stt.wav_to_pcm(audio_bytes)
         if decoded:
             try:
-                with timed("livekit_stt"):
-                    text = livekit_stt.transcribe_pcm(*decoded, lang=lang)
+                stats = {}
+                try:
+                    with timed("livekit_stt"):
+                        text = livekit_stt.transcribe_pcm(*decoded, lang=lang, stats=stats)
+                finally:
+                    _note_stats("stt", stats)
                 return sanitize_transcript(text), "livekit"
             except livekit_stt.LiveKitSTTError as e:
                 log.warning("LiveKit transcription failed, falling back to Gemini: %s", e)

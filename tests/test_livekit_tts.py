@@ -184,6 +184,8 @@ def test_model_per_language(monkeypatch):
 @pytest.fixture
 def stt(livekit, monkeypatch):
     monkeypatch.setattr(ve, "_livekit_stt_down_until", 0.0)
+    monkeypatch.setattr(livekit_stt, "SEND_SPEED", 1000.0)
+    monkeypatch.setattr(livekit_stt, "CREATE_WAIT", 0.2)
     livekit["replies"][:] = [
         {"type": "session.created"},
         {"type": "final_transcript", "transcript": "move swiggy"},
@@ -283,5 +285,51 @@ def test_transcribe_waits_for_words_that_come_after_the_first_final(stt, monkeyp
         return ws
     monkeypatch.setattr(livekit_tts, "_connect", connect)
     assert livekit_stt.transcribe_pcm(b"\x00\x00" * 32000, 16000) == "okay move it to applied"
-    # after the first final it kept listening for at least the clip's own length (2 s)
-    assert waits[1] >= 1.5
+
+
+class _Timeout(Exception):
+    pass
+
+
+_Timeout.__name__ = "WebSocketTimeoutException"
+
+
+def _quiet_ws(replies):
+    ws = FakeWS(replies)
+    recv = ws.recv
+    ws.recv = lambda: recv() if ws.replies else (_ for _ in ()).throw(_Timeout("timed out"))
+    return ws
+
+
+def test_transcribe_waits_for_session_created_before_audio(stt, monkeypatch):
+    seen = []
+
+    def connect(url, headers, timeout):
+        ws = _quiet_ws([{"type": "session.created"}, {"type": "final_transcript", "transcript": "hi"},
+                        {"type": "session.finalized"}])
+        send = ws.send
+
+        def tracked(data):
+            msg = json.loads(data)
+            # by the time audio goes out, the session.created reply has been read
+            seen.append((msg["type"], len(ws.replies)))
+            send(data)
+        ws.send = tracked
+        return ws
+    monkeypatch.setattr(livekit_tts, "_connect", connect)
+    assert livekit_stt.transcribe_pcm(b"\x00\x00" * 1600, 16000) == "hi"
+    first_audio = next(left for kind, left in seen if kind == "input_audio")
+    assert first_audio <= 2
+
+
+def test_transcribe_keeps_words_that_were_never_finalized(stt, monkeypatch):
+    stats = {}
+    monkeypatch.setattr(livekit_tts, "_connect", lambda *a: _quiet_ws([
+        {"type": "session.created"},
+        {"type": "final_transcript", "transcript": "you have three matches"},
+        {"type": "interim_transcript", "transcript": "razorpay is on"},
+        {"type": "interim_transcript", "transcript": "razorpay is on top"},
+        {"type": "session.finalized"}]))
+    text = livekit_stt.transcribe_pcm(b"\x00\x00" * 1600, 16000, stats=stats)
+    assert text == "you have three matches razorpay is on top"
+    assert stats["finals"] == 1 and stats["interims"] == 2
