@@ -603,6 +603,14 @@ body{font-family:'Inter', -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   cursor: pointer; color: var(--ink); background: var(--yolk); flex-shrink: 0; transition: background 0.2s, transform 0.15s; }
 .va-mic:hover { transform: scale(1.05); }
 .va-mic.listening { background: var(--rd); color: #fff; }
+.va-mic.live { background: var(--rd); color: #fff; box-shadow: 0 0 0 0 color-mix(in srgb, var(--rd) 45%, transparent); animation: vaLivePulse 1.8s ease-out infinite; }
+@keyframes vaLivePulse { to { box-shadow: 0 0 0 12px transparent; } }
+.qz-live { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--mut); }
+.qz-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--hin); flex-shrink: 0; }
+.qz-live[data-state="listening"] i { background: var(--ok-txt, #2f9e44); }
+.qz-live[data-state="speaking"] i, .qz-live[data-state="thinking"] i { background: var(--yolk); animation: clPulseLive 1s ease-in-out infinite; }
+@keyframes clPulseLive { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .va-mic.live, .qz-live i { animation: none !important; } }
 .va-mic.pulse::after, .va-mic.listening::after { content: ""; position: absolute; inset: -6px; border-radius: 50%;
   border: 2px solid var(--yolk); animation: vaRing 1.6s ease-out infinite; }
 .va-mic.listening::after { border-color: var(--rd); }
@@ -3362,6 +3370,7 @@ function openVoiceAssistant() {
 }
 
 function closeVoiceAssistant() {
+  if (liveActive('sunny')) liveStop();
   VA.convo = false;
   stopSpeaking();
   cancelListening();
@@ -3420,6 +3429,7 @@ function setAssistantStatus(state, label) {
 // ── Listening ──
 function toggleVoiceListening() {
   hideNudge();
+  if (liveActive('sunny') || LIVE.starting) { liveStop(); return; }
   if (VA.listening) { vaConvoEnd(); cancelListening(); return; }
   if (VA.convo && document.getElementById('va-status')?.dataset.state === 'speaking') { vaConvoEnd(); stopSpeaking(); return; }
   if (vaGet('localStorage', 'mic_consent_accepted') !== 'true') {
@@ -3427,6 +3437,10 @@ function toggleVoiceListening() {
     return;
   }
   if (!document.body.classList.contains('va-panel-open')) openVoiceAssistant();
+  if (liveAvailable()) {  // real-time Sunny; falls back to the mic below if the agent can't be reached
+    liveStart('sunny').then(ok => { if (!ok) { vaConvoStart(); startListening(); } });
+    return;
+  }
   vaConvoStart();
   startListening();
 }
@@ -3707,6 +3721,7 @@ function startBrowserRecognition(SpeechRecognition) {
 
 // ── Conversation ──
 function sendSuggestionQuery(text) {
+  if (liveActive('sunny')) { addMessageBubble(text, 'user'); liveSay(text); return; }
   text = (text || '').trim();
   if (!text) return;
   handleUserText(text, false);
@@ -3723,6 +3738,7 @@ function sendTextInput() {
   const text = input.value.trim();
   if (!text) { toggleVoiceListening(); return; }
   input.value = '';
+  if (liveActive('sunny')) { addMessageBubble(text, 'user'); liveSay(text); return; }
   vaConvoEnd();
   handleUserText(text, false);
 }
@@ -3866,8 +3882,18 @@ function celebrateSunny() {
   setTimeout(() => { if (document.body.dataset.sunny === 'happy') document.body.dataset.sunny = 'idle'; }, 1600);
 }
 
-function confirmBubbleAction() { addMessageBubble(vaT('Yes, go ahead', 'हाँ, कर दो'), 'user'); confirmVoiceAction(); }
-function cancelBubbleAction() { addMessageBubble(vaT('No, cancel', 'नहीं, रद्द करो'), 'user'); cancelVoiceAction(); }
+function confirmBubbleAction() {
+  const said = vaT('Yes, go ahead', 'हाँ, कर दो');
+  addMessageBubble(said, 'user');
+  if (liveActive('sunny')) { hideConfirmButtons(); liveSay(said); return; }
+  confirmVoiceAction();
+}
+function cancelBubbleAction() {
+  const said = vaT('No, cancel', 'नहीं, रद्द करो');
+  addMessageBubble(said, 'user');
+  if (liveActive('sunny')) { hideConfirmButtons(); liveSay(said); return; }
+  cancelVoiceAction();
+}
 
 function hideConfirmButtons() {
   document.querySelectorAll('#voice-messages .va-confirm, #voice-messages .va-confirm-hint').forEach(el => el.remove());
@@ -3876,6 +3902,7 @@ function hideConfirmButtons() {
 
 // A board change needs a reload; the chat and open panel come back afterwards
 function scheduleBoardReload() {
+  if (LIVE.room) { LIVE.reloadPending = true; return; }  // reloading would hang up on live Sunny
   clearTimeout(VA.reloadTimer);
   const started = Date.now();
   const go = () => {
@@ -3885,6 +3912,299 @@ function scheduleBoardReload() {
     location.reload();
   };
   VA.reloadTimer = setTimeout(go, 1600);
+}
+
+// ── Live Sunny: real-time voice through the LiveKit agent in voice_agent/ ──
+// Sunny streams both ways, knows when you've finished talking and stops when you talk over her.
+// She asks this page (over LiveKit RPC) to run board commands and grade quiz answers, through the
+// same endpoints the typed chat uses. If the agent can't be reached, the old mic path takes over.
+const LIVE_CLIENT_SRC = 'https://cdn.jsdelivr.net/npm/livekit-client@2.15.3/dist/livekit-client.umd.min.js';
+const LIVE = { room: null, mode: null, jobId: null, starting: false, segs: new Map(), reloadPending: false, agentTimer: null, agentState: '' };
+
+function liveAvailable() {
+  return !!(VA.welcome && VA.welcome.live_voice) && !!window.RTCPeerConnection && vaGet('sessionStorage', 'va_live_off') !== '1';
+}
+function liveActive(mode) { return !!LIVE.room && (!mode || LIVE.mode === mode); }
+function liveQuizFor(jobId) { return liveActive('quiz') && String(LIVE.jobId) === String(jobId); }
+
+function liveLoadClient() {
+  if (window.LivekitClient) return Promise.resolve(window.LivekitClient);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = LIVE_CLIENT_SRC;
+    s.onload = () => window.LivekitClient ? resolve(window.LivekitClient) : reject(new Error('LiveKit did not load'));
+    s.onerror = () => reject(new Error('LiveKit did not load'));
+    document.head.appendChild(s);
+  });
+}
+
+async function liveStart(mode, opts = {}) {
+  if (LIVE.room || LIVE.starting) return false;
+  LIVE.starting = true;
+  vaConvoEnd();
+  cancelListening();
+  stopSpeaking();
+  if (mode === 'sunny') setAssistantStatus('thinking', vaT('Connecting live…', 'लाइव जुड़ रही हूँ…'));
+  try {
+    const [LK, res] = await Promise.all([
+      liveLoadClient(),
+      vaFetch('/api/voice/live/start', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, lang: VA.lang, ...opts }) }),
+    ]);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Live voice is unavailable');
+    const room = new LK.Room({ adaptiveStream: true, dynacast: true });
+    Object.assign(LIVE, { room, mode, jobId: opts.job_id || null, segs: new Map(), agentState: '' });
+    liveWire(room, LK);
+    await room.connect(data.url, data.token);
+    await room.localParticipant.setMicrophoneEnabled(true);
+    room.startAudio().catch(() => {});
+    liveUi();
+    // No agent within a few seconds (not deployed, or asleep): hand back to the old mic path
+    LIVE.agentTimer = setTimeout(() => { if (LIVE.room === room && !liveAgent()) liveFail(); }, 9000);
+    return true;
+  } catch (e) {
+    console.warn('Live Sunny unavailable:', e);
+    const denied = e && (e.name === 'NotAllowedError' || /permission/i.test(e.message || ''));
+    await liveStop(true);
+    if (!denied) vaSet('sessionStorage', 'va_live_off', '1');
+    return false;
+  } finally {
+    LIVE.starting = false;
+  }
+}
+
+function liveAgent() {
+  const room = LIVE.room;
+  if (!room) return null;
+  return [...room.remoteParticipants.values()].find(p => p.isAgent || (p.kind === 4) || /^agent-/.test(p.identity)) || null;
+}
+
+// The agent never showed up: remember for this tab, and carry on the usual way
+async function liveFail() {
+  const mode = LIVE.mode, jobId = LIVE.jobId;
+  vaSet('sessionStorage', 'va_live_off', '1');
+  await liveStop(true);
+  if (mode === 'sunny') {
+    addAssistantNote(vaT("Live voice isn't answering right now, so I'll listen the usual way.", 'लाइव आवाज़ अभी जवाब नहीं दे रही, इसलिए मैं पहले की तरह सुनूँगी।'));
+    vaConvoStart();
+    startListening();
+  } else if (mode === 'quiz' && QZ[jobId]) {
+    renderPracticeQuestion(jobId, true);
+  }
+}
+
+function liveWire(room, LK) {
+  room.on(LK.RoomEvent.TrackSubscribed, track => {
+    if (track.kind !== 'audio') return;
+    const el = track.attach();
+    el.dataset.live = '1';
+    document.body.appendChild(el);
+  });
+  room.on(LK.RoomEvent.ParticipantConnected, () => { if (liveAgent()) clearTimeout(LIVE.agentTimer); });
+  room.on(LK.RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
+    if (participant.isLocal || !('lk.agent.state' in changed)) return;
+    clearTimeout(LIVE.agentTimer);
+    LIVE.agentState = changed['lk.agent.state'];
+    liveUi();
+  });
+  room.on(LK.RoomEvent.Disconnected, () => { if (LIVE.room === room) liveStop(); });
+
+  // Captions: Sunny's words as she says them, and yours as the speech-to-text hears them
+  room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
+    const attrs = reader.info.attributes || {};
+    const id = attrs['lk.segment_id'] || reader.info.id;
+    const role = participant.identity === room.localParticipant.identity ? 'user' : 'assistant';
+    let text = '';
+    for await (const chunk of reader) {
+      text += chunk;  // each stream carries one segment's latest text; Sunny's streams in as she speaks
+      liveCaption(id, role, text, attrs['lk.transcription_final'] === 'true');
+    }
+  });
+
+  const rpc = (name, fn) => room.registerRpcMethod(name, async data => {
+    let payload = {};
+    try { payload = JSON.parse(data.payload || '{}'); } catch (e) {}
+    try { return JSON.stringify(await fn(payload) || {}); } catch (e) { console.error('Live RPC', name, e); return JSON.stringify({ ok: false, error: 'The page hit an error' }); }
+  });
+  rpc('sunny.ask', liveAsk);
+  rpc('sunny.confirm', liveConfirm);
+  rpc('sunny.cancel', liveCancel);
+  rpc('quiz.show', liveQuizShow);
+  rpc('quiz.grade', liveQuizGrade);
+  rpc('quiz.finish', liveQuizFinish);
+}
+
+function liveCaption(id, role, text, final) {
+  text = (text || '').trim();
+  if (LIVE.mode === 'quiz') {
+    const say = qzEl(LIVE.jobId)?.querySelector('.qz-say');
+    if (say && text) say.textContent = (role === 'user' ? vaT('You: ', 'आप: ') : 'Sunny: ') + text;
+    return;
+  }
+  if (!text) return;
+  const seg = LIVE.segs.get(id);
+  if (!seg) {
+    addMessageBubble(text, role === 'user' ? 'user' : 'assistant', role === 'user');
+    const els = document.querySelectorAll('#voice-messages .va-msg');
+    LIVE.segs.set(id, { el: els[els.length - 1], msg: VA.messages[VA.messages.length - 1], hist: VA.history[VA.history.length - 1] });
+    return;
+  }
+  const bubble = seg.el?.querySelector('.va-bubble');
+  if (bubble) bubble.textContent = text;
+  if (seg.msg) seg.msg.text = text;
+  if (seg.hist) seg.hist.text = text;
+  if (final) saveAssistantState();
+  const box = document.getElementById('voice-messages');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function liveUi() {
+  const on = liveActive();
+  const mic = document.getElementById('voice-action-mic');
+  if (mic) {
+    mic.classList.toggle('live', liveActive('sunny'));
+    mic.title = liveActive('sunny') ? vaT('End live chat', 'लाइव बातचीत खत्म करें') : vaT('Talk to Sunny', 'Sunny से बात करें');
+  }
+  const st = LIVE.agentState;
+  const label = !on ? '' : st === 'speaking' ? vaT('Live · speaking', 'लाइव · बोल रही हूँ')
+    : st === 'thinking' ? vaT('Live · thinking…', 'लाइव · सोच रही हूँ…')
+    : st === 'listening' ? vaT('Live · listening', 'लाइव · सुन रही हूँ')
+    : vaT('Live · connecting…', 'लाइव · जुड़ रही हूँ…');
+  if (LIVE.mode === 'sunny') {
+    if (on) setAssistantStatus(st === 'speaking' ? 'speaking' : st === 'thinking' ? 'thinking' : 'listening', label);
+    else setAssistantStatus('ready');
+    const input = document.getElementById('voice-text-input');
+    if (input) input.placeholder = on ? vaT('Live: just talk, or type here', 'लाइव: बस बोलिए, या यहाँ टाइप करें') : vaT('Ask me anything, or tap the mic', 'कुछ भी पूछें, या माइक टैप करें');
+  }
+  if (LIVE.mode === 'quiz' || !on) {
+    document.querySelectorAll('.qz-live-state').forEach(el => { el.textContent = label; });
+    document.querySelectorAll('.qz-live').forEach(el => { el.dataset.state = st || ''; });
+  }
+}
+
+function liveSay(text) {
+  if (!LIVE.room || !text) return;
+  LIVE.room.localParticipant.sendText(text, { topic: 'lk.chat' }).catch(err => console.warn('Live text failed', err));
+}
+
+async function liveStop(quiet) {
+  clearTimeout(LIVE.agentTimer);
+  const room = LIVE.room, mode = LIVE.mode, jobId = LIVE.jobId;
+  LIVE.room = null;
+  LIVE.agentState = '';
+  if (room) { try { await room.disconnect(); } catch (e) {} }
+  document.querySelectorAll('audio[data-live]').forEach(el => el.remove());
+  LIVE.mode = mode;
+  liveUi();
+  LIVE.mode = null;
+  LIVE.jobId = null;
+  if (mode === 'quiz' && QZ[jobId] && QZ[jobId].view === 'question' && !quiet) renderPracticeQuestion(jobId, false);
+  if (LIVE.reloadPending) { LIVE.reloadPending = false; scheduleBoardReload(); }
+}
+
+// ── What live Sunny asks the page to do ──
+async function liveJson(url, body) {
+  try {
+    const r = await vaFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return await r.json();
+  } catch (e) { return { ok: false }; }
+}
+
+function liveApply(res) {
+  if (res.lang && res.lang !== VA.lang && VA_LANGS.some(l => l.code === res.lang)) {
+    VA.lang = res.lang;
+    vaSet('localStorage', 'va_lang', VA.lang);
+    applyAssistantLang();
+  }
+  VA.pendingToken = res.requires_confirmation && res.action && res.action.token ? res.action.token : null;
+  if (res.context_job_ids && res.context_job_ids.length) VA.contextJobIds = res.context_job_ids.slice(0, 10);
+  // Sunny says the words; the chat shows any job cards and the yes/no buttons
+  if ((res.reply_cards && res.reply_cards.length) || res.requires_confirmation) {
+    addMessageBubble('', 'assistant', false, res.reply_cards, !!res.requires_confirmation, null);
+  }
+  if (res.celebrate) celebrateSunny();
+  if (res.board_changed) {
+    LIVE.reloadPending = true;
+    toast(vaT('Done. Your board refreshes when you end the live chat.', 'हो गया। लाइव बातचीत खत्म होने पर बोर्ड अपडेट होगा।'));
+  }
+  const quizJob = res.action && res.action.type === 'open_quiz' && res.action.job_id;
+  if (quizJob) {
+    // Hand over from chat to the live quiz coach once Sunny finishes her sentence
+    setTimeout(async () => { await liveStop(true); openQuizFor(quizJob); }, 2500);
+  }
+  return { reply: res.reply_text || res.error || '', needs_confirmation: !!res.requires_confirmation,
+           board_changed: !!res.board_changed, opened_quiz: !!quizJob };
+}
+
+async function liveAsk({ text }) {
+  const res = await liveJson('/api/voice/query', { transcript: String(text || '').slice(0, 500),
+    chat_history: VA.history.slice(-9, -1), context_job_ids: VA.contextJobIds, lang: VA.lang });
+  return liveApply(res);
+}
+
+async function liveConfirm() {
+  const token = VA.pendingToken;
+  VA.pendingToken = null;
+  hideConfirmButtons();
+  if (!token) return { reply: vaT('That request has expired. Just ask me again.', 'वह रिक्वेस्ट पुरानी हो गई। बस फिर से पूछ लीजिए।') };
+  const res = await liveJson('/api/voice/confirm', { token, lang: VA.lang });
+  return liveApply(res.ok ? { ...res, celebrate: true } : { reply_text: res.error || vaT("Sorry, I couldn't do that.", 'माफ़ कीजिए, मैं यह नहीं कर पाई।') });
+}
+
+async function liveCancel() {
+  VA.pendingToken = null;
+  hideConfirmButtons();
+  const res = await liveJson('/api/voice/cancel', { lang: VA.lang });
+  return { reply: res.reply_text || vaT('No problem, cancelled.', 'कोई बात नहीं, रद्द कर दिया।') };
+}
+
+function liveQuizShow({ index, retry }) {
+  const st = QZ[LIVE.jobId];
+  if (!st) return { ok: false };
+  if (retry) { quizRetry(LIVE.jobId, true); return { ok: true }; }
+  st.pos = Math.max(0, Math.min(Number(index) || 0, st.order.length - 1));
+  renderPracticeQuestion(LIVE.jobId, false);
+  return { ok: true };
+}
+
+async function liveQuizGrade({ index, answer }) {
+  const jobId = LIVE.jobId;
+  const st = QZ[jobId];
+  if (!st) return { ok: false, error: 'Quiz closed' };
+  const pos = Math.max(0, Math.min(Number(index) || 0, st.order.length - 1));
+  if (pos !== st.pos || st.view !== 'question') { st.pos = pos; renderPracticeQuestion(jobId, false); }
+  const box = qzEl(jobId)?.querySelector('.qz-answer');
+  if (box) box.value = String(answer || '');
+  const res = await quizFeedback(jobId, String(answer || ''));
+  return res.ok ? { ok: true, score: res.score, spoken: res.spoken } : { ok: false, error: res.error || 'grading failed' };
+}
+
+function liveQuizFinish() {
+  const jobId = LIVE.jobId;
+  const st = QZ[jobId];
+  if (!st) return { ok: false };
+  const done = st.order.filter(i => st.results[i]);
+  const avg = done.length ? done.reduce((sum, i) => sum + st.results[i].score, 0) / done.length : 0;
+  renderPracticeSummary(jobId);
+  return { ok: true, summary: done.length
+    ? `${done.length} of ${st.order.length} answered, average ${avg.toFixed(1)} out of 5`
+    : 'no questions answered' };
+}
+
+function liveQuizDecorate(jobId) {
+  const el = qzEl(jobId);
+  if (!el) return;
+  el.querySelectorAll('.qz-mic, .qz-hf, .qz-timer, [onclick^="quizSpeakQuestion"]').forEach(b => { b.style.display = 'none'; });
+  const box = el.querySelector('.qz-answer');
+  if (box) box.placeholder = vaT('Just answer out loud. Or type here and press Send to Sunny.', 'बस बोलकर जवाब दें। या यहाँ टाइप करके Sunny को भेजें दबाएँ।');
+  const submit = el.querySelector('.qz-submit');
+  if (submit) submit.textContent = vaT('Send to Sunny', 'Sunny को भेजें');
+  const actions = el.querySelector('.qz-actions');
+  if (actions && !actions.querySelector('.qz-live')) {
+    actions.insertAdjacentHTML('afterbegin', `<span class="qz-live" data-state="${esc(LIVE.agentState)}"><i></i><span class="qz-live-state"></span></span>`);
+  }
+  liveUi();
 }
 
 // ── Speaking ──
@@ -4295,7 +4615,7 @@ function addAssistantNote(text) {
 function addMessageBubble(text, sender, isSpoken = false, replyCards = null, requiresConfirmation = false, suggestions = null) {
   const msg = { text, sender, spoken: !!isSpoken, cards: replyCards || [], confirm: !!requiresConfirmation,
                 suggestions: suggestions || [], time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-  VA.history.push({ role: sender === 'user' ? 'user' : 'model', text });
+  if (text) VA.history.push({ role: sender === 'user' ? 'user' : 'model', text });
   if (VA.history.length > 12) VA.history.shift();
   VA.messages.push(msg);
   if (VA.messages.length > VA_MAX_MESSAGES) VA.messages.shift();
@@ -4331,7 +4651,7 @@ function renderMessage(msg) {
     el.innerHTML = `
       <div class="va-avatar mascot" aria-hidden="true">${vaSunIcon()}</div>
       <div class="va-body">
-        <div class="va-bubble">${esc(msg.text)}</div>
+        ${msg.text ? `<div class="va-bubble">${esc(msg.text)}</div>` : ''}
         ${cards}${confirm}${chips}
         <span class="va-meta">${esc(msg.time)}</span>
       </div>`;
@@ -6156,8 +6476,16 @@ function startPractice(jobId, onlyWeak) {
   if (!st.order.length) st.order = st.qs.map((_, i) => i);
   if (!onlyWeak) st.results = {};
   st.pos = 0;
-  renderPracticeQuestion(jobId, true);
   qzEl(jobId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (liveAvailable() && vaGet('localStorage', 'mic_consent_accepted') === 'true') {
+    // Real-time coach: Sunny asks, listens with proper turn-taking and talks the feedback through
+    if (LIVE.room) liveStop();
+    renderPracticeQuestion(jobId, false);
+    liveStart('quiz', { job_id: jobId, questions: st.order.map(i => ({ q: st.qs[i].q, hints: st.qs[i].hints })), start: 0 })
+      .then(ok => { if (ok) liveQuizDecorate(jobId); else renderPracticeQuestion(jobId, true); });
+    return;
+  }
+  renderPracticeQuestion(jobId, true);
 }
 
 function renderPracticeQuestion(jobId, speak) {
@@ -6205,6 +6533,7 @@ function renderPracticeQuestion(jobId, speak) {
       <div class="qz-say" aria-live="polite"></div>
       <div class="qz-feedback" hidden></div>
     </div>`;
+  if (liveQuizFor(jobId)) { liveQuizDecorate(jobId); return; }
   if (speak) quizSpeakQuestion(jobId);
 }
 
@@ -6416,10 +6745,26 @@ async function quizSubmit(jobId) {
     box?.focus();
     return;
   }
+  if (liveQuizFor(jobId)) { liveSay(answer); return; }  // live Sunny grades it and talks it through
+  const res = await quizFeedback(jobId, answer);
+  if (!res.ok) return;
+  const token = st.token = (st.token || 0) + 1;
+  st.clarified = false;
+  speakResponse(res.spoken, () => { if (token === st.token && quizHandsFree()) quizListen(jobId, 'command', true); });
+}
+
+// Grades an answer through the website and shows the feedback card. Live Sunny calls this over RPC too,
+// so both paths grade the same way. Returns the response, with `spoken` set to what Sunny should say.
+async function quizFeedback(jobId, answer) {
+  const st = QZ[jobId];
+  const el = qzEl(jobId);
+  if (!st || !el) return { ok: false, error: 'Quiz closed' };
   const idx = st.order[st.pos];
   const item = st.qs[idx];
   const fb = el.querySelector('.qz-feedback');
   const submit = el.querySelector('.qz-submit');
+  const box = el.querySelector('.qz-answer');
+  if (box && !box.value.trim()) box.value = answer;
   if (submit) submit.disabled = true;
   fb.hidden = false;
   fb.innerHTML = `<div class="qz-thinking"><span class="va-typing"><span></span><span></span><span></span></span>${vaT('Sunny is listening back to your answer…', 'Sunny आपका जवाब सुन रही है…')}</div>`;
@@ -6433,7 +6778,7 @@ async function quizSubmit(jobId) {
     res = { ok: false, error: vaT("I couldn't reach the server. Try again?", 'सर्वर से कनेक्ट नहीं हो पाया। फिर कोशिश करें?') };
   }
   if (submit) submit.disabled = false;
-  if (!res.ok) { fb.innerHTML = `<div class="qz-thinking">${esc(res.error || vaT('Something went wrong. Try again?', 'कुछ गड़बड़ हो गई। फिर कोशिश करें?'))}</div>`; return; }
+  if (!res.ok) { fb.innerHTML = `<div class="qz-thinking">${esc(res.error || vaT('Something went wrong. Try again?', 'कुछ गड़बड़ हो गई। फिर कोशिश करें?'))}</div>`; return res; }
   st.results[idx] = { score: res.score, answer };
   const a = qzArg(jobId);
   const last = st.pos >= st.order.length - 1;
@@ -6453,14 +6798,13 @@ async function quizSubmit(jobId) {
       <button class="qz-btn primary" type="button" onclick="quizNext(${a})">${last ? vaT('See how I did', 'मेरा नतीजा देखें') : vaT('Next question →', 'अगला सवाल →')}</button>
     </div>`;
   if (res.score >= 4) celebrateSunny();
-  const token = st.token = (st.token || 0) + 1;
-  st.clarified = false;
-  const spoken = res.spoken || [res.verdict, ...(res.improve || []).slice(0, 2)].filter(Boolean).join(' ');
-  st.said = [...(st.said || []), spoken].slice(-8);  // so the next feedback is worded differently
-  speakResponse(spoken, () => { if (token === st.token && quizHandsFree()) quizListen(jobId, 'command', true); });
+  res.spoken = res.spoken || [res.verdict, ...(res.improve || []).slice(0, 2)].filter(Boolean).join(' ');
+  st.said = [...(st.said || []), res.spoken].slice(-8);  // so the next feedback is worded differently
+  return res;
 }
 
-function quizRetry(jobId) {
+function quizRetry(jobId, fromLive) {
+  if (liveQuizFor(jobId) && !fromLive) { liveSay(vaT('Let me try that one again.', 'मुझे यह फिर से करने दो।')); return; }
   const el = qzEl(jobId);
   const fb = el?.querySelector('.qz-feedback');
   if (fb) { fb.hidden = true; fb.innerHTML = ''; }
@@ -6468,9 +6812,10 @@ function quizRetry(jobId) {
   if (box) { box.value = ''; box.focus(); }
 }
 
-function quizNext(jobId) {
+function quizNext(jobId, skip) {
   const st = QZ[jobId];
   if (!st) return;
+  if (liveQuizFor(jobId)) { liveSay(skip ? vaT("Let's skip this one. Next question.", 'इसे छोड़ते हैं। अगला सवाल।') : vaT('Next question, please.', 'अगला सवाल, प्लीज़।')); return; }
   quizStopMic(jobId);
   st.token = (st.token || 0) + 1;
   stopSpeaking();
@@ -6480,6 +6825,7 @@ function quizNext(jobId) {
 }
 
 function endPractice(jobId) {
+  if (liveQuizFor(jobId)) liveStop();
   quizStopMic(jobId);
   if (QZ[jobId]) QZ[jobId].token = (QZ[jobId].token || 0) + 1;
   stopSpeaking();
@@ -6524,7 +6870,7 @@ function renderPracticeSummary(jobId) {
       </div>
     </div>`;
   if (done.length) {
-    speakResponse(headline);
+    if (!liveQuizFor(jobId)) speakResponse(headline);  // live Sunny sums it up herself
     if (avg >= 4) celebrateSunny();
   }
 }

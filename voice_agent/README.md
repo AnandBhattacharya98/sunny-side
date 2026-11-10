@@ -44,6 +44,14 @@ Leave it running and start a practice call on the Calls page. The live site disp
 
 You can also talk to it in a terminal with `python agent.py console`.
 
+## Real-time Sunny (board chat and Quiz Mode)
+
+The same agent also plays Sunny when the board's mic is tapped, and the Quiz Mode coach when practice starts. The website sends `mode: "sunny"` (with a board snapshot) or `mode: "quiz"` (with the questions) in the job metadata; the code is in [`sunny_live.py`](sunny_live.py).
+
+Sunny never touches the database. When she needs something done, such as moving a job, explaining a score or grading an answer, she asks the browser over LiveKit RPC, and the browser runs it through the same endpoints the typed chat uses. Confirmations, quiz scoring and the summary all behave as they do without live mode. Board changes show up after the live chat ends, because reloading the board would hang up the call.
+
+Sunny speaks with the site's voice (`SUNNY_TTS_VOICE`, Cartesia Sonic 3) in the user's chosen language. Speech-to-text is Deepgram Nova 3 `multi` for English, Hindi, Spanish, French and German, and Cartesia Ink Whisper for the others (`SUNNY_STT_MODEL` overrides it). The quiz coach waits longer before replying (`QUIZ_MIN_ENDPOINTING_DELAY` 1.0 s, `QUIZ_MAX_ENDPOINTING_DELAY` 5.0 s), so thinking pauses don't cut an answer off.
+
 ## Phone practice (LiveKit SIP)
 
 The same recruiter can take a real phone call, two ways. Both log the call on the Calls page when it ends: the agent posts the transcript to the website, signed with a shared secret.
