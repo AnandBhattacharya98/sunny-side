@@ -154,7 +154,7 @@ def test_clean_timed_transcript():
 
 def test_calls_page_has_interview_card(conn):
     html = _client().get("/calls?interview=int-j1").get_data(as_text=True)
-    assert "Mock interview" in html and 'value="int-j1" selected' in html and "Zepto" not in html
+    assert "Mock interview" in html and 'value="int-j1" title="Product Manager · Razorpay" selected' in html and "Zepto" not in html
 
 
 # ── Recruiter call rehearsals: salary negotiation and follow-up ──
