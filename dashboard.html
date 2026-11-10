@@ -3646,7 +3646,7 @@ function scheduleBoardReload() {
   clearTimeout(VA.reloadTimer);
   const started = Date.now();
   const go = () => {
-    const speaking = (VA.player && !VA.player.paused && !VA.player.ended && VA.player.src !== VA_SILENT_WAV) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+    const speaking = !!VA.webSource || (VA.player && !VA.player.paused && !VA.player.ended && VA.player.src !== VA_SILENT_WAV) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
     if (speaking && Date.now() - started < 9000) { VA.reloadTimer = setTimeout(go, 300); return; }
     saveAssistantState(true);
     location.reload();
@@ -3708,7 +3708,50 @@ function speakResponse(text, onDone) {
 
 // Plays Gemini's audio, and hands over to the browser voice if it errors, is blocked, or simply
 // never starts (some browsers resolve play() and then sit there in silence).
+// Sunny's server voice plays through Web Audio first. Some Chrome setups never start an <audio>
+// element (it sits at readyState 0 and stalls) while Web Audio plays fine, so the element is
+// only the second choice, and the browser's own voice the third.
 function vaPlayAudio(src, done, token, onFail) {
+  const ctx = vaAudioCtx();
+  if (!ctx) { vaPlayAudioElement(src, done, token, onFail); return; }
+  let settled = false;
+  const viaElement = () => { if (settled || token !== VA.speakToken) return; settled = true; vaPlayAudioElement(src, done, token, onFail); };
+  const resumed = ctx.state === 'running' ? Promise.resolve() : Promise.race([
+    ctx.resume(), new Promise((_, reject) => setTimeout(() => reject(new Error('audio context suspended')), 1000))
+  ]);
+  resumed
+    .then(() => {
+      const b64 = src.slice(src.indexOf(',') + 1);
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      return new Promise((resolve, reject) => {
+        const p = ctx.decodeAudioData(bytes.buffer, resolve, reject);
+        if (p && p.then) p.then(resolve, reject);
+      });
+    })
+    .then(buffer => {
+      if (settled || token !== VA.speakToken) return;
+      if (ctx.state !== 'running') throw new Error('audio context suspended');
+      settled = true;
+      const node = ctx.createBufferSource();
+      node.buffer = buffer;
+      node.connect(ctx.destination);
+      node.onended = () => { if (VA.webSource === node) { VA.webSource = null; done(); } };
+      VA.webSource = node;
+      node.start();
+    })
+    .catch(viaElement);
+}
+
+function vaAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!VA.audioCtx) {
+    try { VA.audioCtx = new AC(); } catch (e) { return null; }
+  }
+  return VA.audioCtx;
+}
+
+function vaPlayAudioElement(src, done, token, onFail) {
   const player = vaPlayer();
   let playing = false;
   let failed = false;
@@ -3747,6 +3790,10 @@ function vaPlayer() {
 function vaUnlockAudio() {
   if (VA.audioUnlocked) return;
   VA.audioUnlocked = true;
+  try {
+    const ctx = vaAudioCtx();  // created and resumed inside a tap, so it may play later
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  } catch (e) {}
   try {
     const player = vaPlayer();
     player.src = VA_SILENT_WAV;
@@ -3875,6 +3922,7 @@ function stopSpeaking() {
   VA.speakToken++;
   clearInterval(VA.keepAlive);
   if (VA.player) { VA.player.onended = null; VA.player.onerror = null; VA.player.pause(); }
+  if (VA.webSource) { const node = VA.webSource; VA.webSource = null; node.onended = null; try { node.stop(); } catch (e) {} }
   if ('speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   if (document.getElementById('va-status')?.dataset.state === 'speaking') setAssistantStatus('ready');
 }
