@@ -13,14 +13,29 @@ import re
 log = logging.getLogger("interview")
 
 LENGTHS = {"short": 4, "full": 7}
+# Recruiter call rehearsals (Maya plays the recruiter); the mock interview is the "interview" scenario
+SCENARIOS = {
+    "interview": {"label": "Mock interview"},
+    "salary": {"label": "Salary negotiation",
+               "rubric": ["Anchoring and the number you asked for", "Justifying it with your value",
+                          "Handling pushback calmly", "Negotiating beyond base (bonus, joining date, title)",
+                          "Closing with clear next steps"]},
+    "followup": {"label": "Recruiter follow-up",
+                 "rubric": ["Opening and reminding them who you are", "Getting a clear timeline and next step",
+                            "Asking for feedback", "Restating your interest and fit", "Tone: polite, confident, brief"]},
+}
+MAX_TARGET = 200
 MAX_POSTING = 2500
 MAX_REPORT_QUESTIONS = 10
 
 
-def interview_brief(job: dict, *, length: str, resume: str, name: str, lang: str) -> dict:
+def interview_brief(job: dict, *, length: str, resume: str, name: str, lang: str, scenario: str = "interview",
+                    target: str = "") -> dict:
     """The job metadata for the agent."""
     return {
         "mode": "interview",
+        "scenario": scenario if scenario in SCENARIOS else "interview",
+        "target": " ".join((target or "").split())[:MAX_TARGET],
         "lang": lang,
         "candidate_name": " ".join((name or "").split())[:60],
         "role": " ".join((job.get("title") or "").split())[:120],
@@ -77,6 +92,25 @@ def scoring_prompt(transcript: list[dict], role: str, company: str, posting: str
     )
 
 
+def rehearsal_prompt(transcript: list[dict], scenario: str, role: str, company: str, target: str) -> str:
+    sc = SCENARIOS[scenario]
+    rubric = "\n".join(f"- {r}" for r in sc["rubric"])
+    return (
+        f"You are a career coach reviewing a practice {sc['label'].lower()} phone call between a job seeker and a "
+        f"recruiter for {role or 'a role'}{' at ' + company if company else ''}.\n"
+        + (f"The candidate's goal going in: {target}\n" if target else "")
+        + "Below is the transcript; each line has a number in brackets.\n\n"
+        f"{_numbered(transcript)[:24000]}\n\n"
+        f"Score the candidate from 1 to 5 on each of these:\n{rubric}\n"
+        "Be specific: point to what they actually said. For each one, give the number of the transcript line "
+        "where it showed most (an interviewer or candidate line), or -1 if it never came up.\n"
+        "Reply with JSON only, in this shape:\n"
+        '{"overall": 1-5, "summary": "two sentences: how the call went, and the single biggest thing to do next time",'
+        ' "questions": [{"question": "the criterion, as named above", "line": number, "score": 1-5,'
+        ' "worked": "one sentence", "sharpen": "one sentence", "stronger": "a line they could have said instead"}]}'
+    )
+
+
 def _json_from(text: str) -> dict:
     text = (text or "").strip()
     text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.M).strip()
@@ -115,11 +149,11 @@ def parse_report(text: str, transcript: list[dict]) -> dict:
             line = int(q.get("line"))
         except (TypeError, ValueError):
             line = -1
-        # Where the answer starts: the first candidate line after the question
+        # Where the answer starts: the line itself if it's the candidate's, else the next candidate line
         t = None
         if 0 <= line < len(transcript):
             t = transcript[line]["t"]
-            for item in transcript[line + 1:]:
+            for item in ([] if transcript[line]["role"] == "user" else transcript[line + 1:]):
                 if item["role"] == "user":
                     t = item["t"]
                     break
@@ -134,11 +168,15 @@ def parse_report(text: str, transcript: list[dict]) -> dict:
     return {"overall": overall, "summary": _line(data.get("summary"), 600), "questions": questions, "source": "ai"}
 
 
-def score_interview(transcript: list[dict], role: str, company: str, posting: str, api_key: str | None) -> dict:
-    """Scores the interview with Gemini, then LiveKit's LLM. Returns a report, or {"error": ...}."""
+def score_interview(transcript: list[dict], role: str, company: str, posting: str, api_key: str | None,
+                    scenario: str = "interview", target: str = "") -> dict:
+    """Scores the call with Gemini, then LiveKit's LLM. Returns a report, or {"error": ...}."""
     if sum(1 for t in transcript if t["role"] == "user") < 2:
-        return {"error": "There weren't enough answers to score. Try a longer interview."}
-    prompt = scoring_prompt(transcript, role, company, posting)
+        return {"error": "There weren't enough answers to score. Try a longer call."}
+    if scenario in SCENARIOS and scenario != "interview":
+        prompt = rehearsal_prompt(transcript, scenario, role, company, target)
+    else:
+        prompt = scoring_prompt(transcript, role, company, posting)
     attempts = []
     try:
         from ai_engine import _call_gemini, get_fallback_gemini_key
@@ -160,9 +198,22 @@ def score_interview(transcript: list[dict], role: str, company: str, posting: st
     return {"error": "Couldn't score this one. Add a Gemini key in Settings, or try again later."}
 
 
-def summary_line(report: dict, role: str) -> str:
-    what = f"Mock interview for {role}" if role else "Mock interview"
+def summary_line(report: dict, role: str, scenario: str = "interview") -> str:
+    label = SCENARIOS.get(scenario, SCENARIOS["interview"])["label"]
+    what = f"{label} for {role}" if role else label
     if report.get("error"):
         return f"{what}. {report['error']}"
+    if scenario != "interview":
+        return f"{what}: {report['overall']}/5. {report.get('summary') or ''}".strip()
     n = len(report["questions"])
     return f"{what}: {report['overall']}/5 across {n} question{'s' if n != 1 else ''}. {report.get('summary') or ''}".strip()
+
+
+def timeline_event(report: dict, scenario: str = "interview") -> str:
+    """The line added to the job's Timeline after a scored call."""
+    if scenario == "interview":
+        return f"Mock interview: {report['overall']}/5 across {len(report['questions'])} questions"
+    label = SCENARIOS[scenario]["label"]
+    weakest = min(report["questions"], key=lambda q: q["score"])
+    tip = weakest.get("sharpen") or ""
+    return f"{label} rehearsal: {report['overall']}/5. Next time: {tip}"[:300].rstrip(". ") + ("." if tip else "")

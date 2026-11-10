@@ -2351,17 +2351,23 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
       {% if practice_ready %}
       <section class="cl-card" aria-labelledby="cl-int-h">
-        <h3 id="cl-int-h">Mock interview</h3>
-        <p>Maya interviews you for one of your jobs, using its posting and your resume. Afterwards every answer gets a score out of 5 with what worked and what to sharpen, and you can replay the call on this device.</p>
+        <h3 id="cl-int-h">Mock interview and recruiter calls</h3>
+        <p>Maya interviews you for one of your jobs, using its posting and your resume, or plays the recruiter so you can rehearse a salary negotiation or a follow-up call. Afterwards you get a score out of 5 with what worked and what to sharpen, the result goes on the job's Timeline, and you can replay the call on this device.</p>
         {% if interview_jobs %}
         <div class="cl-row" id="int-setup">
           <select id="int-job" aria-label="Job to interview for">
             {% for j in interview_jobs %}<option value="{{ j.job_id }}"{% if j.job_id == interview_job %} selected{% endif %}>{{ j.title }} · {{ j.company }}</option>{% endfor %}
           </select>
+          <select id="int-type" aria-label="Type of call" onchange="interviewTypeChanged()">
+            <option value="interview">Mock interview</option>
+            <option value="salary">Salary negotiation</option>
+            <option value="followup">Recruiter follow-up</option>
+          </select>
           <select id="int-length" aria-label="Interview length">
             <option value="short">Short · 4 questions</option>
             <option value="full">Full · 7 questions</option>
           </select>
+          <input type="text" id="int-target" maxlength="200" aria-label="Your goal for the call" style="display:none;">
           <button type="button" class="cl-btn" id="int-start" onclick="startInterview()">Start interview</button>
         </div>
         <div class="cl-live" id="int-live" aria-live="polite">
@@ -2369,7 +2375,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
             <span class="cl-state"><span class="cl-dot" id="int-dot"></span><span id="int-state-text">Connecting…</span> · <span id="int-timer">0:00</span><span id="int-rec" class="cl-recdot" hidden title="Recording on this device">REC</span></span>
             <span class="cl-row">
               <button type="button" class="cl-btn ghost" id="int-mute" onclick="toggleInterviewMute()">Mute</button>
-              <button type="button" class="cl-btn stop" onclick="endInterview()">End interview</button>
+              <button type="button" class="cl-btn stop" id="int-end" onclick="endInterview()">End interview</button>
             </span>
           </div>
           <div class="cl-captions int-captions" id="int-captions"></div>
@@ -7252,8 +7258,9 @@ function renderCalls() {
     const fresh = !CALLS.seen.has(c.id);
     const kind = c.kind === 'practice' ? '<span class="cl-kind">practice</span>'
       : c.kind === 'phone' ? '<span class="cl-kind">phone practice</span>'
-      : c.kind === 'interview' ? '<span class="cl-kind">mock interview</span>' : '';
-    const more = c.kind === 'interview' && c.has_transcript
+      : c.kind === 'interview' ? '<span class="cl-kind">mock interview</span>'
+      : c.kind === 'rehearsal' ? '<span class="cl-kind">rehearsal</span>' : '';
+    const more = (c.kind === 'interview' || c.kind === 'rehearsal') && c.has_transcript
       ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide report' : (c.has_report ? 'Show report and replay' : 'Show transcript')}</button></div><div class="ir" id="cl-tr-${c.id}"></div>`
       : c.has_transcript
       ? `<div><button type="button" class="cl-link" onclick="toggleCallTranscript(${c.id})">${CALLS.open.has(c.id) ? 'Hide transcript' : 'Show transcript'}</button></div><div class="cl-transcript" id="cl-tr-${c.id}"></div>`
@@ -7293,7 +7300,7 @@ async function loadCallTranscript(id) {
     const res = await fetch(`/api/calls/${id}`);
     const data = await res.json();
     if (!data.ok) return;
-    if (data.call.kind === 'interview') { renderInterviewReport(el, data.call); return; }
+    if (data.call.kind === 'interview' || data.call.kind === 'rehearsal') { renderInterviewReport(el, data.call); return; }
     el.innerHTML = (data.call.transcript || []).map(t =>
       `<div class="cl-cap ${t.role === 'user' ? 'user' : ''}"><b>${t.role === 'user' ? 'You' : 'Recruiter'}</b>${esc(t.text)}</div>`).join('');
   } catch (e) {}
@@ -7572,8 +7579,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ── Mock interview (LiveKit): Maya interviews you for a job; the call is recorded on this device ──
-const INTERVIEW = { room: null, name: '', jobId: '', role: '', started: 0, tick: null, segs: new Map(), order: [], muted: false, ending: false,
+const INTERVIEW = { room: null, name: '', jobId: '', role: '', scenario: 'interview', target: '', started: 0, tick: null, segs: new Map(), order: [], muted: false, ending: false,
   rec: null, chunks: [], actx: null, dest: null };
+
+const INT_TYPES = {
+  interview: { start: 'Start interview', end: 'End interview', saved: 'Interview saved. Your scores appear in a few seconds.' },
+  salary: { start: 'Start call', end: 'Hang up', saved: 'Call saved. Your scored summary appears in a few seconds.',
+            placeholder: 'Your goal, e.g. 32 LPA fixed, or 20% over my current pay' },
+  followup: { start: 'Start call', end: 'Hang up', saved: 'Call saved. Your scored summary appears in a few seconds.',
+              placeholder: 'Where things stand, e.g. final round on 3 Nov, no word since' },
+};
+function interviewType() { const el = document.getElementById('int-type'); return (el && INT_TYPES[el.value]) ? el.value : 'interview'; }
+function interviewTypeChanged() {
+  const type = interviewType(), cfg = INT_TYPES[type];
+  document.getElementById('int-length').style.display = type === 'interview' ? '' : 'none';
+  const target = document.getElementById('int-target');
+  target.style.display = cfg.placeholder ? '' : 'none';
+  target.placeholder = cfg.placeholder || '';
+  const btn = document.getElementById('int-start');
+  if (!btn.disabled) btn.textContent = cfg.start;
+}
 
 function interviewState(state, text) {
   document.getElementById('int-dot').className = `cl-dot ${state}`;
@@ -7632,14 +7657,16 @@ async function startInterview() {
   try {
     const jobId = document.getElementById('int-job').value;
     const length = document.getElementById('int-length').value;
+    const scenario = interviewType();
+    const target = scenario === 'interview' ? '' : document.getElementById('int-target').value.trim();
     const [LK, res] = await Promise.all([
       loadLiveKitClient(),
-      fetch('/api/calls/interview/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId, length }) }),
+      fetch('/api/calls/interview/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId, length, scenario, target }) }),
     ]);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Could not start the interview');
     const room = new LK.Room({ adaptiveStream: true, dynacast: true });
-    Object.assign(INTERVIEW, { room, name: data.room, jobId: data.job_id, role: data.role, segs: new Map(), order: [], muted: false, ending: false, started: 0 });
+    Object.assign(INTERVIEW, { room, name: data.room, jobId: data.job_id, role: data.role, scenario: data.scenario || 'interview', target: data.target || '', segs: new Map(), order: [], muted: false, ending: false, started: 0 });
 
     room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
       const attrs = reader.info.attributes || {};
@@ -7674,6 +7701,7 @@ async function startInterview() {
     room.on(LK.RoomEvent.Disconnected, () => { if (!INTERVIEW.ending) endInterview(); });
 
     document.getElementById('int-setup').style.display = 'none';
+    document.getElementById('int-end').textContent = INT_TYPES[INTERVIEW.scenario].end;
     document.getElementById('int-live').classList.add('on');
     renderInterviewCaptions();
     interviewState('', 'Waiting for Maya…');
@@ -7715,7 +7743,7 @@ function resetInterviewUi() {
   const btn = document.getElementById('int-start');
   if (!btn) return;
   btn.disabled = false;
-  btn.textContent = 'Start interview';
+  btn.textContent = INT_TYPES[interviewType()].start;
   document.getElementById('int-setup').style.display = '';
   document.getElementById('int-live').classList.remove('on');
   document.getElementById('int-timer').textContent = '0:00';
@@ -7728,7 +7756,7 @@ async function endInterview() {
   const duration = INTERVIEW.started ? Math.round((Date.now() - INTERVIEW.started) / 1000) : 0;
   const transcript = INTERVIEW.order.map(id => INTERVIEW.segs.get(id)).filter(s => s.text.trim())
     .map(s => ({ role: s.role, text: s.text, t: Math.round(s.t * 10) / 10 }));
-  const { name, jobId, role } = INTERVIEW;
+  const { name, jobId, role, scenario, target } = INTERVIEW;
   INTERVIEW.started = 0;
   const recording = await interviewStopRecording();
   await teardownInterview();
@@ -7737,15 +7765,15 @@ async function endInterview() {
   try {
     const res = await fetch('/api/calls/interview/end', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: name, job_id: jobId, role, duration_seconds: duration, transcript }),
+      body: JSON.stringify({ room: name, job_id: jobId, role, scenario, target, duration_seconds: duration, transcript }),
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
     if (recording) await recordingPut(data.call.id, recording);
     CALLS.open.add(data.call.id);
-    toast('Interview saved. Your scores appear in a few seconds.');
+    toast((INT_TYPES[scenario] || INT_TYPES.interview).saved);
     refreshCalls();
-  } catch (e) { document.getElementById('int-err').textContent = "The interview ended but couldn't be saved."; }
+  } catch (e) { document.getElementById('int-err').textContent = "The call ended but couldn't be saved."; }
 }
 
 // Recordings stay in this browser (IndexedDB), keyed by call id
@@ -7781,10 +7809,11 @@ async function renderInterviewReport(el, call) {
   if (IR_URLS[call.id]) URL.revokeObjectURL(IR_URLS[call.id]);
   IR_URLS[call.id] = blob ? URL.createObjectURL(blob) : null;
   const audio = blob ? `<audio controls preload="metadata" id="ir-audio-${call.id}" src="${IR_URLS[call.id]}"></audio>`
-    : `<span class="cl-meta">No recording on this device. Recordings stay in the browser you interviewed in.</span>`;
-  const play = t => blob && t != null ? `<button type="button" class="cl-btn ghost ir-play" onclick="irSeek(${call.id}, ${Number(t)})">▶ Play answer · ${irTime(t)}</button>` : '';
+    : `<span class="cl-meta">No recording on this device. Recordings stay in the browser you made the call in.</span>`;
+  const rehearsal = call.kind === 'rehearsal';
+  const play = t => blob && t != null ? `<button type="button" class="cl-btn ghost ir-play" onclick="irSeek(${call.id}, ${Number(t)})">▶ ${rehearsal ? 'Play this moment' : 'Play answer'} · ${irTime(t)}</button>` : '';
   let head;
-  if (!r) head = `<div class="cl-meta">Scoring your answers…</div>`;
+  if (!r) head = `<div class="cl-meta">${rehearsal ? 'Scoring your call…' : 'Scoring your answers…'}</div>`;
   else if (r.error) head = `<div class="cl-meta">${esc(r.error)}</div>`;
   else head = `
     <div class="ir-head"><span class="ir-big">${r.overall} / 5</span>${irDots(r.overall)}</div>
