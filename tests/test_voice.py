@@ -438,6 +438,59 @@ def test_feedback_falls_back_when_gemini_fails(monkeypatch):
     assert quiz_coach.grade_answer("q", "", STAR_ANSWER, api_key="k")["source"] == "local"
 
 
+RESUME = ("Product Manager, Acme Pay\n"
+          "• Led the checkout revamp across web and app, cutting payment drop-off by 18% in two quarters\n"
+          "• Ran weekly user interviews with merchants\n")
+
+
+def test_resume_highlight_picks_an_action_with_a_result():
+    line = quiz_coach.resume_highlight(RESUME, "Tell me about a product launch that improved conversion")
+    assert line.startswith("Led the checkout revamp")
+    assert quiz_coach.resume_highlight("", "q") == ""
+
+
+def test_local_feedback_is_conversational_and_uses_the_resume():
+    res = quiz_coach.local_grade("Tell me about a launch", "", "we did a launch and it went fine", resume=RESUME)
+    assert "checkout revamp" in res["resume_example"]
+    spoken = res["spoken"]
+    assert "checkout revamp" in spoken and spoken.rstrip().endswith("?")
+    assert len(spoken.split(". ")) >= 3  # several sentences, not a one-liner
+    assert '"done"' not in spoken.lower() and "say next" not in spoken.lower()
+
+
+def test_gemini_feedback_gets_the_resume_and_keeps_spoken(monkeypatch):
+    seen = {}
+
+    def fake(api_key, parts, **kw):
+        seen["prompt"] = str(parts)
+        return {"candidates": [{"content": {"parts": [{"text": json.dumps({
+            "score": 3, "verdict": "Good start", "strengths": ["Clear"], "improve": ["Add a number"],
+            "better_answer": "Better", "resume_example": "Use the checkout revamp",
+            "spoken": "Nice start. Try the checkout revamp story. Want another go or move on?"})}]}}]}
+    monkeypatch.setattr(ve, "gemini_generate", fake)
+    res = quiz_coach.grade_answer("q", "", "my answer", api_key="k", resume=RESUME)
+    assert "checkout revamp" in seen["prompt"]
+    assert res["resume_example"] == "Use the checkout revamp" and res["spoken"].startswith("Nice start")
+
+
+def test_feedback_route_passes_the_users_resume(client, monkeypatch):
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET resume_text = ? WHERE id = 101", (RESUME,))
+    conn.commit()
+    conn.close()
+    seen = {}
+    real = quiz_coach.grade_answer
+
+    def spy(*a, **kw):
+        seen["resume"] = kw.get("resume")
+        return real(*a, **kw)
+    monkeypatch.setattr(quiz_coach, "grade_answer", spy)
+    data = client.post("/api/job/j1/interview-prep/feedback",
+                       json={"question": "Tell me about a launch", "answer": "we launched it"}).get_json()
+    assert "checkout revamp" in (seen["resume"] or "")
+    assert data["spoken"] and "checkout revamp" in data["resume_example"]
+
+
 def test_tts_quota_backs_off(monkeypatch):
     calls = []
 
