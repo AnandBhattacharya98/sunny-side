@@ -2167,15 +2167,15 @@ def voice_transcribe():
         api_key = _voice_api_key(conn, uid)
     finally:
         conn.close()
-    if not api_key:
+    if not api_key and not (livekit_tts.is_configured() and mime_type in ("audio/wav", "audio/x-wav")):
         return jsonify({"ok": False, "error": "Voice transcription isn't set up.", "provider_fallback": True}), 400
     try:
-        transcript = ve.transcribe_audio(audio_bytes, mime_type, api_key, lang=g.voice_lang)
+        transcript, provider = ve.transcribe(audio_bytes, mime_type, api_key, lang=g.voice_lang)
     except ve.GeminiError as e:
         # The message never includes the API key; the key travels in a header
         app.logger.warning("Voice transcription failed for user %s: %s", uid, e)
         return jsonify({"ok": False, "error": _t("I couldn't transcribe that just now.", "अभी मैं इसे समझ नहीं पाई।"), "provider_fallback": True}), 502
-    return jsonify({"ok": True, "transcript": transcript})
+    return jsonify({"ok": True, "transcript": transcript, "provider": provider})
 
 
 @app.route("/api/voice/synthesize", methods=["POST"])
@@ -2716,8 +2716,10 @@ def voice_welcome():
         "lang": lang,
         "digest_count": digest_count,
         "has_jobs": bool(snapshot),
-        "server_voice": has_key,
+        "server_voice": has_key or livekit_tts.is_configured(),
         "server_tts": has_key or livekit_tts.is_configured(),
+        # LiveKit hears 16-bit PCM, so the board converts recordings to WAV before sending them
+        "stt_wav": livekit_tts.is_configured(),
     })
 
 

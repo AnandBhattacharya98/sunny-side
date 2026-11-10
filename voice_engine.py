@@ -22,6 +22,7 @@ import requests
 
 from ai_engine import get_fallback_gemini_key
 import livekit_tts
+import livekit_stt
 
 log = logging.getLogger("voice")
 
@@ -272,6 +273,29 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str, api_key: str, lang: str
     res = gemini_generate(api_key, parts, model=VOICE_MODEL, timeout=15)
     text = (_first_part(res).get("text") or "").strip().strip('"').strip()
     return sanitize_transcript(text)
+
+
+_livekit_stt_down_until = 0.0
+
+
+def transcribe(audio_bytes: bytes, mime_type: str, api_key: str | None, lang: str = "en") -> tuple[str, str]:
+    """What the user said, plus who heard it ("livekit" or "gemini").
+
+    LiveKit Inference is tried first when it's configured and the board sent a 16-bit WAV;
+    otherwise, or if it fails, Gemini transcribes with the user's key.
+    """
+    global _livekit_stt_down_until
+    if livekit_stt.is_configured() and time.time() >= _livekit_stt_down_until:
+        decoded = livekit_stt.wav_to_pcm(audio_bytes)
+        if decoded:
+            try:
+                return sanitize_transcript(livekit_stt.transcribe_pcm(*decoded, lang=lang)), "livekit"
+            except livekit_stt.LiveKitSTTError as e:
+                log.warning("LiveKit transcription failed, falling back to Gemini: %s", e)
+                _livekit_stt_down_until = time.time() + LIVEKIT_RETRY_AFTER
+    if not api_key:
+        raise GeminiError("No transcription provider is available")
+    return transcribe_audio(audio_bytes, mime_type, api_key, lang=lang), "gemini"
 
 
 class _TTSCache:
