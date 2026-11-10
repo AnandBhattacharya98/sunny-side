@@ -26,6 +26,8 @@ TIMEOUT = 15            # seconds for the whole transcription
 TRAILING_WAIT = 0.3     # seconds to wait for stray text once the gateway confirms the finalize
 IDLE_WAIT = 1.5         # without that confirmation, how long a quiet gap must be before we stop
 FRAME_MS = 50
+SEND_SPEED = 2.0     # how much faster than real time the clip is sent
+CREATE_WAIT = 3.0    # seconds to wait for session.created before sending audio
 
 
 class LiveKitSTTError(LiveKitTTSError):
@@ -67,8 +69,12 @@ def _ws_url(model: str) -> str:
     return f"{base}/stt?{urlencode({'model': model})}"
 
 
-def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
-    """Transcribe 16-bit mono PCM. Raises LiveKitSTTError."""
+def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en", stats: dict | None = None) -> str:
+    """Transcribe 16-bit mono PCM. Raises LiveKitSTTError.
+
+    `stats`, if given, is filled with counts that help explain a slow or partial transcript.
+    """
+    stats = stats if stats is not None else {}
     key, secret = livekit_tts.credentials()
     if not (key and secret):
         raise LiveKitSTTError("LiveKit isn't configured")
@@ -82,7 +88,8 @@ def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
         "settings": {"sample_rate": str(sample_rate), "encoding": "pcm_s16le", "language": language, "extra": {}},
         "connection": {"timeout": TIMEOUT, "retries": 0},
     }
-    deadline = time.monotonic() + TIMEOUT
+    began = time.monotonic()
+    deadline = began + TIMEOUT
     token = livekit_tts.access_token(key, secret)
     try:
         ws = livekit_tts._connect(_ws_url(model), [f"Authorization: Bearer {token}"], TIMEOUT)
@@ -90,53 +97,81 @@ def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
         raise LiveKitSTTError(f"Couldn't reach LiveKit Inference: {type(e).__name__}: {e}") from e
 
     finals: list[str] = []
+    state = {"created": False, "finalized": False, "closed": False, "interim": ""}
+    stats.update(finals=0, interims=0)
+
+    def handle(raw):
+        if not raw or isinstance(raw, bytes):
+            return
+        msg = json.loads(raw)
+        kind = msg.get("type")
+        if kind == "session.created":
+            state["created"] = True
+        elif kind == "final_transcript":
+            stats["finals"] += 1
+            text = (msg.get("transcript") or "").strip()
+            if text:
+                finals.append(text)
+            state["interim"] = ""
+        elif kind in ("interim_transcript", "preflight_transcript"):
+            stats["interims"] += 1
+            state["interim"] = (msg.get("transcript") or "").strip()
+        elif kind == "session.finalized":
+            state["finalized"] = True
+        elif kind == "session.closed":
+            state["closed"] = True
+        elif kind == "error":
+            raise LiveKitSTTError(f"LiveKit Inference error: {str(msg.get('message') or msg.get('code') or msg)[:300]}")
+
+    def drain(until: float):
+        """Handle whatever the gateway sends until `until` (monotonic seconds)."""
+        while not state["closed"]:
+            wait = until - time.monotonic()
+            if wait <= 0:
+                return
+            ws.settimeout(wait)
+            try:
+                handle(ws.recv())
+            except Exception as e:
+                if _is_timeout(e):
+                    return
+                raise
+
     try:
         ws.send(json.dumps(session))
+        # Audio sent before the gateway has its provider connection ready can be lost, so wait
+        # (briefly) for session.created before the first frame.
+        created_by = time.monotonic() + CREATE_WAIT
+        while not state["created"] and time.monotonic() < created_by and not state["closed"]:
+            drain(min(created_by, time.monotonic() + 0.05))
+        stats["created_ms"] = round((time.monotonic() - began) * 1000)
+        # Send a little faster than real time: a burst of the whole clip can lose words.
         step = sample_rate * 2 * FRAME_MS // 1000
-        for i in range(0, len(pcm), step):
+        sent_from = time.monotonic()
+        for n, i in enumerate(range(0, len(pcm), step)):
+            drain(sent_from + n * FRAME_MS / 1000 / SEND_SPEED)
             ws.send(json.dumps({"type": "input_audio", "audio": base64.b64encode(pcm[i:i + step]).decode("ascii")}))
         ws.send(json.dumps({"type": "session.finalize"}))
-        # Providers can transcribe slower than we upload, so a final for the first words can come
-        # well before the rest. Stop soon after the gateway confirms the finalize; failing that,
-        # once there's text and a quiet gap after the audio could have been fully heard.
-        heard_by = time.monotonic() + len(pcm) / (2 * sample_rate)
-        finalized = False
-        while True:
+        # Providers work at about real time, so the last words can arrive well after the first
+        # final. Stop soon after the gateway confirms the finalize; failing that, once there's
+        # text and a quiet gap after the audio could have been fully heard.
+        heard_by = sent_from + len(pcm) / (2 * sample_rate)
+        while not state["closed"]:
             now = time.monotonic()
-            remaining = deadline - now
-            if remaining <= 0:
-                if finals:
+            if now >= deadline:
+                if finals or state["interim"]:
                     break
                 raise LiveKitSTTError("LiveKit Inference timed out")
-            if finalized:
+            if state["finalized"]:
                 wait = max(TRAILING_WAIT, heard_by - now)
-            elif finals:
+            elif finals or state["interim"]:
                 wait = max(IDLE_WAIT, heard_by - now)
             else:
-                wait = remaining
-            ws.settimeout(min(remaining, wait))
-            try:
-                raw = ws.recv()
-            except Exception as e:
-                if (finalized or finals) and _is_timeout(e):
-                    break  # nothing more is coming
-                raise
-            if not raw:
-                break
-            if isinstance(raw, bytes):
-                continue
-            msg = json.loads(raw)
-            kind = msg.get("type")
-            if kind == "final_transcript":
-                text = (msg.get("transcript") or "").strip()
-                if text:
-                    finals.append(text)
-            elif kind == "session.finalized":
-                finalized = True
-            elif kind == "session.closed":
-                break
-            elif kind == "error":
-                raise LiveKitSTTError(f"LiveKit Inference error: {str(msg.get('message') or msg.get('code') or msg)[:300]}")
+                wait = deadline - now
+            before = (stats["finals"], stats["interims"], state["finalized"])
+            drain(min(deadline, now + wait))
+            if (stats["finals"], stats["interims"], state["finalized"]) == before and (state["finalized"] or finals or state["interim"]):
+                break  # a quiet gap: nothing more is coming
     except LiveKitSTTError:
         raise
     except Exception as e:
@@ -150,4 +185,6 @@ def transcribe_pcm(pcm: bytes, sample_rate: int, lang: str = "en") -> str:
             ws.close()
         except Exception:
             pass
+    if state["interim"]:  # words the provider heard but never finalized
+        finals.append(state["interim"])
     return " ".join(finals).strip()
