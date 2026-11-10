@@ -804,6 +804,7 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
     document.querySelectorAll('#hero, .ticker, .tile, .cta').forEach(function (el) { idler.observe(el); });
   }
 
+  /* ---------- CTA: a burst of confetti the first time it comes into view ---------- */
   if (!reduce && A && A.confetti && 'IntersectionObserver' in window) {
     var cta = document.getElementById('cta');
     var seen = new IntersectionObserver(function (es) {
