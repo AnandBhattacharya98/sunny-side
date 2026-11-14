@@ -1,4 +1,4 @@
-"""Dark mode: every page follows the saved theme or the device setting, with no forced light pages."""
+"""Theme: every page opens in light mode unless the person saved dark; the toggle still works."""
 import os
 
 import dashboard
@@ -9,11 +9,19 @@ def _get(path):
         return c.get(path).get_data(as_text=True)
 
 
-def test_sign_in_pages_follow_the_theme():
+def test_sign_in_pages_follow_the_saved_theme_else_light():
     for path in ("/login", "/signup", "/forgot"):
         html = _get(path)
-        assert "setAttribute('data-theme', 'light')" not in html, path
-        assert "prefers-color-scheme: dark" in html, path
+        assert "localStorage.getItem('theme')" in html, path
+        assert "t = 'light';" in html, path
+        assert "prefers-color-scheme: dark" not in html, path
+
+
+def test_pages_ignore_the_device_dark_setting():
+    for path in ("/", "/login", "/privacy"):
+        html = _get(path)
+        assert "prefers-color-scheme" not in html, path
+        assert "t = 'light';" in html, path
 
 
 def test_homepage_has_dark_colors():

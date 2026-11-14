@@ -41,12 +41,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 {% include "legal/_head.html" %}
 <script>
-  // Set the theme before first paint: saved choice, else the device setting
+  // Set the theme before first paint: saved choice, else light
   (function () {
     var t = null;
     try { t = localStorage.getItem('theme'); } catch (e) {}
     if (t !== 'light' && t !== 'dark') {
-      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      t = 'light'; // open in light mode unless the person picked dark
     }
     document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name="theme-color"]');
@@ -5967,17 +5967,6 @@ function toggleTheme() {
   const target = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   try { localStorage.setItem('theme', target); } catch (e) {}
   applyTheme(target);
-}
-
-// With no saved choice, follow the device when it switches between light and dark
-if (window.matchMedia) {
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  const follow = e => {
-    let saved = null;
-    try { saved = localStorage.getItem('theme'); } catch (err) {}
-    if (saved !== 'light' && saved !== 'dark') applyTheme(e.matches ? 'dark' : 'light');
-  };
-  if (mq.addEventListener) mq.addEventListener('change', follow); else if (mq.addListener) mq.addListener(follow);
 }
 
 // Initialise Theme on Load
