@@ -1,0 +1,28 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<h2 id="who">Who runs Sunny Side</h2>
+<p>Sunny Side was created and is run by <strong>{% if site.owner_url %}<a href="{{ site.owner_url }}" rel="author noopener" target="_blank">{{ site.owner }}</a>{% else %}{{ site.owner }}{% endif %}</strong>, based in {{ site.jurisdiction }}.</p>
+
+<h2 id="email">Get in touch</h2>
+{% if site.email %}
+<p>Email <a href="mailto:{{ site.email }}">{{ site.email }}</a> for anything: help, feedback, privacy questions, data requests, accessibility problems or security reports. We usually reply within 2 working days.</p>
+{% else %}
+<p class="lg-callout">A dedicated contact address is being set up and will appear here shortly. Signed-in users can already download or delete their data themselves from Profile Settings.</p>
+{% endif %}
+
+<h2 id="grievance">Grievance officer</h2>
+<p>Under India's Information Technology Act, 2000 and the rules made under it, and the Digital Personal Data Protection Act, 2023, you can raise a complaint about Sunny Side or how it handles your personal data with our grievance officer:</p>
+<div class="lg-callout">
+  <p><strong>{{ site.owner }}</strong>, Grievance Officer, Sunny Side</p>
+  <p>Email: {{ email() }}</p>
+</div>
+<p>We'll acknowledge your complaint within 24 hours and resolve it within 15 days. If you're not satisfied with our answer about your personal data, you can complain to the Data Protection Board of India. People in the EU or UK can also contact their local data protection authority.</p>
+
+<h2 id="useful">Useful links</h2>
+<ul class="lg-cards">
+  <li><a href="/your-data"><strong>Your data &amp; deletion</strong><span>Download or delete everything yourself.</span></a></li>
+  <li><a href="/privacy"><strong>Privacy Policy</strong><span>What we collect and why.</span></a></li>
+  <li><a href="/accessibility"><strong>Accessibility</strong><span>Report a barrier.</span></a></li>
+</ul>
+{% endblock %}

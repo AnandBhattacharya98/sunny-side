@@ -18,12 +18,14 @@ from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
+import legal
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__, template_folder='.')
 app.secret_key = get_app_secret()
+app.register_blueprint(legal.bp)  # public Privacy, Terms, Cookies... pages and the footer's site details
 # Behind Render's proxy, remote_addr is the proxy. Trust one hop of X-Forwarded-For so
 # login throttling sees the visitor's IP. Set TRUST_PROXY=0 when serving directly.
 if os.getenv("TRUST_PROXY", "1") != "0":
@@ -273,7 +275,7 @@ def _check_oauth_state():
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz"]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz", *legal.PUBLIC_ENDPOINTS]
     if request.endpoint in AGENT_ENDPOINTS:
         if not phone.agent_authorized(request.headers.get("Authorization")):
             return jsonify({"ok": False, "error": "Not authorized"}), 401

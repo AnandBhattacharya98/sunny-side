@@ -1,0 +1,58 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<section class="lg-summary">
+  <h2>The short version</h2>
+  <ul>
+    <li>Sunny Side is a free tool to organise your job search. Use it honestly and lawfully.</li>
+    <li>Your content stays yours. You let us process it only to run the service for you.</li>
+    <li>AI suggestions can be wrong, and we can't promise you a job, an interview, or that the service never goes down.</li>
+  </ul>
+</section>
+
+<h2 id="agreement">1. Agreement</h2>
+<p>These Terms of Service (“Terms”) are an agreement between you and <strong>{{ site.owner }}</strong>, who created and runs Sunny Side (“we”, “us”). By creating an account or using Sunny Side's website or apps you agree to these Terms, our <a href="/privacy">Privacy Policy</a>, <a href="/cookies">Cookie Policy</a> and <a href="/acceptable-use">Acceptable Use Policy</a>. If you don't agree, please don't use the service.</p>
+
+<h2 id="eligibility">2. Who can use Sunny Side</h2>
+<p>You must be at least 18 years old and able to form a binding contract. You may use Sunny Side for your own job search. If you use it on behalf of someone else, you confirm you have their permission.</p>
+
+<h2 id="account">3. Your account</h2>
+<ul>
+  <li>Give accurate information and keep your password and any API keys you create secret. You're responsible for activity under your account.</li>
+  <li>Tell us straight away at {{ email() }} if you think someone else has accessed your account.</li>
+  <li>You can close your account at any time from Profile Settings. We may suspend or close accounts that break these Terms, put others at risk, or have been inactive for a long time, and we'll tell you first where we reasonably can.</li>
+</ul>
+
+<h2 id="service">4. What Sunny Side does</h2>
+<p>Sunny Side collects public job listings, scores them against your resume, helps you track applications, reads job emails you connect, drafts letters and messages, and offers voice coaching, practice calls and mock interviews. Features may change, and some depend on third-party services (see the <a href="/privacy#share">Privacy Policy</a>). The service is currently provided free of charge. If we ever introduce paid features, we'll tell you the price before you're charged and you won't be moved onto a paid plan without agreeing.</p>
+
+<h2 id="content">5. Your content</h2>
+<p>You keep all rights to the resumes, notes, messages and other content you add (“your content”). You give us a worldwide, non-exclusive, royalty-free licence to host, copy, process and display your content only as needed to run Sunny Side for you, including sending it to the providers that power its features. The licence ends when you delete the content or your account, except for copies we must keep by law. You confirm you have the right to upload your content and that it doesn't break anyone else's rights.</p>
+
+<h2 id="ai">6. AI-generated output</h2>
+<p>Scores, summaries, cover letters, interview questions, feedback and voice replies are generated automatically and may be inaccurate, incomplete or biased. Review everything before you send it or rely on it. You're responsible for what you send to employers. See the <a href="/disclaimer">Disclaimer</a>.</p>
+
+<h2 id="third-party">7. Third-party sites and listings</h2>
+<p>Job listings, company pages, videos and contact details come from other websites. We don't control them, don't endorse any employer, and aren't responsible for their content, accuracy, availability or hiring decisions. Your use of other sites is governed by their own terms.</p>
+
+<h2 id="ip">8. Our property</h2>
+<p>Sunny Side's name, logo, mascot, design and code belong to {{ site.owner }} or its licensors. These Terms don't give you any right to use them except to use the service as intended. Feedback you send us may be used to improve Sunny Side without obligation to you.</p>
+
+<h2 id="availability">9. Availability</h2>
+<p>We work to keep Sunny Side running but provide it on an “as is” and “as available” basis. It may be interrupted for maintenance, by our providers, or for reasons beyond our control. Keep your own copies of anything important; you can export your data at any time.</p>
+
+<h2 id="liability">10. Limits on liability</h2>
+<p>To the fullest extent the law allows, we aren't liable for indirect, incidental or consequential losses, lost opportunities, or lost data, and our total liability for any claim relating to the service is limited to the greater of the amount you paid us in the 12 months before the claim or ₹5,000. Nothing in these Terms limits liability that can't be limited by law, or your statutory rights as a consumer.</p>
+
+<h2 id="indemnity">11. Your responsibility to us</h2>
+<p>If you misuse Sunny Side or break these Terms and someone makes a claim against us because of it, you agree to cover our reasonable costs of dealing with that claim, to the extent the law allows.</p>
+
+<h2 id="changes">12. Changes</h2>
+<p>We may update these Terms. We'll change the date above and, for material changes, tell you in the app or by email at least 14 days before they take effect. If you keep using Sunny Side after that, the new Terms apply; if you don't agree, you can delete your account.</p>
+
+<h2 id="law">13. Governing law and disputes</h2>
+<p>These Terms are governed by the laws of {{ site.jurisdiction }}. We'd like to solve problems informally first, so please contact us through our <a href="/contact">grievance process</a>. If that doesn't work, the courts of {{ site.jurisdiction }} have jurisdiction, but if you're a consumer living elsewhere you keep the protection of the mandatory laws and courts of your home country.</p>
+
+<h2 id="misc">14. Everything else</h2>
+<p>If any part of these Terms is found unenforceable, the rest still applies. If we don't enforce a right straight away, we haven't given it up. You may not transfer these Terms; we may transfer them if the service changes hands, with notice to you. These Terms, with the policies linked above, are the whole agreement between us about Sunny Side.</p>
+{% endblock %}

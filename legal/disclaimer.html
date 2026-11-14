@@ -1,0 +1,23 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<h2 id="no-guarantee">No guarantee of outcomes</h2>
+<p>Sunny Side helps you organise and prepare for your job search. It can't guarantee interviews, offers, salaries or any other result, and isn't a recruitment agency, employer or placement service.</p>
+
+<h2 id="ai">AI can be wrong</h2>
+<p>Match scores, role suggestions, career-switch paths, skill gaps, cover letters, outreach messages, interview questions, practice-call feedback and Sunny's voice replies are produced by automated systems, including large language models. They may be inaccurate, out of date, incomplete or reflect bias. Treat them as a starting point: check facts, edit drafts in your own words, and use your own judgement.</p>
+
+<h2 id="listings">Job listings and contacts</h2>
+<p>Listings are gathered from public job boards and company career pages and may be outdated, duplicated, closed or inaccurate. Salary, location and remote details are as stated by the source. Contact details are found from public sources and may be wrong. Always confirm on the employer's own site before applying, and never pay anyone for a job offer.</p>
+
+<h2 id="practice">Practice calls and mock interviews</h2>
+<p>Practice recruiters and interviewers are simulations. Feedback is for practice only and doesn't predict how a real employer will assess you.</p>
+
+<h2 id="advice">Not professional advice</h2>
+<p>Nothing on Sunny Side is legal, financial, immigration, tax or career-counselling advice. For decisions with serious consequences, talk to a qualified professional. Our own policies are written in plain language for clarity; they describe how Sunny Side works but aren't a substitute for advice about your own situation.</p>
+
+<h2 id="links">Links and videos</h2>
+<p>Links to other websites and learning videos are provided for convenience. We don't control or endorse their content.</p>
+
+<p>Spotted something wrong? Let us know at {{ email() }}.</p>
+{% endblock %}

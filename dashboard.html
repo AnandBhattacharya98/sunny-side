@@ -39,6 +39,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+{% include "legal/_head.html" %}
 <script>
   // Set the theme before first paint: saved choice, else the device setting
   (function () {
@@ -1100,6 +1101,8 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .auth-or { display: flex; align-items: center; gap: 12px; color: var(--hin); font-family: var(--font-mono); font-size: 11px; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--bdr); }
 .auth-switch { text-align: center; font-size: 14px; color: var(--mut); }
+.auth-legal { margin: -6px 0 0; text-align: center; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.auth-legal a { color: var(--txt); text-decoration: underline; text-decoration-color: var(--yolk); text-underline-offset: 2px; }
 .auth-switch a { color: var(--txt); font-weight: 600; text-decoration: underline; text-decoration-color: var(--yolk);
                  text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .auth-error { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px;
@@ -1582,6 +1585,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       <button type="submit" class="auth-btn auth-btn-p auth-btn-block">
         {% if view_mode == 'login' %}Log in{% else %}Create account{% endif %}
       </button>
+      {% if view_mode == 'signup' %}
+      <p class="auth-legal">By creating an account you agree to our <a href="/terms" target="_blank">Terms of Service</a> and confirm you've read our <a href="/privacy" target="_blank">Privacy Policy</a>. You must be 18 or older.</p>
+      {% endif %}
 
       <div class="auth-or"><span>or</span></div>
 
@@ -1605,6 +1611,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   <aside class="auth-sun" id="auth-sun" aria-hidden="true" data-mode="{{ view_mode }}"></aside>
   {% endif %}
   </main>
+  {% include "legal/_minifoot.html" %}
 </div>
 {% elif view_mode == 'onboarding' %}
 <div class="auth-shell">
@@ -1669,6 +1676,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     <button onclick="window.location.reload()" class="auth-btn auth-btn-p auth-btn-block auth-btn-lg">Go to my board</button>
   </div>
   </main>
+  {% include "legal/_minifoot.html" %}
 </div>
 {% else %}
 <div class="app">
@@ -1767,6 +1775,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       <span id="assistant-badge" class="nc" style="display: none; background: #DC2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: auto;"></span>
     </button>
   </div>
+  {% with sidefoot=True %}{% include "legal/_minifoot.html" %}{% endwith %}
 </nav>
 
 <!-- Main Kanban Board / Emails Feed -->

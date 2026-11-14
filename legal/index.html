@@ -1,0 +1,9 @@
+{% extends "legal/_layout.html" %}
+{% block body %}
+<p>These documents explain how Sunny Side works, what we do with your data and the rules we all agree to. We've written them to be read, not skimmed past.</p>
+<ul class="lg-cards">
+  {% for s, (t, d) in site.pages.items() %}
+  <li><a href="/{{ s }}"><strong>{{ t }}</strong><span>{{ d }}</span></a></li>
+  {% endfor %}
+</ul>
+{% endblock %}

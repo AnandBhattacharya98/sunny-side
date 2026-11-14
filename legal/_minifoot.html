@@ -1,0 +1,9 @@
+{# Compact legal links: sign-in pages (and the board sidebar with extra class ss-sidefoot). #}
+<div class="ss-minifoot{% if sidefoot %} ss-sidefoot{% endif %}">
+  <a href="/privacy">Privacy</a>
+  <a href="/terms">Terms</a>
+  <a href="/cookies">Cookies</a>
+  {% if sidefoot %}<a href="/legal">More</a>{% else %}<a href="/your-data">Your data</a><a href="/contact">Contact</a>{% endif %}
+  <button type="button" data-cookie-settings>Cookie settings</button>
+  <span class="ss-copy">&copy; {{ site.year }} {{ site.name }} · Created by {{ site.owner }}</span>
+</div>

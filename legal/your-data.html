@@ -1,0 +1,41 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<h2 id="download">Download your data</h2>
+<p>Sign in, open <strong>Profile Settings</strong> from the sidebar and scroll to <strong>Your data</strong>. You can download:</p>
+<ul>
+  <li><strong>Jobs (CSV)</strong>: every job on your board with its status, score and notes, ready for a spreadsheet.</li>
+  <li><strong>Everything (JSON)</strong>: your profile, resume text, jobs, cover letters, timeline, contacts, followed companies and call log. Passwords and API keys are never included.</li>
+</ul>
+{% if session.get('user_id') %}
+<p><a class="lg-btn lg-cta" href="/api/account/export?format=json" download>Download everything (JSON)</a><a class="lg-btn lg-cta" href="/api/account/export?format=csv" download>Download jobs (CSV)</a></p>
+{% else %}
+<p><a class="lg-btn lg-btn-p lg-cta" href="/login">Log in to download your data</a></p>
+{% endif %}
+
+<h2 id="delete">Delete your account</h2>
+<p>In <strong>Profile Settings → Your data</strong>, open <strong>Delete my account</strong>, type <code>DELETE</code> and confirm. This immediately and permanently erases:</p>
+<ul>
+  <li>your profile, resume and match settings</li>
+  <li>every job, note, cover letter, tailored resume, interview prep and timeline entry</li>
+  <li>job emails we matched, hiring contacts, followed companies</li>
+  <li>your call log, practice-call transcripts and phone codes</li>
+  <li>your sign-in history and password-reset links</li>
+</ul>
+<p>It can't be undone, so download a copy first if you might want it. You're signed out straight away. Preferences kept in your browser can be cleared from <button type="button" class="lg-btn" data-cookie-settings style="cursor:pointer;font:inherit;font-weight:600;min-height:32px;padding:0 10px">Cookie settings</button> or your browser.</p>
+
+<h2 id="request">Can't sign in? Ask us</h2>
+<p>If you can't access your account, or want us to delete data about you that isn't in an account (for example, if you're a hiring contact shown to a user), email {{ email() }} with the username or email address involved. We'll confirm it's you and act within 30 days, and tell you when it's done.</p>
+
+<h2 id="partial">Removing just part of your data</h2>
+<ul>
+  <li><strong>Inbox:</strong> clear your Gmail address and app password in Profile Settings. You can also revoke the app password in your Google account.</li>
+  <li><strong>Gemini key:</strong> remove it in Profile Settings.</li>
+  <li><strong>Public profile:</strong> untick “Show my profile on landing page wall” in Profile Settings.</li>
+  <li><strong>Resume:</strong> delete or replace the file in Profile Settings.</li>
+  <li><strong>Calls API key:</strong> revoke it on the Calls page.</li>
+</ul>
+
+<h2 id="third-party">Data held by providers</h2>
+<p>When you delete your account, we no longer send anything about you to the providers listed in the <a href="/privacy#share">Privacy Policy</a>. Requests already processed by AI and voice providers are handled under their own retention terms, which for API use are typically short and not used for training.</p>
+{% endblock %}

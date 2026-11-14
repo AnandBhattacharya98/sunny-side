@@ -1,0 +1,5 @@
+{% macro email() -%}
+{%- if site.email -%}<a href="mailto:{{ site.email }}">{{ site.email }}</a>
+{%- else -%}<strong>{{ site.owner }}</strong> through the <a href="/contact">Contact page</a>
+{%- endif -%}
+{%- endmacro %}
