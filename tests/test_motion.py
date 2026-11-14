@@ -112,3 +112,14 @@ def test_motion_stays_light_on_big_boards_and_phones():
     # Off-screen sections pause, and phones skip the frosted nav
     assert "animation-play-state: paused" in landing
     assert "backdrop-filter: none" in landing
+
+
+def test_homepage_title_keeps_its_height_when_the_verb_changes():
+    # The rotating verb ("land", "interview for", ...) sits on its own line. Without the
+    # line breaks around it, a longer verb rewraps the headline and the hero bobs up and down.
+    html = open(os.path.join(ROOT, "landing.html"), encoding="utf-8").read()
+    h1 = html[html.index('<h1 id="hero-title"'):html.index("</h1>", html.index('<h1 id="hero-title"'))]
+    before, after = h1.split('class="rot"', 1)
+    assert before.rstrip().endswith("<span"), "verb slot moved"
+    assert "<br" in before, "the verb must start its own line"
+    assert "<br" in after.split("tracked in one place", 1)[0], "the verb's line must end before the rest"

@@ -164,7 +164,9 @@ nav.scrolled .nav-inner { height: 56px; }
   font-size: clamp(38px, 6.2vw, 68px); font-weight: 700; line-height: 1.04;
   letter-spacing: -0.045em; max-width: 680px;
 }
-/* The verb that keeps changing, on a yolk highlighter stroke */
+/* The verb that keeps changing, on a yolk highlighter stroke. It sits on its own line
+   (the <br>s in the markup) so a longer or shorter verb never rewraps the headline
+   or changes its height, which used to make the whole hero bob up and down. */
 .rot { display: inline-block; position: relative; vertical-align: bottom; white-space: nowrap; color: var(--ink);
        padding: 0 .12em; margin: 0 -.04em; }
 .rot::before { content: ""; position: absolute; left: 0; right: 0; top: .14em; bottom: .06em; z-index: -1;
@@ -438,8 +440,9 @@ section { position: relative; }
         <div class="hero-copy">
           <div class="eyebrow reveal" style="--d:0ms"><span class="live" aria-hidden="true"></span>A job hunter's board</div>
           <h1 id="hero-title" aria-label="Every job you apply to, tracked in one place.">
-            <span class="h1-part" aria-hidden="true">Every job you</span>
-            <span class="rot" aria-hidden="true"><span class="rot-clip"><span class="rot-word" id="rot-word">apply to</span></span></span><span class="h1-part" aria-hidden="true">, tracked in one place.</span>
+            <span class="h1-part" aria-hidden="true">Every job you</span><br aria-hidden="true">
+            <span class="rot" aria-hidden="true"><span class="rot-clip"><span class="rot-word" id="rot-word">apply to</span></span></span><span class="h1-part" aria-hidden="true">,</span><br aria-hidden="true">
+            <span class="h1-part" aria-hidden="true">tracked in one place.</span>
           </h1>
           <p class="sub reveal" style="--d:450ms">Sunny Side reads your application emails, scores each role against your resume, and drafts your cover letters.</p>
           <div class="hero-ctas reveal" style="--d:550ms">
