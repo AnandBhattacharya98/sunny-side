@@ -326,7 +326,7 @@ def sync_job_statuses_from_email(db_path: str = DB_PATH, user_id: int | None = N
                     if not existing_job:
                         import uuid
                         import random
-                        job_id = f"auto_{extracted_company.lower().replace(' ', '_')}_{str(uuid.uuid4())[:8]}_u{user_id}"
+                        job_id = f"auto_{re.sub(r'[^a-z0-9]+', '_', extracted_company.lower())[:40]}_{str(uuid.uuid4())[:8]}_u{user_id}"
                         auto_score = None  # not scored: there's no job description to score against
                         
                         print(f"  [Auto-Discover!] Creating new applied job: {extracted_company} - {extracted_title}")

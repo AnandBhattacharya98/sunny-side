@@ -23,6 +23,9 @@ def client():
     conn = get_conn(DB_PATH)
     if not conn.execute("SELECT id FROM users WHERE username = ?", ("throttle_me",)).fetchone():
         signup_user(conn, "throttle_me", "correct-horse")
+    # Failed sign-ins are also counted from the sign-in history, so start each test with none
+    conn.execute("DELETE FROM login_events WHERE username = ?", ("throttle_me",))
+    conn.commit()
     conn.close()
     with dashboard.app.test_client() as c:
         yield c

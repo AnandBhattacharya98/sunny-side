@@ -41,7 +41,7 @@ def test_cards_have_move_menu_without_their_own_column(client):
     html = client.get("/").get_data(as_text=True)
     card = html[html.index('data-job-id="ux_b"'):]
     card = card[:card.index("</select>")]
-    assert 'onchange="moveJob(\'ux_b\'' in card
+    assert 'onchange="moveJob(&#34;ux_b&#34;' in card
     assert '<option value="applied">' not in card and '<option value="offer">' in card
 
 

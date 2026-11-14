@@ -1940,8 +1940,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         {% elif job.source %}
           {% set source_type = job.source %}
         {% endif %}
-        <div class="jcard{% if job.closed_at %} is-closed{% endif %}" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" data-remote="{{ 1 if job.is_remote else 0 }}" data-salary="{{ 1 if job.salary_text else 0 }}" ondragstart="dragStart(event)" onclick="openJobModal('{{ job.job_id }}')">
-          <button class="delete-card-btn" onclick="handleCardDelete(event, '{{ job.job_id }}')" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;display:flex;align-items:center;justify-content:center;">
+        <div class="jcard{% if job.closed_at %} is-closed{% endif %}" draggable="true" data-job-id="{{ job.job_id }}" data-score="{{ score }}" data-scraped-at="{{ job.scraped_at or '' }}" data-source-type="{{ source_type }}" data-location="{{ job.location or 'Remote' }}" data-remote="{{ 1 if job.is_remote else 0 }}" data-salary="{{ 1 if job.salary_text else 0 }}" ondragstart="dragStart(event)" onclick="openJobModal({{ job.job_id|tojson|forceescape }})">
+          <button class="delete-card-btn" onclick="handleCardDelete(event, {{ job.job_id|tojson|forceescape }})" title="Delete job" style="position:absolute;top:6px;right:6px;background:none;border:none;font-size:10px;color:var(--mut);cursor:pointer;opacity:0;transition:opacity 0.15s, color 0.15s, background 0.15s;padding:2px 4px;border-radius:4px;z-index:10;display:flex;align-items:center;justify-content:center;">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           </button>
           <div class="jt">{{ job.title }}</div>
@@ -1963,16 +1963,16 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
               </span>
               <!-- Thumbs Up/Down -->
               <div style="display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
-                <button onclick="submitFeedback(event, '{{ job.job_id }}', 1)" class="jfb" title="Like role" aria-label="Like role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#22c55e'" onmouseout="this.style.color='{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}'">
+                <button onclick="submitFeedback(event, {{ job.job_id|tojson|forceescape }}, 1)" class="jfb" title="Like role" aria-label="Like role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#22c55e'" onmouseout="this.style.color='{% if job.feedback == 1 %}#22c55e{% else %}var(--mut){% endif %}'">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                 </button>
-                <button onclick="submitFeedback(event, '{{ job.job_id }}', -1)" class="jfb" title="Dislike role" aria-label="Dislike role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}'">
+                <button onclick="submitFeedback(event, {{ job.job_id|tojson|forceescape }}, -1)" class="jfb" title="Dislike role" aria-label="Dislike role" style="background:none; border:none; cursor:pointer; padding:2px; display:flex; align-items:center; color:{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='{% if job.feedback == -1 %}#ef4444{% else %}var(--mut){% endif %}'">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>
                 </button>
               </div>
               <label class="jmove" onclick="event.stopPropagation();" title="Move to another column">
                 <span aria-hidden="true">Move</span>
-                <select aria-label="Move {{ job.title }} to" onchange="moveJob('{{ job.job_id }}', this.value); this.selectedIndex = 0;">
+                <select aria-label="Move {{ job.title }} to" onchange="moveJob({{ job.job_id|tojson|forceescape }}, this.value); this.selectedIndex = 0;">
                   <option value="" selected disabled>Move to…</option>
                   {% for target, label in [('new', 'Inbox'), ('shortlisted', 'Shortlist'), ('interviewing', 'Interviewing'), ('applied', 'Applied'), ('offer', 'Offer'), ('rejected', 'Rejected')] if target != col %}
                   <option value="{{ target }}">{{ label }}</option>
@@ -1996,7 +1996,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
             {% else %}
             <span style="font-size:10px; font-weight:500; color:var(--mut); font-style:italic;">No round set</span>
             {% endif %}
-            <button onclick="openRoundModal('{{ job.job_id }}', {{ (job.interview_round or '')|tojson|forceescape }}, '{{ job.interview_at or '' }}')" style="background:none; border:none; color:var(--pur); font-size:10px; font-weight:600; cursor:pointer; padding:2px 4px; border-radius:4px; transition: background 0.15s;" onmouseover="this.style.background='var(--purl)'" onmouseout="this.style.background='none'">Edit Stage</button>
+            <button onclick="openRoundModal({{ job.job_id|tojson|forceescape }}, {{ (job.interview_round or '')|tojson|forceescape }}, {{ (job.interview_at or '')|tojson|forceescape }})" style="background:none; border:none; color:var(--pur); font-size:10px; font-weight:600; cursor:pointer; padding:2px 4px; border-radius:4px; transition: background 0.15s;" onmouseover="this.style.background='var(--purl)'" onmouseout="this.style.background='none'">Edit Stage</button>
           </div>
           {% if job.interview_at %}
           <div class="jiv" onclick="event.stopPropagation();">
@@ -2031,7 +2031,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
             <div class="mcard-sender" style="font-size:12px;font-weight:600;">From: {{ mail.sender }}</div>
             <div class="mcard-subject" style="font-size:12px;color:var(--mut);font-weight:500;margin-top:2px;">Subject: {{ mail.subject }}</div>
             {% if mail.company and mail.title %}
-            <div style="font-size:11px;color:var(--pur);margin-top:6px;font-weight:600;" onclick="event.stopPropagation(); openJobModal('{{ mail.job_id }}')">
+            <div style="font-size:11px;color:var(--pur);margin-top:6px;font-weight:600;" onclick="event.stopPropagation(); openJobModal({{ mail.job_id|tojson|forceescape }})">
               Matched Job: <span style="text-decoration:underline;cursor:pointer;">{{ mail.title }} at {{ mail.company }} ↗</span>
             </div>
             {% endif %}

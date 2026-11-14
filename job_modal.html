@@ -1,22 +1,22 @@
 {# One job's details popup. Loaded on demand by openJobModal() from /job/<id>/modal. #}
-<div class="modal-backdrop" id="modal-backdrop-{{ job.job_id }}" onclick="closeJobModal('{{ job.job_id }}')">
+<div class="modal-backdrop" id="modal-backdrop-{{ job.job_id }}" onclick="closeJobModal({{ job.job_id|tojson|forceescape }})">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div>
         <h3 class="modal-title">{{ job.title }}</h3>
-        <p class="jc" style="font-size:12px">{{ job.company }} &middot; {{ job.location }} &middot; <a href="{{ job.url }}" target="_blank" style="color:var(--pur);text-decoration:none">View Posting ↗</a></p>
+        <p class="jc" style="font-size:12px">{{ job.company }} &middot; {{ job.location }} &middot; <a href="{{ job.url|safe_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--pur);text-decoration:none">View Posting ↗</a></p>
       </div>
-      <button class="modal-close" onclick="closeJobModal('{{ job.job_id }}')">&times;</button>
+      <button class="modal-close" onclick="closeJobModal({{ job.job_id|tojson|forceescape }})">&times;</button>
     </div>
     <div class="modal-content">
       <div class="modal-tabs">
-        <button class="tab-btn active" onclick="switchTab(this, '{{ job.job_id }}', 'fit')">Fit Analysis</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'cl')">Cover Letter</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'resume')">Resume</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'emails')">Emails ({{ job.emails|length }})</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'notes')">Notes & Contacts</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'timeline')">Timeline</button>
-        <button class="tab-btn" onclick="switchTab(this, '{{ job.job_id }}', 'quiz'); initQuizMode('{{ job.job_id }}')">Quiz Mode</button>
+        <button class="tab-btn active" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'fit')">Fit Analysis</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'cl')">Cover Letter</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'resume')">Resume</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'emails')">Emails ({{ job.emails|length }})</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'notes')">Notes & Contacts</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'timeline')">Timeline</button>
+        <button class="tab-btn" onclick="switchTab(this, {{ job.job_id|tojson|forceescape }}, 'quiz'); initQuizMode({{ job.job_id|tojson|forceescape }})">Quiz Mode</button>
       </div>
       <div class="modal-body">
         
@@ -87,13 +87,13 @@
           {% endif %}
           
           <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
-            <button class="btn btn-p" onclick="saveCL('{{ job.job_id }}')">Save Changes</button>
-            <button class="btn" onclick="regen('{{ job.job_id }}')">↺ Regenerate with AI</button>
-            <button class="btn btn-g" onclick="sendEmail('{{ job.job_id }}')">✉ Send email</button>
+            <button class="btn btn-p" onclick="saveCL({{ job.job_id|tojson|forceescape }})">Save Changes</button>
+            <button class="btn" onclick="regen({{ job.job_id|tojson|forceescape }})">↺ Regenerate with AI</button>
+            <button class="btn btn-g" onclick="sendEmail({{ job.job_id|tojson|forceescape }})">✉ Send email</button>
           </div>
           {% else %}
           <div style="color:var(--mut);font-size:13px;margin-bottom:8px">No cover letter generated yet.</div>
-          <button class="btn btn-p" onclick="regen('{{ job.job_id }}')">Generate with Gemini</button>
+          <button class="btn btn-p" onclick="regen({{ job.job_id|tojson|forceescape }})">Generate with Gemini</button>
           {% endif %}
         </div>
         
@@ -134,7 +134,7 @@
               <div class="ct2">{{ c.title }}</div>
               <div class="cl2">
                 {% if c.linkedin_url %}
-                  <a href="{{ c.linkedin_url }}" target="_blank">LinkedIn ↗</a>
+                  <a href="{{ c.linkedin_url|safe_url }}" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a>
                 {% endif %}
                 {% if c.email %}
                   <a href="mailto:{{ c.email }}">{{ c.email }}</a>
@@ -149,7 +149,7 @@
           <span class="lbl" style="display:block;margin-top:14px">Your application notes</span>
           <textarea class="notes" id="note-{{ job.job_id }}"
                     placeholder="Interview details, referral notes, salary targets…"
-                    onblur="saveNote('{{ job.job_id }}')">{{ job.notes.note if job.notes else '' }}</textarea>
+                    onblur="saveNote({{ job.job_id|tojson|forceescape }})">{{ job.notes.note if job.notes else '' }}</textarea>
         </div>
         
         <!-- Timeline Panel -->
@@ -168,7 +168,7 @@
         <div class="tab-panel" id="panel-resume-{{ job.job_id }}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <span class="lbl">Tailored Resume</span>
-            <a href="/resume/{{ job.job_id }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
+            <a href="/resume/{{ job.job_id|urlencode }}/print" target="_blank" class="btn btn-p" style="font-size:11px;padding:6px 12px;text-decoration:none;display:flex;align-items:center;gap:4px;">
               Save / Download as PDF
             </a>
           </div>
@@ -196,7 +196,7 @@
           
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <span class="lbl" style="color:var(--pur); font-weight:700;">Interview Prep Quiz</span>
-            <button class="btn btn-p" style="background:var(--yolk); border:none; color:#0D0C0A; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz('{{ job.job_id }}')">Regenerate Questions</button>
+            <button class="btn btn-p" style="background:var(--yolk); border:none; color:#0D0C0A; font-size:11px; padding:6px 12px; border-radius:12px; cursor:pointer;" onclick="regenerateQuiz({{ job.job_id|tojson|forceescape }})">Regenerate Questions</button>
           </div>
           
           <div class="quiz-loading-{{ job.job_id }}" style="text-align:center; padding:40px; color:var(--mut);">

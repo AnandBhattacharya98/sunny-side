@@ -398,7 +398,8 @@ def check_linkedin_closures(conn, user_id: int, limit: int = 10, recheck_days: i
     for job_id, url in rows:
         now = datetime.now().isoformat()
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=8)
+            from security import safe_get
+            resp = safe_get(url, headers=HEADERS, timeout=8)
         except Exception:
             continue
         if resp.status_code == 200 and _LINKEDIN_CLOSED.search(resp.text or ""):
@@ -705,7 +706,8 @@ def find_board_posting(ref: str, boards: list[dict] | None = None) -> dict | Non
 
 def _fetch_description(url: str) -> str:
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=8)
+        from security import safe_get
+        resp = safe_get(url, headers=HEADERS, timeout=8)
         soup = BeautifulSoup(resp.text, "html.parser")
         for sel in ["div.job-desc", "div#job_description", "div.description__text",
                     "section.description", "div.job-description", "div[class*='description']"]:

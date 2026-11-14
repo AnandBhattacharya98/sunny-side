@@ -1,5 +1,5 @@
-import os, re, json, sqlite3, hmac, secrets, threading, time, base64, logging
-from datetime import datetime, timezone
+import os, re, json, sqlite3, hmac, hashlib, secrets, threading, time, base64, logging
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for, send_file, abort, g, Response, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -16,8 +16,10 @@ import interview as mock_interview
 import phone_practice as phone
 from scraper import REMOTE_SOURCES as SEARCH_REMOTE_SOURCES
 from notifier import send_email_digest, recipient_for_user, send_email, email_configured
-from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
+from auth import signup_user, login_user, hash_password, validate_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
+import security
+from security import extract_resume_text, ResumeError
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -53,7 +55,31 @@ def _client_ip() -> str:
 
 def _login_locked(username: str) -> bool:
     return (login_throttle.count(("user", username), "login_fail", LOGIN_WINDOW_SECONDS) >= LOGIN_FAILS_PER_USER
-            or login_throttle.count(("ip", _client_ip()), "login_fail", LOGIN_WINDOW_SECONDS) >= LOGIN_FAILS_PER_IP)
+            or login_throttle.count(("ip", _client_ip()), "login_fail", LOGIN_WINDOW_SECONDS) >= LOGIN_FAILS_PER_IP
+            or _account_locked_in_db(username))
+
+
+def _account_locked_in_db(username: str) -> bool:
+    """The in-memory counters are per worker and reset on deploy. Failed sign-ins on real accounts
+    are also in login_events, so count those too: every worker and restart then sees the same lock."""
+    if not username:
+        return False
+    since = (datetime.now() - timedelta(seconds=LOGIN_WINDOW_SECONDS)).isoformat()
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not row:
+            return False
+        last_ok = conn.execute("SELECT MAX(created_at) FROM login_events WHERE user_id = ? AND success = 1",
+                               (row[0],)).fetchone()[0] or ""
+        fails = conn.execute("SELECT COUNT(*) FROM login_events WHERE user_id = ? AND success = 0 AND created_at >= ? "
+                             "AND created_at > ?", (row[0], since, last_ok)).fetchone()[0]
+    except Exception as e:
+        app.logger.warning("Could not check sign-in lock for %s: %r", username, e)
+        return False
+    finally:
+        conn.close()
+    return fails >= LOGIN_FAILS_PER_USER
 
 
 def _record_login_failure(username: str) -> None:
@@ -95,6 +121,17 @@ def utc_iso(value):
 
 
 app.jinja_env.filters["utc_iso"] = utc_iso
+# href="{{ job.url|safe_url }}": never lets a javascript: link from a scraped page or email onto the board
+app.jinja_env.filters["safe_url"] = security.safe_url
+
+
+def _request_is_https() -> bool:
+    return request.is_secure or request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip() == "https"
+
+
+@app.after_request
+def _security_headers(response):
+    return security.apply_security_headers(response, _request_is_https())
 
 
 def _viewer_tz():
@@ -191,25 +228,69 @@ def is_admin() -> bool:
 
 
 ACCOUNT_DISABLED = "This account has been turned off. Contact the site admin if you think that's a mistake."
-_disabled_cache = {}  # user_id -> (disabled, checked_at); short-lived so a switch-off lands within seconds
+SESSION_ENDED = "You were signed out because your password changed. Please log in again."
+_disabled_cache = {}  # user_id -> (disabled, password fingerprint, checked_at); short-lived so changes land within seconds
 DISABLED_CACHE_SECONDS = 20
+# The admin console can manage every account, so an admin sign-in lasts hours, not a month.
+ADMIN_SESSION_HOURS = float(os.getenv("ADMIN_SESSION_HOURS", "12"))
+
+
+def _password_fingerprint(password_hash: str) -> str:
+    """A short keyed digest of the stored hash. It goes in the login cookie, so changing or resetting
+    the password signs out every other device (Flask cookies can't be revoked any other way)."""
+    return hmac.new(app.secret_key.encode(), (password_hash or "").encode(), hashlib.sha256).hexdigest()[:20]
+
+
+def _account_state(uid):
+    """(disabled, password fingerprint) for an account, cached briefly. A deleted account counts as off."""
+    hit = _disabled_cache.get(uid)
+    if hit and time.time() - hit[2] < DISABLED_CACHE_SECONDS:
+        return hit[0], hit[1]
+    conn = get_conn(DB_PATH)
+    try:
+        row = conn.execute("SELECT disabled, password_hash FROM users WHERE id = ?", (uid,)).fetchone()
+    finally:
+        conn.close()
+    disabled = (not row) or (bool(row[0]) and uid != 1)
+    fp = _password_fingerprint(row[1]) if row else ""
+    _disabled_cache[uid] = (disabled, fp, time.time())
+    return disabled, fp
 
 
 def _account_disabled(uid) -> bool:
-    if not uid or uid == 1:
+    if not uid:
         return False
-    hit = _disabled_cache.get(uid)
-    if hit and time.time() - hit[1] < DISABLED_CACHE_SECONDS:
-        return hit[0]
-    conn = get_conn(DB_PATH)
-    try:
-        row = conn.execute("SELECT disabled FROM users WHERE id = ?", (uid,)).fetchone()
-    finally:
-        conn.close()
-    # A deleted account counts as off too
-    disabled = (not row) or bool(row[0])
-    _disabled_cache[uid] = (disabled, time.time())
-    return disabled
+    return _account_state(uid)[0]
+
+
+def _start_session(user_id, username, is_new_user=None):
+    """Signs a browser in. Starts from an empty session so nothing from before the login carries over."""
+    _disabled_cache.pop(user_id, None)
+    session.clear()
+    session.permanent = True
+    session["user_id"] = user_id
+    session["username"] = username
+    session["login_at"] = time.time()
+    session["pw_fp"] = _account_state(user_id)[1]
+    if is_new_user is not None:
+        session["is_new_user"] = is_new_user
+
+
+def _session_problem():
+    """Why the signed-in session can't be used any more, or None if it's fine."""
+    uid = session.get("user_id")
+    disabled, fp = _account_state(uid)
+    if disabled:
+        return ACCOUNT_DISABLED
+    if "pw_fp" not in session:
+        session["pw_fp"] = fp  # signed in before fingerprints existed: adopt the current one
+    elif not hmac.compare_digest(str(session["pw_fp"]), fp):
+        return SESSION_ENDED
+    if "login_at" not in session:
+        session["login_at"] = time.time()  # from before sign-in times were kept: start the clock now
+    if uid == 1 and time.time() - float(session.get("login_at") or 0) > ADMIN_SESSION_HOURS * 3600:
+        return "Admin sign-ins last " + f"{ADMIN_SESSION_HOURS:g}" + " hours. Please log in again."
+    return None
 
 
 def _log_login(conn, user_id, username, method, success=True):
@@ -282,11 +363,12 @@ def require_login():
         if _api_key_user() is None:
             return jsonify({"ok": False, "error": "That API key isn't valid. Make a new one on the Calls page."}), 401
         return
-    if session.get("user_id") and request.endpoint not in ("static", "logout") and _account_disabled(session["user_id"]):
+    problem = _session_problem() if session.get("user_id") and request.endpoint not in ("static", "logout") else None
+    if problem:
         session.clear()
         if request.path.startswith("/api/"):
-            return jsonify({"ok": False, "error": ACCOUNT_DISABLED}), 401
-        return render_template("dashboard.html", view_mode="login", error=ACCOUNT_DISABLED), 403
+            return jsonify({"ok": False, "error": problem}), 401
+        return render_template("dashboard.html", view_mode="login", error=problem), 403
     if not session.get("user_id"):
         if request.endpoint and request.endpoint not in allowed_endpoints:
             if request.path.startswith("/api/"):
@@ -323,10 +405,7 @@ def login():
         finally:
             conn.close()
         if user:
-            session.clear()
-            session.permanent = True
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
+            _start_session(user["id"], user["username"])
             return redirect(url_for("index"))
         return render_template("dashboard.html", view_mode="login", error="Invalid username or password")
     return render_template("dashboard.html", view_mode="login")
@@ -352,29 +431,12 @@ def signup():
         resume_filename = ""
         file = request.files.get("resume_file")
         if file and file.filename:
-            resume_filename = file.filename
-            filename = file.filename.lower()
-            if filename.endswith(".txt"):
-                try:
-                    resume_text = file.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    pass
-            elif filename.endswith(".pdf"):
-                import pypdf
-                try:
-                    reader = pypdf.PdfReader(file)
-                    resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
-                except Exception as e:
-                    print(f"Error parsing PDF: {e}")
-                    resume_text = ""
-            elif filename.endswith(".docx"):
-                import docx
-                try:
-                    doc = docx.Document(file)
-                    resume_text = "\n".join([p.text for p in doc.paragraphs])
-                except Exception as e:
-                    print(f"Error parsing DOCX: {e}")
-                    resume_text = ""
+            resume_filename = _clean_filename(file.filename)
+            try:
+                resume_text = extract_resume_text(file)
+            except ResumeError as e:
+                print(f"Signup resume skipped: {e}")
+                resume_text = ""
         
         if not resume_text:
             resume_text = request.form.get("resume_text", "").strip()
@@ -404,16 +466,16 @@ def signup():
                 run_in_background(("sync", uid), run_user_sync, uid)
             _log_login(conn, uid, username.strip().lower(), "signup")
 
-            session.clear()
-            session.permanent = True
-            session["user_id"] = uid
-            session["username"] = username
-            session["is_new_user"] = True
             conn.close()
+            _start_session(uid, username.strip().lower(), is_new_user=True)
             return redirect(url_for("index"))
-        except Exception as e:
+        except ValueError as e:
             conn.close()
             return render_template("dashboard.html", view_mode="signup", error=str(e))
+        except Exception as e:
+            conn.close()
+            app.logger.error("Signup failed: %r", e)
+            return render_template("dashboard.html", view_mode="signup", error="Couldn't create the account. Please try again.")
     return render_template("dashboard.html", view_mode="signup")
 
 def handle_social_login(provider, email, name):
@@ -449,13 +511,8 @@ def handle_social_login(provider, email, name):
             conn.commit()
             is_new = True
         _log_login(conn, uid, username, provider)
-
-        session.clear()
-        session.permanent = True
-        session["user_id"] = uid
-        session["username"] = username
-        session["is_new_user"] = is_new
         conn.close()
+        _start_session(uid, username, is_new_user=is_new)
         return redirect(url_for("index"))
     except Exception as e:
         conn.close()
@@ -690,9 +747,10 @@ def reset_password(token):
         if request.method == "GET":
             return render_template("dashboard.html", view_mode="reset", reset_ok=True, reset_token=token)
         password = request.form.get("password", "")
-        if len(password) < MIN_PASSWORD_LENGTH:
-            return render_template("dashboard.html", view_mode="reset", reset_ok=True, reset_token=token,
-                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+        try:
+            validate_password(password)
+        except ValueError as e:
+            return render_template("dashboard.html", view_mode="reset", reset_ok=True, reset_token=token, error=str(e))
         now = datetime.now().isoformat()
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(password), row[1]))
         # One use only; this also retires any other links sent to the same account
@@ -701,6 +759,7 @@ def reset_password(token):
         login_throttle.reset_key(("user", conn.execute("SELECT username FROM users WHERE id = ?", (row[1],)).fetchone()[0]), "login_fail")
     finally:
         conn.close()
+    _disabled_cache.pop(row[1], None)
     session.clear()
     return render_template("dashboard.html", view_mode="reset", notice="Your password has been changed. You can log in with it now.")
 
@@ -724,7 +783,7 @@ def _no_store_signed_in_pages(response):
 
 @app.route("/api/profile", methods=["POST"])
 def update_profile():
-    d = request.json
+    d = request.get_json(silent=True) or {}
     uid = get_user_id()
     conn = get_conn(DB_PATH)
     
@@ -736,7 +795,7 @@ def update_profile():
     old_secrets = get_user_secrets(conn, uid)
     old_key = old_secrets["gemini_api_key"]
     
-    new_resume = d.get("resume_text", "")
+    new_resume = str(d.get("resume_text") or "")[:security.RESUME_MAX_CHARS]
     new_key = d.get("gemini_api_key", "")
     if new_key == SECRET_PLACEHOLDER:
         new_key = old_key
@@ -762,8 +821,10 @@ def update_profile():
            weight_thumbs_up = ?, weight_applied = ?, weight_thumbs_down = ?, weight_rejected = ?,
            daily_recs_enabled = ?, daily_recs_min_score = ?, daily_recs_time = ?
            WHERE id = ?""",
-        (new_resume, d.get("imap_email", ""), encrypt_secret(new_imap_password), encrypt_secret(new_key), d.get("linkedin_profile", ""),
-         d.get("name", ""), d.get("designation", ""), d.get("share_profile", 0), d.get("resume_filename", ""), profile_json,
+        (new_resume, str(d.get("imap_email") or "")[:200], encrypt_secret(new_imap_password), encrypt_secret(new_key),
+         str(d.get("linkedin_profile") or "")[:300], str(d.get("name") or "")[:120], str(d.get("designation") or "")[:160],
+         1 if d.get("share_profile") in (1, True, "1", "on", "true") else 0, _clean_filename(d.get("resume_filename") or "")
+         if d.get("resume_filename") else "", profile_json,
          float(d.get("weight_thumbs_up", 1.0)), float(d.get("weight_applied", 1.0)), float(d.get("weight_thumbs_down", -1.0)), float(d.get("weight_rejected", -1.5)),
          int(d.get("daily_recs_enabled", 1)), float(d.get("daily_recs_min_score", 7.5)), d.get("daily_recs_time", "07:30"), uid)
     )
@@ -809,27 +870,12 @@ def upload_profile_resume():
     if not file or not file.filename:
         return jsonify({"ok": False, "error": "No file uploaded"}), 400
         
-    filename = file.filename.lower()
-    resume_text = ""
-    if filename.endswith(".txt"):
-        resume_text = file.read().decode("utf-8", errors="ignore")
-    elif filename.endswith(".pdf"):
-        import pypdf
-        try:
-            reader = pypdf.PdfReader(file)
-            resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
-        except Exception as e:
-            return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
-    elif filename.endswith(".docx"):
-        import docx
-        try:
-            doc = docx.Document(file)
-            resume_text = "\n".join([p.text for p in doc.paragraphs])
-        except Exception as e:
-            return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
-    else:
-        return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF, TXT, or DOCX."}), 400
-        
+    try:
+        resume_text = extract_resume_text(file)
+    except ResumeError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    resume_filename = _clean_filename(file.filename)
+
     conn = get_conn(DB_PATH)
     api_key = get_user_secrets(conn, uid)["gemini_api_key"] or None
     
@@ -840,13 +886,19 @@ def upload_profile_resume():
     except Exception as e:
         print(f"Error parsing resume: {e}")
         
-    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, file.filename, profile_json, uid))
+    conn.execute("UPDATE users SET resume_text = ?, resume_filename = ?, resume_profile_json = ? WHERE id = ?", (resume_text, resume_filename, profile_json, uid))
     conn.commit()
     conn.close()
     
     # Re-score in the background to prevent gateway timeouts on large pipelines
     rescore_inbox_in_background(uid)
-    return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": file.filename})
+    return jsonify({"ok": True, "resume_text": resume_text, "resume_filename": resume_filename})
+
+
+def _clean_filename(name: str) -> str:
+    """Just the file's own name, for display: no folders, control characters or anything over 120 characters."""
+    name = re.split(r"[\\/]", str(name or ""))[-1]
+    return re.sub(r"[\x00-\x1f\x7f<>\"']", "", name).strip()[:120] or "resume"
 
 
 @app.route("/api/onboard_skip", methods=["POST"])
@@ -863,26 +915,11 @@ def onboard_resume():
     resume_text = ""
     resume_filename = "Pasted_Resume.txt"
     if file and file.filename:
-        resume_filename = file.filename
-        filename = file.filename.lower()
-        if filename.endswith(".txt"):
-            resume_text = file.read().decode("utf-8", errors="ignore")
-        elif filename.endswith(".pdf"):
-            import pypdf
-            try:
-                reader = pypdf.PdfReader(file)
-                resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
-            except Exception as e:
-                return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
-        elif filename.endswith(".docx"):
-            import docx
-            try:
-                doc = docx.Document(file)
-                resume_text = "\n".join([p.text for p in doc.paragraphs])
-            except Exception as e:
-                return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
-        else:
-            return jsonify({"ok": False, "error": "Unsupported file format. Please upload PDF, TXT, or DOCX."}), 400
+        resume_filename = _clean_filename(file.filename)
+        try:
+            resume_text = extract_resume_text(file)
+        except ResumeError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
     else:
         # Fallback to form field or JSON body
         resume_text = request.form.get("resume_text", "").strip()
@@ -945,25 +982,10 @@ def api_resume_parse():
     file = request.files.get("resume_file")
     resume_text = ""
     if file and file.filename:
-        filename = file.filename.lower()
-        if filename.endswith(".txt"):
-            resume_text = file.read().decode("utf-8", errors="ignore")
-        elif filename.endswith(".pdf"):
-            import pypdf
-            try:
-                reader = pypdf.PdfReader(file)
-                resume_text = "\n".join([page.extract_text() or "" for page in reader.pages])
-            except Exception as e:
-                return jsonify({"ok": False, "error": f"Error parsing PDF: {str(e)}"}), 400
-        elif filename.endswith(".docx"):
-            import docx
-            try:
-                doc = docx.Document(file)
-                resume_text = "\n".join([p.text for p in doc.paragraphs])
-            except Exception as e:
-                return jsonify({"ok": False, "error": f"Error parsing DOCX: {str(e)}"}), 400
-        else:
-            return jsonify({"ok": False, "error": "Unsupported file format"}), 400
+        try:
+            resume_text = extract_resume_text(file)
+        except ResumeError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
     else:
         try:
             d = request.json or {}
@@ -984,7 +1006,8 @@ def api_resume_parse():
         profile = parse_resume(resume_text, api_key)
         return jsonify({"ok": True, "profile": profile})
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        app.logger.error("Resume parse failed: %r", e)
+        return jsonify({"ok": False, "error": "Couldn't read that resume. Try again in a moment."}), 500
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -1347,6 +1370,7 @@ def admin_reset_password(user_id):
     finally:
         conn.close()
     login_throttle.reset_key(("user", row[0]), "login_fail")
+    _disabled_cache.pop(user_id, None)  # their signed-in devices are signed out on the next request
     return jsonify({"ok": True, "username": row[0], "temporary_password": temp})
 
 
@@ -1472,16 +1496,18 @@ def healthz():
 
 # ── API ────────────────────────────────────────────────────────────────────
 
+JOB_STATUSES = {"whatsapp", "new", "scored", "shortlisted", "ready", "applied", "interviewing", "offer", "rejected", "archived"}
+
+
 @app.route("/api/job/<job_id>/status", methods=["POST"])
 def set_status(job_id):
-    status = request.json.get("status")
-    allowed = {"whatsapp", "new", "scored", "shortlisted", "ready", "applied", "interviewing", "offer", "rejected", "archived"}
-    if status not in allowed:
+    status = (request.get_json(silent=True) or {}).get("status")
+    if status not in JOB_STATUSES:
         return jsonify({"error": "invalid"}), 400
     conn = get_conn(DB_PATH)
     uid = get_user_id()
     conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status, job_id, uid))
-    add_timeline(conn, job_id, f"Status → {status}")
+    add_timeline(conn, job_id, f"Status → {status}", user_id=uid)
     conn.commit()
     conn.close()
     
@@ -1503,12 +1529,16 @@ def save_cover_letter(job_id):
 
 @app.route("/api/job/<job_id>/note", methods=["POST"])
 def save_note(job_id):
-    d = request.json
+    d = request.get_json(silent=True) or {}
     conn = get_conn(DB_PATH)
     uid = get_user_id()
+    # Notes are keyed by job_id alone, so writing one for a job you don't own would replace its owner's note
+    if not conn.execute("SELECT 1 FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, uid)).fetchone():
+        conn.close()
+        return jsonify({"ok": False, "error": "Job not found"}), 404
     conn.execute(
         "INSERT OR REPLACE INTO application_notes (job_id, note, linkedin_note, user_id) VALUES (?,?,?,?)",
-        (job_id, d.get("note",""), d.get("linkedin_note",""), uid)
+        (job_id, str(d.get("note") or "")[:20000], str(d.get("linkedin_note") or "")[:5000], uid)
     )
     conn.commit(); conn.close()
     return jsonify({"ok": True})
@@ -1540,7 +1570,7 @@ def regenerate(job_id):
         "INSERT OR REPLACE INTO cover_letters (job_id, subject, body, linkedin_note, created_at, user_id) VALUES (?,?,?,?,?,?)",
         (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid)
     )
-    add_timeline(conn, job_id, "Regenerated cover letter")
+    add_timeline(conn, job_id, "Regenerated cover letter", user_id=uid)
     conn.commit(); conn.close()
     return jsonify({"ok": True, "score": score_data["score"],
                     "fit_summary": score_data["fit_summary"],
@@ -1573,7 +1603,7 @@ def send_email(job_id):
     if ok:
         conn2 = get_conn(DB_PATH)
         conn2.execute("UPDATE jobs SET status='applied' WHERE job_id=? AND user_id=?", (job_id, uid))
-        add_timeline(conn2, job_id, "Email sent → applied")
+        add_timeline(conn2, job_id, "Email sent → applied", user_id=uid)
         conn2.commit(); conn2.close()
     return jsonify({"ok": ok, "message": "Email sent!" if ok else "Couldn't send. Add your email address in settings, or email isn't configured on this server."})
 
@@ -1590,7 +1620,7 @@ def bulk_action():
         status_map = {"shortlist": "shortlisted", "archive": "archived", "applied": "applied"}
         for jid in ids:
             conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (status_map[action], jid, uid))
-            add_timeline(conn, jid, f"Bulk → {status_map[action]}")
+            add_timeline(conn, jid, f"Bulk → {status_map[action]}", user_id=uid)
 
     elif action == "send-digest":
         items = []
@@ -1618,11 +1648,13 @@ def bulk_action():
 
 @app.route("/api/pipeline/move", methods=["POST"])
 def pipeline_move():
-    d = request.json
+    d = request.get_json(silent=True) or {}
+    if d.get("status") not in JOB_STATUSES or not d.get("job_id"):
+        return jsonify({"ok": False, "error": "invalid"}), 400
     conn = get_conn(DB_PATH)
     uid = get_user_id()
     conn.execute("UPDATE jobs SET status=? WHERE job_id=? AND user_id=?", (d["status"], d["job_id"], uid))
-    add_timeline(conn, d["job_id"], f"Pipeline → {d['status']}")
+    add_timeline(conn, d["job_id"], f"Pipeline → {d['status']}", user_id=uid)
     conn.commit(); conn.close()
     return jsonify({"ok": True})
 
@@ -1744,7 +1776,7 @@ def api_followup_done(job_id):
             return jsonify({"ok": False, "error": "Job not found"}), 404
         followups.snooze(conn, uid, job_id)
         if sent:
-            add_timeline(conn, job_id, "Followed up")
+            add_timeline(conn, job_id, "Followed up", user_id=uid)
     finally:
         conn.close()
     return jsonify({"ok": True})
@@ -1817,7 +1849,7 @@ def update_interview_round(job_id):
     )
     conn.commit()
     
-    add_timeline(conn, job_id, f"Interview round -> {round_name}" + (f" on {at}" if at else ""))
+    add_timeline(conn, job_id, f"Interview round -> {round_name}" + (f" on {at}" if at else ""), user_id=uid)
     
     conn.close()
     return jsonify({"ok": True})
@@ -1908,7 +1940,8 @@ def get_job_interview_prep(job_id):
         })
     except Exception as e:
         conn.close()
-        return jsonify({"ok": False, "error": f"Failed to generate prep questions: {e}"}), 500
+        app.logger.error("Interview prep failed: %r", e)
+        return jsonify({"ok": False, "error": "Couldn't make prep questions right now. Try again in a moment."}), 500
 
 
 @app.route("/api/job/<job_id>/interview-prep/feedback", methods=["POST"])
@@ -1980,7 +2013,8 @@ def regenerate_job_interview_prep(job_id):
         })
     except Exception as e:
         conn.close()
-        return jsonify({"ok": False, "error": f"Failed to regenerate prep questions: {e}"}), 500
+        app.logger.error("Interview prep failed: %r", e)
+        return jsonify({"ok": False, "error": "Couldn't make prep questions right now. Try again in a moment."}), 500
 
 
 @app.route("/api/stats")
@@ -2254,7 +2288,7 @@ def add_web_search_result():
             return jsonify({"ok": True, "already": True, "job_id": dup_id})
         if not _insert_job(conn, job, user_id=uid):
             return jsonify({"ok": True, "already": True, "job_id": job["job_id"]})
-        add_timeline(conn, job["job_id"], "Added from web search")
+        add_timeline(conn, job["job_id"], "Added from web search", user_id=uid)
         conn.commit()
     finally:
         conn.close()
@@ -2594,7 +2628,7 @@ def api_interview_end():
             try:
                 call_log.set_report(c, uid, saved["id"], report, mock_interview.summary_line(report, role, scenario))
                 if job_id and not report.get("error"):
-                    add_timeline(c, job_id, mock_interview.timeline_event(report, scenario))
+                    add_timeline(c, job_id, mock_interview.timeline_event(report, scenario), user_id=uid)
             finally:
                 c.close()
         run_in_background(("interview_score", uid, saved["id"]), work)
@@ -3195,7 +3229,7 @@ def voice_confirm():
             if not status:
                 return jsonify({"ok": False, "error": _t("I lost track of which column you wanted. Ask me again?", "मैं भूल गई कि कौन सा कॉलम चाहिए था। फिर से बताइए?")}), 400
             conn.execute("UPDATE jobs SET status = ? WHERE job_id = ? AND user_id = ?", (status, job_id, uid))
-            add_timeline(conn, job_id, f"Pipeline → {status} (Voice)")
+            add_timeline(conn, job_id, f"Pipeline → {status} (Voice)", user_id=uid)
             conn.commit()
             rescore_inbox_in_background(uid)
             text = _t(ve.pick("Done!", "All set!", "You got it!") + f" {job['company']} is now in {ve.column_label(status)}.",
@@ -3227,7 +3261,7 @@ def voice_confirm():
                          (score_data["score"], score_data["fit_summary"], json.dumps(score_data.get("key_requirements", [])), job_id, uid))
             conn.execute("INSERT OR REPLACE INTO cover_letters (job_id, subject, body, linkedin_note, created_at, user_id) VALUES (?,?,?,?,?,?)",
                          (job_id, letter["subject"], letter["body"], li_note, datetime.now().isoformat(), uid))
-            add_timeline(conn, job_id, "Regenerated cover letter (Voice)")
+            add_timeline(conn, job_id, "Regenerated cover letter (Voice)", user_id=uid)
             conn.commit()
             text = _t(f"Your new cover letter for {job['company']} is ready. Open the job to read it.",
                       f"{job['company']} के लिए आपका नया कवर लेटर तैयार है। पढ़ने के लिए जॉब खोलिए।")
@@ -3255,7 +3289,7 @@ def voice_confirm():
             if not send_email_digest([item], recipient=recipient_for_user(uid)):
                 return jsonify({"ok": False, "error": _t("I couldn't send that email. Check your email settings and try again.", "ईमेल नहीं भेज पाई। अपनी ईमेल सेटिंग्स देखकर फिर से कोशिश करें।")}), 502
             conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ? AND user_id = ?", (job_id, uid))
-            add_timeline(conn, job_id, "Email sent → applied (Voice)")
+            add_timeline(conn, job_id, "Email sent → applied (Voice)", user_id=uid)
             conn.commit()
             text = _t(f"Sent! I moved {job['company']} to Applied. Good luck!", f"भेज दिया! {job['company']} को Applied में डाल दिया। ऑल द बेस्ट!")
             return jsonify({"ok": True, "reply_text": text, "board_changed": True,
@@ -3263,7 +3297,7 @@ def voice_confirm():
 
         if intent == "archive_job":
             conn.execute("UPDATE jobs SET status = 'archived' WHERE job_id = ? AND user_id = ?", (job_id, uid))
-            add_timeline(conn, job_id, "Pipeline → archived (Voice)")
+            add_timeline(conn, job_id, "Pipeline → archived (Voice)", user_id=uid)
             conn.commit()
             text = _t(f"Archived {job['title']} at {job['company']}. One less thing to think about.",
                       f"{job['company']} की {job['title']} जॉब आर्काइव कर दी।")
@@ -3625,7 +3659,7 @@ def scrape_job_url(url: str) -> dict:
     loc = "India"
     
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = security.safe_get(url, headers=HEADERS, timeout=10)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
             fetched_desc = _fetch_description(url)
@@ -3698,7 +3732,7 @@ Respond ONLY with a JSON object containing keys: "company", "title", "location",
 
 @app.route("/api/whatsapp/import", methods=["POST"])
 def import_whatsapp():
-    text = request.json.get("text", "")
+    text = str((request.get_json(silent=True) or {}).get("text") or "")[:20000]
     if not text:
         return jsonify({"ok": False, "error": "Empty text"}), 400
         
@@ -3742,7 +3776,6 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
 
     # Regex fallback if Gemini failed or is not active
     if not parsed:
-        import re
         urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', text)
         for url in urls:
             print(f"[WhatsApp Import] Scraping fallback URL: {url}")
@@ -3787,7 +3820,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
                 "error": f"Duplicate found: '{existing['title']}' at {existing['company']} is already in the '{lane}' lane!"
             }), 409
 
-        job_id = f"wa_{company.lower().replace(' ', '_')}_{str(uuid.uuid4())[:8]}"
+        job_id = f"wa_{re.sub(r'[^a-z0-9]+', '_', company.lower())[:40]}_{str(uuid.uuid4())[:8]}"
         
         # Calculate real score if description and title are present
         try:
@@ -3807,7 +3840,7 @@ Respond ONLY with a JSON array of objects with the keys: "company", "title", "ur
                VALUES (?, ?, ?, 'whatsapp', ?, ?, ?, ?, ?, ?, ?, ?)""",
             (job_id, company, title, url, loc, desc, datetime.now().isoformat(), auto_score, ai_summary, key_reqs, uid)
         )
-        add_timeline(conn, job_id, "Imported from WhatsApp forward")
+        add_timeline(conn, job_id, "Imported from WhatsApp forward", user_id=uid)
         added_count += 1
             
     conn.commit()
@@ -3880,16 +3913,23 @@ def print_resume(job_id):
             if i > 0 and lines[i-1].strip():
                 new_lines.append("")
         new_lines.append(line)
-    processed_resume = "\n".join(new_lines)
-    
-    import markdown
-    html_content = markdown.markdown(processed_resume)
+    # The resume is AI output built from a job posting anyone can write, so treat it as untrusted:
+    # escape any HTML in it first, then let markdown add only its own formatting.
+    import html as html_lib
+    processed_resume = html_lib.escape("\n".join(new_lines), quote=False)
+    processed_resume = processed_resume.replace('&lt;span style="float: right;"&gt;', '<span style="float: right;">') \
+                                       .replace("&lt;/span&gt;", "</span>")
+    try:
+        import markdown
+        html_content = markdown.markdown(processed_resume)
+    except ImportError:
+        html_content = "<pre style='white-space:pre-wrap;font-family:inherit'>" + processed_resume + "</pre>"
     
     return f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Tailored Resume - {job_id}</title>
+  <title>Tailored Resume - {html_lib.escape(job_id)}</title>
   <style>
     @page {{
       size: letter;

@@ -9,6 +9,8 @@ import pytest
 os.environ.setdefault("DB_PATH", os.path.join(tempfile.mkdtemp(), "test.db"))
 os.environ.setdefault("FLASK_SECRET_KEY", "test-secret")
 os.environ.setdefault("SKIP_STARTUP_RESCORE", "1")
+# Production hashing is deliberately slow; tests make many accounts
+os.environ.setdefault("PASSWORD_HASH_ROUNDS", "1000")
 os.environ.pop("DATABASE_URL", None)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,3 +26,15 @@ def _csrf_off_by_default(request):
     dashboard.app.config["CSRF_ENABLED"] = False
     yield
     dashboard.app.config["CSRF_ENABLED"] = True
+
+
+@pytest.fixture(autouse=True)
+def _offline_dns(request, monkeypatch):
+    """Outbound fetches check where a host points (security.check_public_url). Tests run offline
+    with fake pages, so every name resolves to a public documentation address unless a test says otherwise."""
+    if "real_dns" in request.keywords:
+        yield
+        return
+    import security
+    monkeypatch.setattr(security, "_resolve", lambda host, port: ["93.184.216.34"])
+    yield

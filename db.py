@@ -443,6 +443,9 @@ def _ensure_admin(conn) -> None:
         return
 
     current_hash = row[0] or ""
+    if admin_pw and len(admin_pw) < 12:
+        print("WARNING: ADMIN_PASSWORD is shorter than 12 characters. The admin account can manage every user; "
+              "use a long random password.")
     if admin_pw:
         if not verify_password(admin_pw, current_hash):
             conn.execute("UPDATE users SET password_hash = ? WHERE id = 1", (hash_password(admin_pw),))
@@ -667,10 +670,14 @@ def record_login(conn, user_id, username, method, success, ip="", user_agent="")
     conn.commit()
 
 
-def add_timeline(conn: sqlite3.Connection, job_id: str, event: str) -> None:
+def add_timeline(conn: sqlite3.Connection, job_id: str, event: str, user_id=None) -> None:
+    """Notes an event on a job's history. With user_id, only if that user owns the job,
+    so a request about someone else's job can never write into their history."""
     from datetime import datetime
     row = conn.execute("SELECT user_id FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
-    uid = row[0] if row else 1
+    if not row or (user_id is not None and row[0] != user_id):
+        return
+    uid = row[0]
     conn.execute(
         "INSERT INTO application_timeline (job_id, event, created_at, user_id) VALUES (?, ?, ?, ?)",
         (job_id, event, datetime.now().isoformat(), uid),
