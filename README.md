@@ -65,6 +65,10 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 | `DB_PATH` | Optional | Path to SQLite database file (default: `jobs.db`) |
 | `MIN_SCORE` | Optional | Threshold score to include a scraped job in recommendation runs (default: `6.0`) |
 | `DASHBOARD_PORT` | Optional | Local port to run the Flask dashboard server (default: `5050`) |
+| `SITE_OWNER_NAME` | Recommended | Who created and runs the site, shown as "Created by" in the footer and named in the legal pages (default `AB`) |
+| `SITE_CONTACT_EMAIL` | Recommended | Address for privacy, deletion, accessibility and grievance requests on the legal pages. Until it's set, the Contact page says an address is being set up |
+| `SITE_OWNER_URL` | Optional | Link for the owner's name in the footer, e.g. a portfolio or LinkedIn page |
+| `SITE_JURISDICTION` | Optional | Country whose laws and courts the Terms name (default `India`) |
 | `LOG_LEVEL` | Optional | How much the server logs: `DEBUG`, `INFO` (default), `WARNING` or `ERROR` |
 
 ---
@@ -118,6 +122,12 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 `mobile/` holds the Android and iOS apps. They open this website in a native shell, so a deploy
 reaches app users without a store update. The site is also installable from the browser (manifest
 and service worker in `static/`). See [mobile/README.md](mobile/README.md) for building and publishing.
+
+## Legal pages and cookie consent
+
+Public pages at `/privacy`, `/terms`, `/cookies`, `/acceptable-use`, `/disclaimer`, `/your-data`, `/accessibility`, `/contact` and the `/legal` index live in `legal/` and are served by `legal.py`. They describe what the app actually collects and which providers it uses, so update them when you add a provider, a cookie or a new kind of personal data, and bump `LAST_UPDATED` (and `CONSENT_VERSION` when the cookie choices change, which asks everyone again). They're written as plain-language templates, not legal advice.
+
+`static/site/consent.js` shows the cookie banner. The only optional category is "Preferences" (theme, tour, Sunny's settings, practice phone number in localStorage). Until a visitor allows it, those keys are kept in sessionStorage for the tab only. New localStorage keys must be added to `PREF_EXACT` there (or start with `va_`) and to the Cookie Policy; `tests/test_legal.py` checks this.
 
 ## Running for many users
 

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{ title }} · {{ site.name }}</title>
+<meta name="description" content="{{ summary }}">
+<link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#F5F2EB">
+{% include "legal/_head.html" %}
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0D0C0A' : '#F5F2EB');
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.documentElement.classList.add(calm ? 'calm' : 'motion');
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ss-bg); }
+body { font: 16px/1.65 var(--ss-sans); color: var(--ss-txt); letter-spacing: -0.005em; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--ss-yolk); color: var(--ss-ink); }
+a { color: var(--ss-link); text-underline-offset: 3px; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; background: var(--ss-yolk); color: var(--ss-ink);
+        padding: 10px 14px; border-radius: 10px; font-weight: 700; text-decoration: none; }
+.skip:focus { top: 12px; }
+
+.lg-nav { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--ss-bdr);
+          background: color-mix(in srgb, var(--ss-bg) 84%, transparent);
+          -webkit-backdrop-filter: saturate(1.4) blur(12px); backdrop-filter: saturate(1.4) blur(12px); }
+.lg-nav-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lg-logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.03em;
+           color: var(--ss-txt); text-decoration: none; }
+.lg-logo i { width: 12px; height: 12px; border-radius: 50%; background: var(--ss-yolk); }
+.lg-actions { display: flex; gap: 8px; }
+.lg-btn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 14px;
+          text-decoration: none; color: var(--ss-txt); border: 1px solid var(--ss-bdr); transition: background .15s, transform .15s; }
+.lg-btn:hover { background: var(--ss-sur2); }
+.lg-btn-p { background: var(--ss-yolk); border-color: var(--ss-yolk); color: var(--ss-ink); }
+.lg-btn-p:hover { background: #FFB529; }
+
+.lg-hero { max-width: 1120px; margin: 0 auto; padding: 56px 24px 28px; }
+.lg-eyebrow { font: 700 12px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ss-hin); margin-bottom: 14px; }
+.lg-eyebrow a { color: inherit; text-decoration: none; }
+.lg-eyebrow a:hover { color: var(--ss-txt); }
+.lg-hero h1 { margin: 0; font-size: clamp(34px, 5.4vw, 56px); line-height: 1.04; letter-spacing: -0.045em; font-weight: 700; max-width: 18ch; }
+.lg-hero p { margin: 14px 0 0; color: var(--ss-mut); font-size: 18px; max-width: 60ch; }
+.lg-meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+.lg-chip { font: 700 11px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .05em; padding: 7px 10px; border-radius: 999px;
+           background: var(--ss-sur); border: 1px solid var(--ss-bdr); color: var(--ss-mut); }
+
+.lg-wrap { max-width: 1120px; margin: 0 auto; padding: 12px 24px 80px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 56px; }
+.lg-side { position: sticky; top: 88px; align-self: start; }
+.lg-side h2 { font: 700 11px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ss-hin); margin: 0 0 12px; }
+.lg-side ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--ss-bdr); }
+.lg-side a { display: block; padding: 6px 14px; margin-left: -1px; border-left: 2px solid transparent; color: var(--ss-mut);
+             text-decoration: none; font-size: 14px; transition: color .15s, border-color .2s; }
+.lg-side a:hover { color: var(--ss-txt); }
+.lg-side a[aria-current="page"] { color: var(--ss-txt); font-weight: 700; border-left-color: var(--ss-yolk); }
+
+.lg-doc { max-width: 72ch; }
+.lg-doc h2 { font-size: 24px; letter-spacing: -0.03em; line-height: 1.2; margin: 44px 0 10px; scroll-margin-top: 88px; }
+.lg-doc h2:first-child { margin-top: 0; }
+.lg-doc h3 { font-size: 17px; letter-spacing: -0.02em; margin: 26px 0 6px; }
+.lg-doc p, .lg-doc li { color: var(--ss-mut); }
+.lg-doc strong { color: var(--ss-txt); }
+.lg-doc ul, .lg-doc ol { padding-left: 22px; }
+.lg-doc li { margin: 4px 0; }
+.lg-doc li::marker { color: var(--ss-yolk); }
+.lg-summary { background: var(--ss-sur); border: 1px solid var(--ss-bdr); border-radius: 16px; padding: 18px 20px 6px; margin: 0 0 8px; }
+.lg-summary h2 { margin: 0 0 6px !important; font-size: 15px; font-family: var(--ss-mono); text-transform: uppercase; letter-spacing: .06em; }
+.lg-table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--ss-bdr); border-radius: 14px; background: var(--ss-sur); }
+.lg-doc table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
+.lg-doc th, .lg-doc td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--ss-bdr); color: var(--ss-mut); }
+.lg-doc th { color: var(--ss-txt); font: 700 11px/1.3 var(--ss-mono); text-transform: uppercase; letter-spacing: .05em; background: var(--ss-sur2); }
+.lg-doc tr:last-child td { border-bottom: 0; }
+.lg-doc code { font: 13px var(--ss-mono); background: var(--ss-sur2); padding: 1px 6px; border-radius: 6px; color: var(--ss-txt); }
+.lg-callout { border-left: 3px solid var(--ss-yolk); padding: 10px 16px; background: var(--ss-sur); border-radius: 0 12px 12px 0; margin: 16px 0; }
+.lg-callout p { margin: 4px 0; }
+.lg-cta { display: inline-flex; align-items: center; gap: 8px; margin: 6px 8px 6px 0; }
+.lg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0 !important; list-style: none; }
+.lg-cards li { margin: 0; }
+.lg-cards a { display: block; height: 100%; padding: 18px; border: 1px solid var(--ss-bdr); border-radius: 16px; background: var(--ss-sur);
+              text-decoration: none; color: var(--ss-mut); transition: transform .25s var(--ss-ease), box-shadow .25s, border-color .2s; }
+.lg-cards a:hover { transform: translateY(-3px); box-shadow: var(--ss-shadow); border-color: var(--ss-yolk); }
+.lg-cards strong { display: block; font-size: 17px; letter-spacing: -0.02em; margin-bottom: 4px; color: var(--ss-txt); }
+.lg-cards span { font-size: 14px; }
+
+/* Motion: the article rises in once; nothing moves with reduce motion */
+.motion .lg-rise { animation: lg-rise .7s var(--ss-ease) both; animation-delay: var(--d, 0ms); }
+@keyframes lg-rise { from { opacity: 0; transform: translateY(14px); } }
+
+@media (max-width: 860px) {
+  .lg-wrap { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 0 16px 64px; }
+  .lg-side { position: static; min-width: 0; }
+  .lg-side ul { display: flex; gap: 6px; overflow-x: auto; border: 0; padding-bottom: 6px; scrollbar-width: none; }
+  .lg-side ul::-webkit-scrollbar { display: none; }
+  .lg-side a { white-space: nowrap; border: 1px solid var(--ss-bdr); border-radius: 999px; padding: 7px 12px; margin: 0; font-size: 13px; background: var(--ss-sur); }
+  .lg-side a[aria-current="page"] { border-color: var(--ss-yolk); background: rgba(255, 167, 0, 0.14); }
+  .lg-side h2 { display: none; }
+  .lg-hero { padding: 36px 16px 20px; }
+  .lg-nav-in { padding: 0 16px; }
+  .lg-hero p { font-size: 16px; }
+}
+@media (max-width: 420px) { .lg-actions .lg-btn:not(.lg-btn-p) { display: none; } }
+@media print {
+  .lg-nav, .lg-side, .ss-footer, .ss-cc { display: none !important; }
+  .lg-wrap { display: block; }
+  body { background: #fff; color: #000; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="lg-nav">
+  <div class="lg-nav-in">
+    <a class="lg-logo" href="/">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <g stroke="#FFA700" stroke-width="2.2" stroke-linecap="round">
+          <line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/>
+          <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/>
+        </g>
+        <circle cx="12" cy="12" r="5.5" fill="#FFA700"/>
+      </svg>{{ site.name }}</a>
+    <div class="lg-actions">
+      {% if session.get('user_id') %}
+      <a class="lg-btn lg-btn-p" href="/">Back to my board</a>
+      {% else %}
+      <a class="lg-btn" href="/login">Log in</a>
+      <a class="lg-btn lg-btn-p" href="/signup">Sign up</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<main id="content">
+  <div class="lg-hero lg-rise">
+    <div class="lg-eyebrow"><a href="/legal">Legal &amp; policies</a>{% if slug != 'legal' %} / {{ title }}{% endif %}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ summary }}</p>
+    <div class="lg-meta">
+      <span class="lg-chip">Last updated {{ site.updated_text }}</span>
+      <span class="lg-chip">Effective {{ site.updated_text }}</span>
+    </div>
+  </div>
+
+  <div class="lg-wrap">
+    <aside class="lg-side" aria-label="Policies">
+      <h2>Policies</h2>
+      <ul>
+        <li><a href="/legal"{% if slug == 'legal' %} aria-current="page"{% endif %}>Overview</a></li>
+        {% for s, (t, _) in site.pages.items() %}
+        <li><a href="/{{ s }}"{% if slug == s %} aria-current="page"{% endif %}>{{ t }}</a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+    <article class="lg-doc lg-rise" style="--d:120ms">
+      {% block body %}{% endblock %}
+    </article>
+  </div>
+</main>
+
+{% include "legal/_footer.html" %}
+<script>
+  // Keep the current policy visible in the phone-width pill row
+  (function () {
+    var cur = document.querySelector('.lg-side a[aria-current="page"]');
+    if (cur && window.matchMedia('(max-width: 860px)').matches) {
+      var row = cur.closest('ul');
+      row.scrollLeft = cur.offsetLeft - (row.clientWidth - cur.offsetWidth) / 2;
+    }
+  })();
+</script>
+</body>
+</html>

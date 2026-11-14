@@ -8,6 +8,8 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#F5F2EB">
+<meta name="description" content="Sunny Side is a free job hunter's board: it reads your application emails, scores roles against your resume and drafts your cover letters.">
+{% include "legal/_head.html" %}
 <script>
   // Same theme as the board: saved choice, else the device setting
   (function () {
@@ -326,8 +328,6 @@ section { position: relative; }
 .cta h2 { font-size: clamp(32px, 5vw, 52px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; margin-bottom: 14px; }
 .cta p { color: var(--mut); font-size: 17px; margin-bottom: 30px; }
 
-footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--font-mono); font-size: 12px; color: var(--hin); }
-.footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
 /* ---------- Reveal on scroll (only hidden when it will animate) ---------- */
 .motion .reveal { opacity: 0; transform: translateY(18px); }
@@ -600,12 +600,7 @@ footer { padding: 28px 0; border-top: 1px solid var(--bdr); font-family: var(--f
   </section>
 </main>
 
-<footer>
-  <div class="container footer-inner">
-    <span>&copy; 2026 Sunny Side</span>
-    <span>Stored securely, never shared.</span>
-  </div>
-</footer>
+{% include "legal/_footer.html" %}
 
 <script src="/static/vendor/sunny-anim.min.js?v=1"></script>
 <script>

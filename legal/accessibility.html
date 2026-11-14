@@ -1,0 +1,27 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<h2 id="commitment">Our commitment</h2>
+<p>We want everyone to be able to run their job search on Sunny Side, including people who use screen readers, keyboards, magnification, voice control or reduced motion. We aim to meet the <strong>Web Content Accessibility Guidelines (WCAG) 2.1, level AA</strong>, in line with India's Rights of Persons with Disabilities Act, 2016 and the accessibility standards it refers to.</p>
+
+<h2 id="what">What we've done</h2>
+<ul>
+  <li>Light and dark themes that follow your device setting, with text colours checked for contrast.</li>
+  <li>Animations switch off when your device asks for reduced motion.</li>
+  <li>Pages work on phones and tablets, and text can be zoomed to 200% without loss of content.</li>
+  <li>Forms have labels, buttons have accessible names, and dialogs can be closed with the Escape key.</li>
+  <li>Sunny can be used by voice or by typing, and replies are shown as text as well as spoken.</li>
+  <li>Pages work without the voice features, and nothing depends on colour alone.</li>
+</ul>
+
+<h2 id="known">Known limitations</h2>
+<ul>
+  <li>Dragging cards between columns on the board needs a mouse or touch; each card also has a “Move to…” menu that works with a keyboard and screen reader.</li>
+  <li>Some AI-generated text and third-party job descriptions may not be well structured.</li>
+  <li>Live voice and practice calls need a microphone; transcripts are provided afterwards.</li>
+</ul>
+
+<h2 id="feedback">Tell us about a barrier</h2>
+<p>If something on Sunny Side is hard or impossible for you to use, email {{ email() }} with the page and what happened. We'll reply within 5 working days and try to give you the information another way while we fix it.</p>
+<p>This statement was prepared on {{ site.updated_text }} from our own testing.</p>
+{% endblock %}

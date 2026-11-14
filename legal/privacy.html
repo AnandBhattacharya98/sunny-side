@@ -1,0 +1,108 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<section class="lg-summary">
+  <h2>The short version</h2>
+  <ul>
+    <li>We collect what you give us to run your job search: your account, resume, the jobs on your board, and anything you connect such as your inbox or voice sessions.</li>
+    <li>We use it only to provide Sunny Side to you. <strong>We don't sell it, rent it or use it for advertising.</strong></li>
+    <li>Some features send your data to service providers (for example Google's Gemini AI or LiveKit for voice) only to do the job you asked for.</li>
+    <li>You can download everything or delete your account yourself, any time, from Profile Settings.</li>
+  </ul>
+</section>
+
+<h2 id="who">1. Who we are</h2>
+<p>Sunny Side (“Sunny Side”, “we”, “us”) is a job-search board created and run by <strong>{{ site.owner }}</strong>, based in {{ site.jurisdiction }}. {{ site.owner }} decides why and how your personal data is processed, which makes us the <em>data fiduciary</em> under India's Digital Personal Data Protection Act, 2023 (DPDP Act) and the <em>controller</em> under the EU and UK General Data Protection Regulation (GDPR). You can reach us at {{ email() }}.</p>
+<p>This policy covers the website, the installable web app, and the Android and iOS apps, which all open the same service.</p>
+
+<h2 id="collect">2. What we collect</h2>
+<h3>Information you give us</h3>
+<ul>
+  <li><strong>Account details:</strong> username, password (stored only as a salted hash), email address, your name and job title. If you sign in with Google or LinkedIn we receive your name and email address from them.</li>
+  <li><strong>Your resume:</strong> the file name and text of the resume you upload or paste, and the skills, experience and roles we extract from it.</li>
+  <li><strong>Your job search:</strong> jobs you save or import (including text you paste from WhatsApp or elsewhere), statuses, notes, feedback, interview dates and rounds, companies you follow, cover letters and outreach drafts, and your match settings.</li>
+  <li><strong>Connected inbox (optional):</strong> if you add a Gmail address and app password, we store the password encrypted and read the sender, subject and body of job-related emails to update your board. We keep the emails we match to your applications.</li>
+  <li><strong>Your own API keys (optional):</strong> a Gemini API key you add is stored encrypted and is never shown back to your browser.</li>
+  <li><strong>Voice and calls (optional):</strong> when you talk to Sunny, rehearse a call or run a mock interview, your voice is streamed for transcription and replies. We keep the transcript, summary and feedback of practice calls and interviews in your call log, and the phone number you ask a practice call to ring. We do not keep audio recordings.</li>
+  <li><strong>Call log entries:</strong> calls you log through the Calls page or its API, including the caller's name and phone number you enter.</li>
+  <li><strong>Public profile (optional):</strong> if you opt in, your name, job title and LinkedIn link appear on our homepage's wall of job seekers. It is off unless you turn it on.</li>
+  <li><strong>Messages to us:</strong> anything you send when you contact us.</li>
+</ul>
+<h3>Information collected automatically</h3>
+<ul>
+  <li><strong>Sign-in records:</strong> the time, method, IP address and browser of each sign-in attempt, kept for 180 days to protect accounts and spot abuse.</li>
+  <li><strong>Technical logs:</strong> our host keeps short-lived server logs (such as IP address, page requested and errors) to keep the service running and secure.</li>
+  <li><strong>Cookies and browser storage:</strong> one essential sign-in cookie, plus preferences only if you allow them. See the <a href="/cookies">Cookie Policy</a>. We use no analytics, advertising or tracking tools.</li>
+</ul>
+<h3>Information about other people</h3>
+<p>Job listings come from public job boards and company career pages. To help you reach out, Sunny Side may show hiring contacts for a role (name, title, public LinkedIn link and work email where available), found through public sources or a people-search provider. If you are one of those people and want to be removed, contact us and we will delete your details.</p>
+
+<h2 id="use">3. How we use it, and why we're allowed to</h2>
+<div class="lg-table-wrap"><table>
+  <thead><tr><th>What we do</th><th>Data used</th><th>Legal basis</th></tr></thead>
+  <tbody>
+    <tr><td>Create and secure your account, sign you in</td><td>Account details, sign-in records</td><td>Contract; legitimate interest in security</td></tr>
+    <tr><td>Score jobs against your resume, suggest roles and career switches, find gaps and learning videos</td><td>Resume, job search data</td><td>Contract (it's the service you signed up for); consent under the DPDP Act</td></tr>
+    <tr><td>Draft cover letters, follow-ups and interview prep</td><td>Resume, job details, notes</td><td>Contract; consent</td></tr>
+    <tr><td>Read your job emails and update statuses</td><td>Connected inbox</td><td>Consent (you connect it and can remove it)</td></tr>
+    <tr><td>Voice assistant, practice calls, mock interviews</td><td>Voice stream, transcripts, phone number</td><td>Consent (each session is started by you)</td></tr>
+    <tr><td>Send password-reset and digest emails you turn on</td><td>Email address</td><td>Contract; consent for digests</td></tr>
+    <tr><td>Show your profile on the homepage wall</td><td>Name, title, LinkedIn link</td><td>Consent (opt-in)</td></tr>
+    <tr><td>Prevent abuse, fix bugs, comply with law</td><td>Logs, sign-in records</td><td>Legitimate interest; legal obligation</td></tr>
+  </tbody>
+</table></div>
+<p>We do not use your data to train AI models, and we don't make decisions about you that have legal or similarly significant effects. Match scores are suggestions to help you prioritise; you decide what to do with them.</p>
+
+<h2 id="share">4. Who we share it with</h2>
+<p>We share personal data only with service providers that help run Sunny Side, only for the purpose below, and under their own security and data-protection terms:</p>
+<div class="lg-table-wrap"><table>
+  <thead><tr><th>Provider</th><th>Purpose</th><th>Data involved</th></tr></thead>
+  <tbody>
+    <tr><td>Render (hosting and database)</td><td>Runs the app and stores your account data</td><td>Everything stored in your account</td></tr>
+    <tr><td>Google (Gemini API)</td><td>AI scoring, writing, translation, voice replies</td><td>Resume text, job details, your questions and transcripts</td></tr>
+    <tr><td>Anthropic (Claude API, when enabled)</td><td>AI scoring and cover letters</td><td>Resume text and job details</td></tr>
+    <tr><td>LiveKit (and the speech and language models it routes to)</td><td>Live voice, speech-to-text, text-to-speech, practice phone calls</td><td>Your voice stream, transcripts, the phone number for a practice call</td></tr>
+    <tr><td>Google and LinkedIn sign-in</td><td>Signing in, if you choose it</td><td>Name and email address returned by them</td></tr>
+    <tr><td>Google (Gmail over IMAP)</td><td>Reading job emails you connect</td><td>Your mailbox login, used only to read job emails</td></tr>
+    <tr><td>Brevo</td><td>Sending password-reset and digest emails</td><td>Your email address and the message</td></tr>
+    <tr><td>YouTube Data API</td><td>Finding learning videos for skill gaps</td><td>Skill names only, never your identity</td></tr>
+    <tr><td>Proxycurl (when enabled)</td><td>Looking up public hiring contacts for a company</td><td>Company name only</td></tr>
+    <tr><td>Google Fonts and jsDelivr</td><td>Delivering fonts and the voice client library to your browser</td><td>Your IP address and browser details, as with any web request</td></tr>
+  </tbody>
+</table></div>
+<p>We may also disclose data if the law requires it, to protect people's safety or our rights, or as part of a transfer of the service, in which case this policy continues to apply. <strong>We never sell or “share” personal data for cross-context behavioural advertising</strong>, as those terms are used in the California Consumer Privacy Act (CCPA/CPRA).</p>
+
+<h2 id="transfers">5. Where your data goes</h2>
+<p>Sunny Side's servers and several providers above are located outside India, including in the United States and the European Union. When data moves across borders we rely on the providers' contractual safeguards (such as Standard Contractual Clauses for data from the EU/UK). The DPDP Act allows transfers except to countries the Government of India restricts; we will follow any such restriction.</p>
+
+<h2 id="retention">6. How long we keep it</h2>
+<ul>
+  <li><strong>Your account data</strong> is kept while your account is open. When you delete your account, we erase your profile, resume, jobs, notes, emails, contacts, calls and sign-in records straight away.</li>
+  <li><strong>Sign-in records</strong> are deleted after 180 days.</li>
+  <li><strong>Server logs and backups</strong> at our host roll over on their own schedule, normally within a few weeks.</li>
+  <li><strong>Learning video results</strong> are cached by skill name and contain no personal data.</li>
+</ul>
+
+<h2 id="rights">7. Your rights</h2>
+<p>Wherever you live, you can:</p>
+<ul>
+  <li><strong>Access and port</strong> your data: download it as CSV or JSON from Profile Settings → Your data.</li>
+  <li><strong>Correct</strong> it: edit your profile, resume and board at any time.</li>
+  <li><strong>Erase</strong> it: delete your account from Profile Settings, or ask us to. See <a href="/your-data">Your Data &amp; Deletion</a>.</li>
+  <li><strong>Withdraw consent</strong>: disconnect your inbox, remove your API key, turn off the public profile or stop using voice features. Withdrawing doesn't affect what was done before.</li>
+  <li><strong>Object or restrict</strong> processing based on legitimate interest (GDPR).</li>
+  <li><strong>Nominate</strong> someone to exercise your rights if you die or become unable to (DPDP Act, section 14).</li>
+  <li><strong>Complain</strong>: contact us first, see <a href="/contact">Contact &amp; Grievances</a>. If you're not satisfied you can approach the Data Protection Board of India, or your local data protection authority in the EU or UK.</li>
+</ul>
+<p>California residents have the right to know, delete and correct personal information, and not to be discriminated against for using these rights. We don't sell or share personal information, so there is nothing to opt out of. We honour Global Privacy Control signals by default.</p>
+<p>We answer requests within 30 days and may ask you to confirm it's really you first.</p>
+
+<h2 id="children">8. Children</h2>
+<p>Sunny Side is for adults looking for work. You must be at least 18 to use it, and we don't knowingly collect data from anyone younger. If you believe a child has signed up, tell us and we'll delete the account.</p>
+
+<h2 id="security">9. Security</h2>
+<p>We use HTTPS everywhere, hash passwords with a unique salt, encrypt stored mailbox passwords and API keys, keep each person's data separate, protect forms against forgery, and limit repeated sign-in attempts. No system is perfectly secure; if a breach affects your data we will tell you and the authorities as the law requires, including the Data Protection Board of India.</p>
+
+<h2 id="changes">10. Changes to this policy</h2>
+<p>If we change this policy we'll update the date at the top. For significant changes we'll tell you in the app or by email before they take effect.</p>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<p>Sunny Side is built to help people find work. To keep it safe and useful for everyone, you agree not to use it, or help anyone else use it, to:</p>
+<ul>
+  <li>Break any law, including data protection, anti-spam, employment and anti-discrimination laws.</li>
+  <li>Upload content you don't have the right to share, or other people's personal data without a lawful reason.</li>
+  <li>Pretend to be someone else, or misrepresent your qualifications, identity or work history to employers in ways that are fraudulent.</li>
+  <li>Send bulk, unsolicited or harassing messages to recruiters or hiring contacts found through Sunny Side.</li>
+  <li>Use the practice-call or calls features to ring anyone without their consent, or anyone other than yourself.</li>
+  <li>Harass, threaten or abuse anyone, including Sunny, our voice assistant, in ways meant to produce harmful content.</li>
+  <li>Upload malware, or try to probe, scan or break the security of Sunny Side or any account that isn't yours.</li>
+  <li>Scrape, copy or resell the service or its data, or access it with bots beyond the API we provide.</li>
+  <li>Overload the service, get around rate limits, or share API keys or accounts.</li>
+  <li>Use the AI features to produce content that is illegal, hateful, sexually explicit, or that infringes someone else's rights.</li>
+</ul>
+<h2 id="enforcement">What happens if this is broken</h2>
+<p>We may remove content, limit features, or suspend or close the account involved, and where required, report illegal activity to the authorities. We'll usually warn you first unless the problem is serious or urgent.</p>
+<h2 id="report">Reporting misuse</h2>
+<p>If you see something that breaks this policy, or you've been contacted in an abusive way through Sunny Side, tell us at {{ email() }}. Security researchers: please report vulnerabilities privately to the same address and give us reasonable time to fix them before sharing details.</p>
+{% endblock %}

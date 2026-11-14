@@ -1,0 +1,56 @@
+{% extends "legal/_layout.html" %}
+{% from "legal/_macros.html" import email with context %}
+{% block body %}
+<section class="lg-summary">
+  <h2>The short version</h2>
+  <ul>
+    <li>One essential cookie keeps you signed in, and one remembers your cookie choice.</li>
+    <li>Preferences such as your theme are stored on your device only if you allow them.</li>
+    <li><strong>No analytics, advertising or third-party tracking cookies.</strong></li>
+  </ul>
+  <p><button type="button" class="lg-btn lg-btn-p" data-cookie-settings style="cursor:pointer;font:inherit;font-weight:600">Change cookie settings</button></p>
+</section>
+
+<h2 id="what">1. What cookies and browser storage are</h2>
+<p>Cookies are small text files a website asks your browser to keep. Browser storage (localStorage and sessionStorage) works in a similar way but stays in your browser and isn't sent to our server. This policy covers both, and uses “cookies” for either.</p>
+
+<h2 id="essential">2. Essential (always on)</h2>
+<p>These are strictly necessary to provide the service you asked for, so they don't need consent under the GDPR, the UK and EU ePrivacy rules, or the DPDP Act.</p>
+<div class="lg-table-wrap"><table>
+  <thead><tr><th>Name</th><th>Type</th><th>Purpose</th><th>Lasts</th></tr></thead>
+  <tbody>
+    <tr><td><code>session</code></td><td>First-party cookie, HttpOnly, Secure</td><td>Keeps you signed in and holds a security token that protects forms from cross-site forgery. Signed so it can't be tampered with.</td><td>30 days after you sign in, or until you log out</td></tr>
+    <tr><td><code>ss_consent</code></td><td>First-party cookie, Secure</td><td>Remembers your cookie choice so we don't ask on every page.</td><td>12 months</td></tr>
+    <tr><td><code>mic_consent_accepted</code></td><td>localStorage</td><td>Records that you agreed to Sunny using your microphone, so we only ask once on this device.</td><td>Until you clear it</td></tr>
+    <tr><td><code>va_*</code>, <code>ss_pref:*</code></td><td>sessionStorage</td><td>Keeps Sunny's conversation and on-screen state while the tab is open, and holds preferences for this tab only when you haven't allowed preferences.</td><td>Until the tab is closed</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="preferences">3. Preferences (your choice)</h2>
+<p>These make Sunny Side remember you on this device. If you don't allow them, everything still works; your choices just last only until you close the tab.</p>
+<div class="lg-table-wrap"><table>
+  <thead><tr><th>Name</th><th>Type</th><th>Purpose</th><th>Lasts</th></tr></thead>
+  <tbody>
+    <tr><td><code>theme</code></td><td>localStorage</td><td>Light or dark mode.</td><td>Until you clear it</td></tr>
+    <tr><td><code>walkthrough_completed</code></td><td>localStorage</td><td>That you finished the welcome tour, so it doesn't play again.</td><td>Until you clear it</td></tr>
+    <tr><td><code>va_lang</code>, <code>va_speech_on</code>, <code>va_used</code>, <code>va_hint_off</code></td><td>localStorage</td><td>Sunny's language, whether Sunny speaks aloud, and tips you've dismissed.</td><td>Until you clear it</td></tr>
+    <tr><td><code>qz_handsfree</code></td><td>localStorage</td><td>Whether interview quizzes listen for your answers hands-free.</td><td>Until you clear it</td></tr>
+    <tr><td><code>va_tr_*</code></td><td>localStorage</td><td>A cache of interface translations for your language, so pages load faster.</td><td>Until you clear it</td></tr>
+    <tr><td><code>ss-practice-phone</code></td><td>localStorage</td><td>The phone number you last asked a practice call to ring, to save retyping it.</td><td>Until you clear it</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="none">4. Analytics and advertising</h2>
+<p>We don't use any. There are no Google Analytics, Meta pixels, ad networks or session-recording tools on Sunny Side. If that ever changes, we'll update this policy and ask for your consent first; nothing will be turned on by default.</p>
+
+<h2 id="third">5. Third-party requests</h2>
+<p>Our pages load fonts from Google Fonts, and the voice features load the LiveKit client library from jsDelivr. These requests share your IP address and browser details with those providers, as any web request does, but they don't set cookies for us. Signing in with Google or LinkedIn takes you to their site, where their own cookie policies apply.</p>
+
+<h2 id="control">6. Changing your mind</h2>
+<ul>
+  <li>Use <strong>Cookie settings</strong> in the footer of any page, or the button above. Turning preferences off removes them from this device's storage straight away.</li>
+  <li>You can also clear or block cookies in your browser settings. Blocking essential cookies will stop you from signing in.</li>
+  <li>We ask again after 12 months, or sooner if this policy changes in a way that affects your choice.</li>
+</ul>
+<p>Questions? Contact {{ email() }}.</p>
+{% endblock %}
