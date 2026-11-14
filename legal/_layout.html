@@ -16,7 +16,7 @@
     var t = null;
     try { t = localStorage.getItem('theme'); } catch (e) {}
     if (t !== 'light' && t !== 'dark') {
-      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      t = 'light'; // open in light mode unless the person picked dark
     }
     document.documentElement.setAttribute('data-theme', t);
     document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0D0C0A' : '#F5F2EB');
