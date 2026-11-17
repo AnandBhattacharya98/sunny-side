@@ -406,6 +406,10 @@ def migrate_db(conn) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_login_events_user ON login_events (user_id)")
     conn.commit()
 
+    # Recruiter accounts and their job posts (recruiter.py)
+    import recruiter
+    recruiter.migrate(conn)
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
@@ -641,6 +645,8 @@ def delete_user_data(conn, user_id: int) -> None:
     conn.execute("DELETE FROM calls WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM phone_codes WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM login_events WHERE user_id = ?", (user_id,))
+    import recruiter
+    recruiter.delete_recruiter_data(conn, user_id)
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
 

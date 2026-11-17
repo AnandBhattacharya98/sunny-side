@@ -22,6 +22,33 @@
         
         <!-- Fit Analysis Panel -->
         <div class="tab-panel active" id="panel-fit-{{ job.job_id }}">
+          {% if rpost %}
+          <div class="rp-box">
+            <div class="rp-head">
+              <span class="jtag jtag-rec">Posted directly by recruiter</span>
+              {% if rpost.employment_type %}<span class="jtag">{{ rpost.employment_type }}</span>{% endif %}
+              {% if rpost.experience %}<span class="jtag">{{ rpost.experience }}</span>{% endif %}
+              {% if rpost.salary %}<span class="jtag jtag-pay">{{ rpost.salary }}</span>{% endif %}
+            </div>
+            {% if rapp %}
+            <div class="rp-sent"><b>Resume sent</b> on {{ (rapp.created_at or '')[:10] }} to the recruiter at {{ rpost.company }}. They reply to {{ rapp.email }}.</div>
+            {% elif rpost.status != 'live' %}
+            <div class="rp-sent">The recruiter has closed this post, so it isn't taking resumes now.</div>
+            {% else %}
+            <div class="rp-apply">
+              <p>The recruiter posted this on Sunny Side for people whose resumes fit. Send yours in one tap: they'll see your resume, your name and this match score.</p>
+              <label for="rp-email-{{ job.job_id }}">Email the recruiter can reach you at</label>
+              <input type="email" id="rp-email-{{ job.job_id }}" name="rp-email" value="{{ apply_email }}" placeholder="you@example.com" autocomplete="email">
+              <label for="rp-note-{{ job.job_id }}">A short note <span>(optional)</span></label>
+              <textarea id="rp-note-{{ job.job_id }}" name="rp-note" rows="2" maxlength="1500" placeholder="Why you're a good fit, notice period..."></textarea>
+              <div class="rp-row">
+                <button class="btn btn-p" onclick="sendResumeToRecruiter('{{ job.job_id }}', this)">Send my resume</button>
+                {% if rpost.apply_url %}<a href="{{ rpost.apply_url }}" target="_blank" rel="noopener nofollow">or apply on their site ↗</a>{% endif %}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
           <span class="lbl">Fit analysis</span>
           <div class="fit">{{ job.ai_summary or 'No summary yet — click Regenerate.' }}</div>
           

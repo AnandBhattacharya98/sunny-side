@@ -1,0 +1,565 @@
+{# Recruiter pages (recruiter.py / dashboard.py "Recruiters" routes). One template, picked by `view`:
+   hiring (front door + sign up), home (my posts), edit (paste + form), post (one post + applicants), public (a live post). #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% if view == 'public' %}
+<title>{{ post.title }} at {{ post.company }} · {{ site.name }}</title>
+<meta name="description" content="{{ post.title }} at {{ post.company }}, {{ post.location }}. Posted directly by the recruiter on {{ site.name }}.">
+{% elif view == 'hiring' %}
+<title>Post a job · {{ site.name }}</title>
+<meta name="description" content="Paste your job description and it reaches job seekers whose resumes fit it. Free.">
+{% else %}
+<title>Recruiter · {{ site.name }}</title>
+{% endif %}
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#F5F2EB">
+{% include "legal/_head.html" %}
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = 'light'; // open in light mode unless the person picked dark
+    document.documentElement.setAttribute('data-theme', t);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0D0C0A' : '#F5F2EB');
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.documentElement.classList.add(calm ? 'calm' : 'motion');
+  })();
+  // Send the CSRF token with every same-origin request that changes data
+  (function () {
+    var token = document.querySelector('meta[name="csrf-token"]').content;
+    var orig = window.fetch;
+    window.fetch = function (input, init) {
+      init = init || {};
+      var method = (init.method || 'GET').toUpperCase();
+      if (['GET', 'HEAD', 'OPTIONS'].indexOf(method) === -1) {
+        var h = new Headers(init.headers || {});
+        h.set('X-CSRF-Token', token);
+        init.headers = h;
+      }
+      return orig.call(this, input, init);
+    };
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ss-bg); }
+body { font: 16px/1.6 var(--ss-sans); color: var(--ss-txt); letter-spacing: -0.005em; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--ss-yolk); color: var(--ss-ink); }
+a { color: var(--ss-link); text-underline-offset: 3px; }
+h1, h2, h3 { letter-spacing: -0.035em; line-height: 1.1; margin: 0; }
+
+.rc-nav { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--ss-bdr);
+          background: color-mix(in srgb, var(--ss-bg) 84%, transparent);
+          -webkit-backdrop-filter: saturate(1.4) blur(12px); backdrop-filter: saturate(1.4) blur(12px); }
+.rc-nav-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rc-logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.03em; color: var(--ss-txt); text-decoration: none; white-space: nowrap; }
+.rc-logo small { font: 700 10px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ss-ink);
+                 background: var(--ss-yolk); padding: 4px 6px; border-radius: 6px; }
+.motion .rc-logo svg .rays { transform-origin: 12px 12px; animation: rc-spin 24s linear infinite; }
+@keyframes rc-spin { to { transform: rotate(360deg); } }
+.rc-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px; border-radius: 11px;
+       font: 600 14px/1 var(--ss-sans); text-decoration: none; color: var(--ss-txt); border: 1px solid var(--ss-bdr);
+       background: var(--ss-sur); cursor: pointer; transition: background .15s, transform .2s var(--ss-ease), box-shadow .2s; white-space: nowrap; }
+.btn:hover { background: var(--ss-sur2); }
+.btn:active { transform: scale(.98); }
+.btn-p { background: var(--ss-yolk); border-color: var(--ss-yolk); color: var(--ss-ink); }
+.btn-p:hover { background: #FFB529; box-shadow: 0 10px 24px -12px rgba(255, 167, 0, .8); }
+.btn-ghost { background: transparent; }
+.btn-danger { color: #B42318; }
+.btn-sm { min-height: 34px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+.btn[disabled] { opacity: .55; cursor: progress; }
+.btn .arrow { transition: transform .25s var(--ss-ease); }
+.btn:hover .arrow { transform: translateX(3px); }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 80px; }
+.eyebrow { font: 700 12px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ss-hin); margin-bottom: 14px; }
+.eyebrow a { color: inherit; text-decoration: none; }
+.eyebrow a:hover { color: var(--ss-txt); }
+.lead { color: var(--ss-mut); font-size: 18px; max-width: 58ch; margin: 14px 0 0; }
+.muted { color: var(--ss-mut); }
+.hand { font-family: 'Caveat', cursive; font-weight: 700; color: #A86400; }
+[data-theme="dark"] .hand { color: var(--ss-yolk); }
+
+.card { background: var(--ss-sur); border: 1px solid var(--ss-bdr); border-radius: 18px; padding: 22px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .05em;
+        padding: 7px 10px; border-radius: 999px; background: var(--ss-sur2); color: var(--ss-mut); white-space: nowrap; }
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.live { background: rgba(255, 167, 0, .18); color: #7A4A00; }
+[data-theme="dark"] .chip.live { color: var(--ss-yolk); }
+.chip.live i { background: var(--ss-yolk); box-shadow: 0 0 0 0 rgba(255, 167, 0, .6); }
+.motion .chip.live i { animation: rc-pulse 2.2s infinite; }
+@keyframes rc-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,167,0,.55); } 70% { box-shadow: 0 0 0 7px rgba(255,167,0,0); } 100% { box-shadow: 0 0 0 0 rgba(255,167,0,0); } }
+.chip.pending { background: rgba(13, 12, 10, .06); color: var(--ss-txt); }
+.chip.rejected { background: rgba(180, 35, 24, .1); color: #B42318; }
+[data-theme="dark"] .chip.rejected { color: #FF8A80; }
+
+.msg { padding: 12px 14px; border-radius: 12px; font-size: 14px; margin: 0 0 16px; border: 1px solid var(--ss-bdr); background: var(--ss-sur); }
+.msg.err { border-color: rgba(180, 35, 24, .35); background: rgba(180, 35, 24, .07); color: #B42318; }
+[data-theme="dark"] .msg.err { color: #FF8A80; }
+.msg.ok { border-color: var(--ss-yolk); background: rgba(255, 167, 0, .12); }
+
+/* Forms */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font: 700 11px/1 var(--ss-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--ss-mut); }
+.field .hint { font-size: 12.5px; color: var(--ss-hin); }
+.input { width: 100%; font: 15px/1.4 var(--ss-sans); color: var(--ss-txt); background: var(--ss-bg); border: 1px solid var(--ss-bdr);
+         border-radius: 11px; padding: 11px 13px; outline: none; transition: border-color .15s, box-shadow .15s, background .6s; }
+.input:focus { border-color: var(--ss-yolk); box-shadow: 0 0 0 3px rgba(255, 167, 0, .22); }
+textarea.input { resize: vertical; min-height: 120px; line-height: 1.55; }
+.input.filled { background: rgba(255, 167, 0, .14); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form { display: flex; flex-direction: column; gap: 16px; }
+
+/* Hiring front door */
+.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 48px; align-items: start; }
+.hero h1 { font-size: clamp(38px, 6vw, 64px); line-height: 1.02; letter-spacing: -0.05em; max-width: 13ch; }
+.hero h1 em { font-style: normal; background: linear-gradient(transparent 62%, rgba(255, 167, 0, .55) 62%); }
+.steps { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 12px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start;
+            background: var(--ss-sur); border: 1px solid var(--ss-bdr); border-radius: 16px; padding: 16px 18px;
+            transition: transform .3s var(--ss-ease), border-color .2s; }
+.steps li:hover { transform: translateX(4px); border-color: var(--ss-yolk); }
+.steps li::before { content: counter(s); display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+                    background: var(--ss-yolk); color: var(--ss-ink); font: 700 16px/1 var(--ss-mono); }
+.steps b { display: block; font-size: 16px; letter-spacing: -0.02em; }
+.steps span { color: var(--ss-mut); font-size: 14.5px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.signup h2 { font-size: 26px; }
+.signup .card { box-shadow: var(--ss-shadow); }
+.switch { text-align: center; font-size: 14px; color: var(--ss-mut); margin: 14px 0 0; }
+
+/* Recruiter home */
+.head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+.head h1 { font-size: clamp(30px, 4.6vw, 44px); }
+.posts { display: grid; gap: 12px; }
+.post { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; text-decoration: none; color: inherit;
+        background: var(--ss-sur); border: 1px solid var(--ss-bdr); border-radius: 18px; padding: 18px 20px;
+        transition: transform .3s var(--ss-ease), box-shadow .3s, border-color .2s; }
+.post:hover { transform: translateY(-2px); box-shadow: var(--ss-shadow); border-color: var(--ss-yolk); }
+.post h3 { font-size: 19px; }
+.post .meta { color: var(--ss-mut); font-size: 14px; margin-top: 4px; }
+.nums { display: flex; gap: 18px; text-align: right; }
+.nums b { display: block; font-size: 24px; letter-spacing: -0.04em; line-height: 1; }
+.nums span { font: 700 10px/1.2 var(--ss-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--ss-hin); }
+.empty { text-align: center; padding: 56px 24px; border: 1.5px dashed var(--ss-bdr); border-radius: 22px; }
+.empty .sun { width: 64px; height: 64px; margin: 0 auto 14px; }
+.motion .empty .sun { animation: rc-bob 3.2s ease-in-out infinite; }
+@keyframes rc-bob { 50% { transform: translateY(-6px) rotate(8deg); } }
+
+/* Editor */
+.editor { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.paste { position: sticky; top: 84px; }
+.paste textarea { min-height: 340px; }
+.paste .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.spark { display: inline-block; }
+.motion .busy .spark { animation: rc-spin 1s linear infinite; }
+.reqs-note { font-size: 12.5px; color: var(--ss-hin); }
+
+/* One post */
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; align-items: start; }
+.desc { white-space: pre-wrap; color: var(--ss-mut); font-size: 15px; line-height: 1.65; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tag { font-size: 13px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--ss-bdr); background: var(--ss-bg); }
+.side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 84px; }
+.side .card { padding: 18px; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--ss-bdr); font-size: 14px; }
+.stat:last-child { border-bottom: 0; }
+.stat b { font-size: 18px; }
+.applicant { border: 1px solid var(--ss-bdr); border-radius: 16px; padding: 16px 18px; background: var(--ss-sur); }
+.applicant + .applicant { margin-top: 10px; }
+.applicant .top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.score { font: 700 14px/1 var(--ss-mono); padding: 7px 10px; border-radius: 10px; background: var(--ss-yolk); color: var(--ss-ink); white-space: nowrap; }
+.score.mid { background: rgba(255, 167, 0, .22); }
+.applicant details { margin-top: 10px; }
+.applicant summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.applicant pre { white-space: pre-wrap; font: 13.5px/1.55 var(--ss-sans); color: var(--ss-mut); background: var(--ss-bg); border-radius: 12px;
+                 padding: 14px; max-height: 420px; overflow: auto; margin: 10px 0 0; }
+.note { margin-top: 8px; font-size: 14px; color: var(--ss-mut); border-left: 3px solid var(--ss-yolk); padding-left: 10px; }
+
+.rise { opacity: 1; }
+.motion .rise { animation: rc-rise .7s var(--ss-ease) both; animation-delay: var(--d, 0ms); }
+@keyframes rc-rise { from { opacity: 0; transform: translateY(14px); } }
+.motion .flash { animation: rc-flash 1.2s var(--ss-ease); }
+@keyframes rc-flash { 0% { box-shadow: 0 0 0 0 rgba(255,167,0,.7); } 100% { box-shadow: 0 0 0 10px rgba(255,167,0,0); } }
+
+@media (max-width: 900px) {
+  .hero, .editor, .detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .paste, .side { position: static; }
+  .paste textarea { min-height: 200px; }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 28px 16px 64px; }
+  .rc-nav-in { padding: 0 16px; }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .post { grid-template-columns: minmax(0, 1fr); }
+  .nums { text-align: left; }
+  .lead { font-size: 16px; }
+  .rc-actions .btn-hide-sm { display: none; }
+  .card { padding: 18px; }
+}
+</style>
+</head>
+<body>
+<header class="rc-nav">
+  <div class="rc-nav-in">
+    <a class="rc-logo" href="{{ '/recruiter' if me else '/hiring' if view == 'hiring' else '/' }}">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <g class="rays" stroke="#FFA700" stroke-width="2.2" stroke-linecap="round">
+          <line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/>
+          <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/>
+        </g>
+        <circle cx="12" cy="12" r="5.5" fill="#FFA700"/>
+      </svg>{{ site.name }}{% if view != 'public' %} <small>Hiring</small>{% endif %}</a>
+    <div class="rc-actions">
+      {% if me %}
+      <span class="muted btn-hide-sm" style="font-size:14px;">{{ me.company_name }}</span>
+      <a class="btn btn-sm btn-ghost" href="/logout">Log out</a>
+      {% elif session.get('user_id') %}
+      <a class="btn btn-sm btn-p" href="/">Back to my board</a>
+      {% elif view == 'hiring' %}
+      <a class="btn btn-sm btn-hide-sm btn-ghost" href="/">I'm job hunting</a>
+      <a class="btn btn-sm" href="/login">Log in</a>
+      {% else %}
+      <a class="btn btn-sm" href="/login">Log in</a>
+      <a class="btn btn-sm btn-p" href="/signup">Sign up</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="content">
+
+{% if view == 'hiring' %}
+  <div class="hero">
+    <div class="rise">
+      <div class="eyebrow">For recruiters &amp; hiring teams</div>
+      <h1>Paste your job. We bring the <em>people who fit</em>.</h1>
+      <p class="lead">Sunny Side reads every job seeker's resume. Post your opening once and it lands on the boards of the candidates it matches, marked as posted by you.</p>
+      <ol class="steps">
+        <li class="rise" style="--d:120ms"><div><b>Paste the job description</b><span>AI fills in the title, location, pay and requirements. You check it before it goes out.</span></div></li>
+        <li class="rise" style="--d:200ms"><div><b>It reaches the right people</b><span>Seekers whose resumes score {{ '%g'|format(limits.min_score) }}/10 or better for the role see it, labelled "Posted directly by recruiter".</span></div></li>
+        <li class="rise" style="--d:280ms"><div><b>Candidates send you their resume</b><span>You see each applicant's name, resume and match score, best fit first.</span></div></li>
+      </ol>
+      <div class="facts rise" style="--d:360ms">
+        <span class="chip">Free</span>
+        <span class="chip">Posts stay up {{ limits.days }} days</span>
+        <span class="chip">Up to {{ limits.open }} open posts</span>
+        <span class="chip">First post reviewed by us</span>
+      </div>
+    </div>
+    <div class="signup rise" style="--d:160ms">
+      <div class="card">
+        <h2>Create a recruiter account</h2>
+        <p class="muted" style="margin:6px 0 18px; font-size:14.5px;">Separate from a job seeker account. You'll log in with your work email.</p>
+        {% if error %}<div class="msg err" role="alert">{{ error }}</div>{% endif %}
+        <form method="POST" action="/hiring/signup" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="field"><label for="r-name">Your name</label>
+            <input class="input" id="r-name" name="name" required autocomplete="name" value="{{ form.name or '' }}" placeholder="Priya Sharma"></div>
+          <div class="field"><label for="r-company">Company</label>
+            <input class="input" id="r-company" name="company" required autocomplete="organization" value="{{ form.company or '' }}" placeholder="Acme Labs"></div>
+          <div class="field"><label for="r-email">Work email</label>
+            <input class="input" id="r-email" name="email" type="email" required autocomplete="email" value="{{ form.email or '' }}" placeholder="priya@acme.com"></div>
+          <div class="field"><label for="r-pw">Password</label>
+            <input class="input" id="r-pw" name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></div>
+          <button class="btn btn-p" type="submit">Create account and post a job <span class="arrow" aria-hidden="true">→</span></button>
+          <p class="muted" style="font-size:12.5px; margin:0;">By creating an account you agree to our <a href="/terms" target="_blank">Terms</a> and <a href="/acceptable-use" target="_blank">Acceptable Use</a> rules and confirm you've read our <a href="/privacy" target="_blank">Privacy Policy</a>. Only post real openings you're hiring for.</p>
+        </form>
+      </div>
+      <p class="switch">Already have a recruiter account? <a href="/login">Log in</a></p>
+    </div>
+  </div>
+
+{% elif view == 'home' %}
+  <div class="head rise">
+    <div>
+      <div class="eyebrow">Hi {{ (me.name or '').split(' ')[0] or 'there' }} <span class="hand" style="font-size:20px; text-transform:none; letter-spacing:0;">welcome back</span></div>
+      <h1>Your job posts</h1>
+    </div>
+    {% if limit_error %}
+    <span class="muted" style="font-size:14px; max-width:40ch;">{{ limit_error }}</span>
+    {% else %}
+    <a class="btn btn-p" href="/recruiter/new">Post a job <span class="arrow" aria-hidden="true">→</span></a>
+    {% endif %}
+  </div>
+
+  {% if posted %}
+  {% set just = (posts|selectattr('post_id', 'equalto', posted)|list)[0] if posts else None %}
+  {% if just %}
+  <div class="msg ok rise" role="status">
+    {% if just.status == 'pending' %}
+      <b>Thanks, it's in.</b> Your first post is reviewed by our team before it goes live, usually within a day. After that, your posts go live straight away.
+    {% else %}
+      <b>Your post is live.</b> We're matching it against job seekers' resumes now. It shows up on the boards it fits over the next few minutes.
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if posts %}
+  <div class="posts">
+    {% for p in posts %}
+    <a class="post rise" style="--d:{{ loop.index0 * 60 }}ms" href="/recruiter/post/{{ p.post_id }}">
+      <div style="min-width:0;">
+        <span class="chip {{ p.status }}">{% if p.status == 'live' %}<i></i>{% endif %}{{ p.status_label }}</span>
+        <h3 style="margin-top:10px;">{{ p.title }}</h3>
+        <div class="meta">{{ p.company }} · {{ p.location }}{% if p.status == 'live' and p.days_left is not none %} · {{ p.days_left }} day{{ '' if p.days_left == 1 else 's' }} left{% endif %}</div>
+      </div>
+      <div class="nums">
+        <div><b>{{ p.match_count }}</b><span>Matched<br>seekers</span></div>
+        <div><b>{{ p.applicant_count }}</b><span>Resumes<br>received</span></div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty rise" style="--d:120ms">
+    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><g stroke="#FFA700" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g><circle cx="12" cy="12" r="5.5" fill="#FFA700"/></svg>
+    <h2 style="font-size:24px;">No posts yet</h2>
+    <p class="muted" style="margin:8px auto 18px; max-width:42ch;">Paste a job description and it reaches job seekers whose resumes fit it.</p>
+    <a class="btn btn-p" href="/recruiter/new">Post your first job <span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+  {% endif %}
+
+  <p class="muted" style="font-size:13px; margin-top:28px;">Posts close after {{ limits.days }} days unless you renew them. You can have up to {{ limits.open }} open posts and add up to {{ limits.per_day }} a day.</p>
+
+{% elif view == 'edit' %}
+  <div class="head rise">
+    <div>
+      <div class="eyebrow"><a href="/recruiter">Your posts</a> / {{ 'Edit post' if post else 'New post' }}</div>
+      <h1>{{ 'Edit your post' if post else 'Post a job' }}</h1>
+    </div>
+  </div>
+  {% if error %}<div class="msg err" role="alert">{{ error }}</div>{% endif %}
+  {% if post and post.status == 'rejected' %}
+  <div class="msg">This post wasn't approved{% if post.review_note %}: {{ post.review_note }}{% endif %}. Saving your changes sends it back for review.</div>
+  {% endif %}
+
+  <div class="editor">
+    <section class="paste card rise" style="--d:80ms" aria-labelledby="paste-h">
+      <h2 id="paste-h" style="font-size:20px;">1. Paste the job description</h2>
+      <p class="muted" style="font-size:14px; margin:6px 0 12px;">Copy it from your careers page, ATS or a doc. We'll fill the form from it.</p>
+      <textarea class="input" id="jd-paste" placeholder="Senior Backend Engineer&#10;Acme Labs · Bengaluru (Hybrid)&#10;&#10;About the role...&#10;&#10;Requirements&#10;- 4+ years with Python&#10;- ..."></textarea>
+      <div class="row">
+        <button class="btn btn-p" type="button" id="jd-fill"><span class="spark" aria-hidden="true">✦</span> Fill the form for me</button>
+        <span class="muted" id="jd-status" role="status" style="font-size:13.5px;"></span>
+      </div>
+    </section>
+
+    <section class="card rise" style="--d:160ms" aria-labelledby="form-h">
+      <h2 id="form-h" style="font-size:20px;">2. Check the details</h2>
+      <p class="muted" style="font-size:14px; margin:6px 0 16px;">This is exactly what job seekers will see.</p>
+      <form method="POST" action="{{ '/recruiter/post/' ~ post.post_id ~ '/edit' if post else '/recruiter/new' }}" class="form" id="post-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field"><label for="f-title">Job title</label>
+          <input class="input" id="f-title" name="title" required maxlength="120" value="{{ form.title or '' }}" placeholder="Senior Backend Engineer"></div>
+        <div class="grid2">
+          <div class="field"><label for="f-company">Company</label>
+            <input class="input" id="f-company" name="company" required maxlength="120" value="{{ form.company or '' }}"></div>
+          <div class="field"><label for="f-location">Location</label>
+            <input class="input" id="f-location" name="location" required maxlength="120" value="{{ form.location or '' }}" placeholder="Bengaluru, or Remote"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="f-type">Job type</label>
+            <select class="input" id="f-type" name="employment_type">
+              <option value="">Not stated</option>
+              {% for t in employment_types %}<option value="{{ t }}" {% if form.employment_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select></div>
+          <div class="field"><label for="f-exp">Experience</label>
+            <input class="input" id="f-exp" name="experience" maxlength="60" value="{{ form.experience or '' }}" placeholder="3-5 years"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="f-salary">Salary <span style="text-transform:none; letter-spacing:0; font-family:var(--ss-sans); font-weight:500;">(optional)</span></label>
+            <input class="input" id="f-salary" name="salary" maxlength="80" value="{{ form.salary or '' }}" placeholder="₹25-35 LPA"></div>
+          <div class="field"><label for="f-url">Apply link <span style="text-transform:none; letter-spacing:0; font-family:var(--ss-sans); font-weight:500;">(optional)</span></label>
+            <input class="input" id="f-url" name="apply_url" maxlength="500" value="{{ form.apply_url or '' }}" placeholder="https://"></div>
+        </div>
+        <div class="field"><label for="f-reqs">Key requirements</label>
+          <textarea class="input" id="f-reqs" name="requirements" style="min-height:110px;" placeholder="One per line">{{ form.requirements or '' }}</textarea>
+          <span class="reqs-note">One per line, up to 8. Shown as tags and used for matching.</span></div>
+        <div class="field"><label for="f-desc">Full description</label>
+          <textarea class="input" id="f-desc" name="description" required style="min-height:260px;">{{ form.description or '' }}</textarea>
+          <span class="hint">At least 40 words. Seekers see this in full.</span></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-p" type="submit">{{ 'Save changes' if post else 'Publish job' }} <span class="arrow" aria-hidden="true">→</span></button>
+          <a class="btn btn-ghost" href="{{ '/recruiter/post/' ~ post.post_id if post else '/recruiter' }}">Cancel</a>
+        </div>
+        {% if not post and not me.recruiter_trusted %}
+        <p class="muted" style="font-size:13px; margin:0;">Your first post is checked by our team before it goes live. After that, posts go live straight away.</p>
+        {% endif %}
+      </form>
+    </section>
+  </div>
+
+{% elif view == 'post' %}
+  <div class="head rise">
+    <div style="min-width:0;">
+      <div class="eyebrow"><a href="/recruiter">Your posts</a> / {{ post.title }}</div>
+      <span class="chip {{ post.status }}">{% if post.status == 'live' %}<i></i>{% endif %}{{ post.status_label }}</span>
+      <h1 style="margin-top:12px;">{{ post.title }}</h1>
+      <p class="muted" style="margin:6px 0 0;">{{ post.company }} · {{ post.location }}{% if post.employment_type %} · {{ post.employment_type }}{% endif %}{% if post.salary %} · {{ post.salary }}{% endif %}</p>
+    </div>
+  </div>
+  {% if saved %}<div class="msg ok" role="status">Saved. Job seekers who already have this post see the new version.</div>{% endif %}
+  {% if post.status == 'rejected' %}<div class="msg err">This post wasn't approved{% if post.review_note %}: {{ post.review_note }}{% endif %}. Edit it to send it back for review.</div>{% endif %}
+  {% if post.status == 'pending' %}<div class="msg">Our team checks a recruiter's first post before it goes live, usually within a day. We'll email you when it's up.</div>{% endif %}
+
+  <div class="detail">
+    <div>
+      <section class="card rise" style="--d:80ms" aria-labelledby="ap-h">
+        <h2 id="ap-h" style="font-size:22px;">Applicants <span class="muted" style="font-weight:500;">({{ applicants|length }})</span></h2>
+        <p class="muted" style="font-size:14px; margin:6px 0 16px;">People who sent you their resume, best match first.</p>
+        {% for a in applicants %}
+        <article class="applicant">
+          <div class="top">
+            <div style="min-width:0;">
+              <b style="font-size:17px;">{{ a.name or 'Job seeker' }}</b>
+              <div class="muted" style="font-size:14px; overflow-wrap:anywhere;">
+                <a href="mailto:{{ a.email }}?subject={{ ('About your application: ' ~ post.title)|urlencode }}">{{ a.email }}</a>
+                {% if a.linkedin %} · <a href="{{ a.linkedin if a.linkedin.startswith('http') else 'https://' ~ a.linkedin }}" target="_blank" rel="noopener nofollow">LinkedIn</a>{% endif %}
+                · sent {{ (a.created_at or '')[:10] }}
+              </div>
+            </div>
+            {% if a.score is not none %}<span class="score {% if a.score < 8 %}mid{% endif %}" title="How well their resume fits this job">{{ '%.1f'|format(a.score) }}/10</span>{% endif %}
+          </div>
+          {% if a.note %}<div class="note">{{ a.note }}</div>{% endif %}
+          <details>
+            <summary>Resume</summary>
+            <pre>{{ a.resume_text }}</pre>
+          </details>
+        </article>
+        {% else %}
+        <p class="muted" style="margin:0;">{% if post.status == 'live' %}No resumes yet. Matched job seekers see a "Send my resume" button on your post.{% else %}No resumes yet.{% endif %}</p>
+        {% endfor %}
+      </section>
+
+      <section class="card rise" style="--d:160ms; margin-top:16px;" aria-labelledby="desc-h">
+        <h2 id="desc-h" style="font-size:20px;">The post</h2>
+        {% if post.requirements_list %}<div class="tags">{% for r in post.requirements_list %}<span class="tag">{{ r }}</span>{% endfor %}</div>{% endif %}
+        <div class="desc" style="margin-top:14px;">{{ post.description }}</div>
+      </section>
+    </div>
+
+    <aside class="side rise" style="--d:120ms">
+      <div class="card">
+        <div class="stat"><span class="muted">Matched job seekers</span><b>{{ post.match_count }}</b></div>
+        <div class="stat"><span class="muted">Resumes received</span><b>{{ applicants|length }}</b></div>
+        {% if post.status == 'live' %}<div class="stat"><span class="muted">Closes in</span><b>{{ post.days_left }} day{{ '' if post.days_left == 1 else 's' }}</b></div>{% endif %}
+      </div>
+      <div class="card" style="display:flex; flex-direction:column; gap:8px;">
+        <a class="btn" href="/recruiter/post/{{ post.post_id }}/edit">Edit post</a>
+        {% if post.status == 'live' %}
+        <a class="btn btn-ghost" href="/jobs/r/{{ post.post_id }}" target="_blank">View public page ↗</a>
+        <form method="POST" action="/recruiter/post/{{ post.post_id }}/renew"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn" style="width:100%;" type="submit">Renew for {{ limits.days }} days</button></form>
+        {% endif %}
+        {% if post.status in ('closed', 'expired') %}
+          {% if limit_error %}<p class="muted" style="font-size:13px; margin:0;">{{ limit_error }}</p>
+          {% else %}
+          <form method="POST" action="/recruiter/post/{{ post.post_id }}/renew"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-p" style="width:100%;" type="submit">Reopen for {{ limits.days }} days</button></form>
+          {% endif %}
+        {% endif %}
+        {% if post.status in ('live', 'pending') %}
+        <form method="POST" action="/recruiter/post/{{ post.post_id }}/close" onsubmit="return confirm('Close this post? It stops taking resumes and shows as closed to job seekers.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-danger" style="width:100%;" type="submit">Close post</button></form>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+
+{% elif view == 'public' %}
+  <div class="detail">
+    <article class="rise">
+      <div class="eyebrow">Posted directly by the recruiter{% if post.published_at %} · {{ post.published_at[:10] }}{% endif %}</div>
+      {% if post.status != 'live' %}<span class="chip {{ post.status }}">{{ post.status_label }}</span>{% endif %}
+      <h1 style="font-size:clamp(32px,5vw,50px); margin-top:8px;">{{ post.title }}</h1>
+      <p class="lead" style="margin-top:10px;">{{ post.company }} · {{ post.location }}</p>
+      <div class="tags" style="margin-top:16px;">
+        {% if post.employment_type %}<span class="tag">{{ post.employment_type }}</span>{% endif %}
+        {% if post.experience %}<span class="tag">{{ post.experience }}</span>{% endif %}
+        {% if post.salary %}<span class="tag">{{ post.salary }}</span>{% endif %}
+        {% for r in post.requirements_list %}<span class="tag">{{ r }}</span>{% endfor %}
+      </div>
+      <div class="desc" style="margin-top:24px;">{{ post.description }}</div>
+    </article>
+    <aside class="side rise" style="--d:120ms">
+      <div class="card">
+        {% if on_board %}
+        <h2 style="font-size:20px;">It's on your board</h2>
+        <p class="muted" style="font-size:14px; margin:6px 0 14px;">Open it there to see your match and send your resume.</p>
+        <a class="btn btn-p" style="width:100%;" href="/?job={{ on_board }}">Open my board <span class="arrow" aria-hidden="true">→</span></a>
+        {% elif session.get('user_id') %}
+        <h2 style="font-size:20px;">Interested?</h2>
+        <p class="muted" style="font-size:14px; margin:6px 0 14px;">This post goes to job seekers whose resumes fit it. It isn't on your board, so your resume may not match this role.</p>
+        {% if post.apply_url %}<a class="btn" style="width:100%;" href="{{ post.apply_url }}" target="_blank" rel="noopener nofollow">Apply on the company's site ↗</a>{% endif %}
+        {% else %}
+        <h2 style="font-size:20px;">Job hunting?</h2>
+        <p class="muted" style="font-size:14px; margin:6px 0 14px;">Create a free Sunny Side account with your resume. If you fit this role, it lands on your board and you can send your resume in one tap.</p>
+        <a class="btn btn-p" style="width:100%;" href="/signup">Sign up free <span class="arrow" aria-hidden="true">→</span></a>
+        {% if post.apply_url %}<a class="btn btn-ghost" style="width:100%; margin-top:8px;" href="{{ post.apply_url }}" target="_blank" rel="noopener nofollow">Apply on the company's site ↗</a>{% endif %}
+        {% endif %}
+      </div>
+      <p class="muted" style="font-size:13px; text-align:center;">Hiring? <a href="/hiring">Post a job on Sunny Side</a></p>
+    </aside>
+  </div>
+{% endif %}
+</main>
+
+{% include "legal/_footer.html" %}
+
+{% if view == 'edit' %}
+<script>
+(function () {
+  var btn = document.getElementById('jd-fill');
+  var paste = document.getElementById('jd-paste');
+  var status = document.getElementById('jd-status');
+  var map = { title: 'f-title', company: 'f-company', location: 'f-location', salary: 'f-salary', employment_type: 'f-type',
+              experience: 'f-exp', apply_url: 'f-url', description: 'f-desc' };
+  btn.addEventListener('click', async function () {
+    var text = paste.value.trim();
+    if (text.length < 40) { status.textContent = 'Paste the whole job description first.'; paste.focus(); return; }
+    btn.disabled = true; btn.classList.add('busy'); status.textContent = 'Reading the description…';
+    try {
+      var resp = await fetch('/api/recruiter/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                         body: JSON.stringify({ text: text }) });
+      var data = await resp.json();
+      if (!data.ok) { status.textContent = data.error || 'That didn\'t work. Fill the form by hand.'; return; }
+      var f = data.fields, filled = 0, i = 0;
+      Object.keys(map).forEach(function (k) {
+        var el = document.getElementById(map[k]);
+        if (!el || !f[k]) return;
+        el.value = f[k]; filled++;
+        setTimeout(function () {
+          el.classList.add('filled', 'flash');
+          setTimeout(function () { el.classList.remove('filled', 'flash'); }, 1400);
+        }, (i++) * 70);
+      });
+      if (f.requirements && f.requirements.length) {
+        var r = document.getElementById('f-reqs'); r.value = f.requirements.join('\n'); r.classList.add('filled', 'flash');
+        setTimeout(function () { r.classList.remove('filled', 'flash'); }, 1400 + i * 70);
+      }
+      status.textContent = filled ? 'Filled in. Check each field, then publish.' : 'Couldn\'t find the details. Fill the form by hand.';
+      if (window.matchMedia('(max-width: 900px)').matches) document.getElementById('post-form').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+      status.textContent = 'Connection problem. Try again, or fill the form by hand.';
+    } finally {
+      btn.disabled = false; btn.classList.remove('busy');
+    }
+  });
+})();
+</script>
+{% endif %}
+</body>
+</html>

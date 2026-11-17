@@ -77,6 +77,11 @@ def run_pipeline_for_user(user_id: int, scrape: bool = True):
     sync_job_statuses_from_email(DB_PATH, user_id=user_id)
 
     digest = process_new_jobs(DB_PATH, min_score=MIN_SCORE, user_id=user_id)
+    try:
+        from recruiter import match_open_posts_for_user
+        match_open_posts_for_user(user_id)
+    except Exception as e:
+        print(f"  [User {user_id}] Recruiter post matching failed: {e}")
     notify(digest, user_id=user_id)
     return digest
 
@@ -93,7 +98,8 @@ def run_pipeline_for_all_users(scrape: bool = True):
 
     init_db(DB_PATH)
     conn = get_conn(DB_PATH)
-    users = conn.execute("SELECT id, username FROM users").fetchall()
+    # Recruiter accounts post jobs; they have no board to fill
+    users = conn.execute("SELECT id, username FROM users WHERE COALESCE(account_type, 'seeker') = 'seeker'").fetchall()
     conn.close()
 
     print(f"Found {len(users)} user(s) to process.\n")
