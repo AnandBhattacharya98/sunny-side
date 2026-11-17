@@ -2869,6 +2869,20 @@ def _career_context(conn, uid):
     return current, settings.get("resume_text") or "", settings.get("gemini_api_key") or get_fallback_gemini_key()
 
 
+@app.route("/map")
+def map_view():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        pins, unplaced = home_stats.board_pins(conn, uid)
+        nearby = home_stats.nearby_openings(conn, uid)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="map", map_pins=pins, map_unplaced=unplaced,
+                           map_nearby=nearby, stats=stats)
+
+
 @app.route("/career-switch")
 def career_switch_view():
     uid = get_user_id()

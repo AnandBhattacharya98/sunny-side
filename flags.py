@@ -44,6 +44,9 @@ FLAGS = {
     "calls": Flag("Calls",
                   "Practice recruiter calls, phone practice and the call log.",
                   paths=("/calls", "/api/calls", "/api/agent/")),
+    "job_map": Flag("Map",
+                    "A map of the jobs on your board, nearest first, plus other openings nearby.",
+                    default="admin", paths=("/map",)),
     "home_refresh": Flag("Homepage refresh",
                          "Live job numbers, who's hiring, browse chips, animated how-it-works and Sunny's welcome "
                          "on the public homepage. Admins can preview it at /?preview=home.",

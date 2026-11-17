@@ -244,3 +244,71 @@ def get(conn_factory) -> dict:
 def clear_cache() -> None:
     with _lock:
         _cache.update(at=0.0, data=None)
+
+
+# ── The signed-in Map view ──────────────────────────────────────────────────
+
+BOARD_GROUPS = {
+    "new": "To review", "scored": "To review", "ready": "To review", "whatsapp": "To review",
+    "shortlisted": "Shortlisted", "applied": "Applied", "interviewing": "Interviewing",
+    "offer": "Offer", "rejected": "Closed",
+}
+
+
+def board_pins(conn, uid: int):
+    """One pin per company per area from this person's own board (archived jobs left out).
+    Returns (pins, jobs_without_a_place)."""
+    rows = conn.execute(
+        "SELECT job_id, title, company, location, status, ai_score FROM jobs "
+        "WHERE user_id = ? AND COALESCE(status, 'new') != 'archived' "
+        "ORDER BY COALESCE(ai_score, 0) DESC LIMIT 2000", (uid,)).fetchall()
+    pins, unplaced = {}, 0
+    for r in rows:
+        job_id, title, company, location, status, score = r[0], r[1], r[2], r[3], r[4], r[5]
+        place = place_of(location or "")
+        if not place:
+            unplaced += 1
+            continue
+        area, city, lat, lng = place
+        company = (company or "Unknown").strip()
+        k = (_norm(company), area)
+        if k not in pins:
+            plat, plng = _spread(lat, lng, _norm(company) + "|" + area)
+            pins[k] = {"company": company, "area": area, "city": city, "lat": plat, "lng": plng, "jobs": []}
+        pins[k]["jobs"].append({
+            "id": str(job_id), "title": (title or "")[:100],
+            "group": BOARD_GROUPS.get(status or "new", "To review"),
+            "score": round(float(score), 1) if score else None,
+        })
+    return list(pins.values()), unplaced
+
+
+def nearby_openings(conn, uid: int, limit: int = 300) -> list:
+    """Public openings (as on the homepage) that aren't already on this person's board."""
+    data = get(lambda: conn_factory_passthrough(conn))
+    mine = {(_norm(r[0]), _norm(r[1])) for r in conn.execute(
+        "SELECT company, title FROM jobs WHERE user_id = ?", (uid,)).fetchall()}
+    out = []
+    for p in data.get("pins", []):
+        roles = [r for r in p["roles"] if (_norm(p["company"]), _norm(r["title"])) not in mine]
+        if roles:
+            out.append({**p, "roles": roles, "count": len(roles)})
+        if len(out) >= limit:
+            break
+    return out
+
+
+class _NoClose:
+    """Lend an open connection to get() without letting it close it."""
+    def __init__(self, conn):
+        self._c = conn
+
+    def execute(self, *a, **k):
+        return self._c.execute(*a, **k)
+
+    def close(self):
+        pass
+
+
+def conn_factory_passthrough(conn):
+    return _NoClose(conn)

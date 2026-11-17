@@ -117,3 +117,44 @@ def test_hello_overlay_can_actually_be_hidden(conn):
     page = dashboard.app.test_client().get("/").get_data(as_text=True)
     assert re.search(r'<div class="hello" id="hello" hidden', page)
     assert ".hello[hidden] { display: none; }" in page
+
+
+# ── The signed-in Map view (flag job_map) ──
+
+def signed_in(uid):
+    c = dashboard.app.test_client()
+    with c.session_transaction() as s:
+        s["user_id"] = uid
+        s["username"] = "admin" if uid == 1 else f"user{uid}"
+    return c
+
+
+def test_board_pins_are_your_own_jobs(conn):
+    add(conn, 20, "Product Manager", "Flipkart", "Bellandur, Bengaluru", user_id=1)
+    add(conn, 21, "Designer", "Flipkart", "Bellandur, Bengaluru", user_id=1)
+    add(conn, 22, "Analyst", "Elsewhere", "India", user_id=1)                 # no city: counted, not pinned
+    add(conn, 23, "Someone else's job", "Other Co", "Pune", user_id=2)
+    conn.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ?", (PREFIX + "21",))
+    conn.commit()
+    pins, unplaced = home_stats.board_pins(conn, 1)
+    mine = [p for p in pins if p["company"] == "Flipkart"]
+    assert len(mine) == 1 and {j["group"] for j in mine[0]["jobs"]} >= {"Applied"}
+    assert not any(p["company"] == "Other Co" for p in pins)
+    assert unplaced >= 1
+
+
+def test_map_view_needs_the_switch(conn):
+    add(conn, 30, "Product Manager", "Flipkart", "Bellandur, Bengaluru", user_id=1)
+    conn.commit()
+    page = signed_in(1).get("/map").get_data(as_text=True)
+    assert 'id="mv-map"' in page and PREFIX + "30" in page   # admin sees it while it's admin-only
+    conn.execute("DELETE FROM users WHERE id = 7301")
+    conn.execute("INSERT INTO users (id, username, password_hash) VALUES (7301, 'map_user', 'x')")
+    conn.commit()
+    r = signed_in(7301).get("/map")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")   # others wait for the switch
+    assert 'href="/map"' not in signed_in(7301).get("/progress").get_data(as_text=True)
+    flags.set_state(conn, "job_map", "on")
+    assert 'href="/map"' in signed_in(7301).get("/progress").get_data(as_text=True)
+    conn.execute("DELETE FROM users WHERE id = 7301")
+    conn.commit()

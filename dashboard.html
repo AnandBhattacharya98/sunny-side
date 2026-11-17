@@ -1738,6 +1738,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     Career Switch
   </a>
   {% endif %}
+  {% if feature('job_map') %}
+  <a class="nl {% if view_mode=='map' %}on{% endif %}" href="/map" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+    Map
+  </a>
+  {% endif %}
   {% if feature('learn') %}
   <a class="nl {% if view_mode=='learn' %}on{% endif %}" href="/learn" style="text-decoration:none;font-weight:500;display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:8px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M22 10 12 5 2 10l10 5 10-5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
@@ -2118,6 +2124,102 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   </details>
   <div class="fj-status" id="fj-status" aria-live="polite"></div>
   <div class="wr-list fj-list" id="fj-list"></div>
+  {% elif view_mode == 'map' %}
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css?v=1.9.4">
+  <style>
+    .mv-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 14px; }
+    .mv-map { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--bdr); background: var(--sur2); min-height: 420px; isolation: isolate; }
+    #mv-map { position: absolute; inset: 0; z-index: 0; background: var(--sur2); }
+    .mv-map .osm-tiles { filter: grayscale(.85) sepia(.18) brightness(1.04) contrast(.92); }
+    [data-theme="dark"] .mv-map .osm-tiles { filter: grayscale(1) invert(1) brightness(.82) contrast(.9) sepia(.12); }
+    .mv-ask { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 500; width: min(92%, 380px); display: flex; align-items: center; gap: 10px;
+              padding: 10px 12px; border-radius: 14px; background: var(--sur); border: 1px solid var(--bdr-strong); box-shadow: 0 20px 40px -20px rgba(0,0,0,.4); font-size: 13px; transition: opacity .3s, transform .3s; }
+    .mv-ask.gone { opacity: 0; transform: translate(-50%, 16px); pointer-events: none; }
+    .mv-ask span.t { flex: 1; min-width: 0; }
+    .mv-ask small { display: block; color: var(--hin); font-family: var(--font-mono); font-size: 10.5px; margin-top: 2px; }
+    .mv-btn { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--yolk); background: var(--yolk); color: var(--ink); white-space: nowrap; text-decoration: none; }
+    .mv-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
+    .mv-side { display: flex; flex-direction: column; min-height: 0; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; padding: 14px; }
+    .mv-head b { display: block; font-family: 'Space Grotesk', sans-serif; font-size: 16px; }
+    .mv-head span { font-family: var(--font-mono); font-size: 11px; color: var(--hin); }
+    .mv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; }
+    .mv-chip { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--bdr-strong); background: transparent; color: var(--txt); cursor: pointer; }
+    .mv-chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    [data-theme="dark"] .mv-chip[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+    .mv-toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--mut); margin-bottom: 8px; cursor: pointer; }
+    .mv-list { list-style: none; margin: 0 -4px; padding: 0 4px; overflow-y: auto; flex: 1; min-height: 120px; }
+    .mv-list li + li { border-top: 1px solid var(--bdr); }
+    .mv-item { width: 100%; display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 9px 4px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+    .mv-item:hover, .mv-item:focus-visible { background: var(--sur2); }
+    .mv-av { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--sur2); }
+    .mv-item.mine .mv-av { background: var(--yolk); color: var(--ink); }
+    .mv-t { min-width: 0; }
+    .mv-t b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mv-t span { display: block; font-size: 12px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mv-d { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); text-align: right; }
+    .mv-empty { color: var(--mut); font-size: 13px; padding: 14px 4px; }
+    .mv-note { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); margin-top: 8px; }
+    .jpin { width: 32px !important; height: 32px !important; margin: -32px 0 0 -16px !important; background: none; border: 0; }
+    .jpin div { width: 32px; height: 32px; border-radius: 50% 50% 50% 6px; transform: rotate(-45deg); background: var(--yolk); border: 2px solid #0D0C0A; display: grid; place-items: center; box-shadow: 0 6px 14px -6px rgba(13,12,10,.5); transition: transform .2s; }
+    .jpin div span { transform: rotate(45deg); font: 700 12px 'Space Grotesk', sans-serif; color: #0D0C0A; }
+    .jpin.other div { background: #FFFDF8; border-style: dashed; }
+    [data-theme="dark"] .jpin.other div { background: #2a2722; border-color: #F5F2EB; }
+    [data-theme="dark"] .jpin.other div span { color: #F5F2EB; }
+    .jpin:hover div { transform: rotate(-45deg) scale(1.15); }
+    .cpin { background: none; border: 0; }
+    .cpin div { transform: translate(-50%, -50%); border-radius: 999px; background: var(--yolk); color: #0D0C0A; font: 700 12.5px 'Space Grotesk', sans-serif; padding: 5px 10px; white-space: nowrap; border: 2px solid #0D0C0A; box-shadow: 0 0 0 5px rgba(255,167,0,.25); }
+    .me-pin { background: none; border: 0; }
+    .me-pin div { width: 16px; height: 16px; border-radius: 50%; background: #2F7BF6; border: 3px solid #fff; box-shadow: 0 0 0 7px rgba(47,123,246,.22); }
+    .mv-map .leaflet-popup-content-wrapper, .mv-map .leaflet-popup-tip { background: var(--sur); color: var(--txt); }
+    [data-theme="dark"] .mv-map .leaflet-popup-content-wrapper, [data-theme="dark"] .mv-map .leaflet-popup-tip { background: #1F1D19; }
+    .mv-map .leaflet-popup-content { margin: 12px 14px; font-size: 13px; min-width: 220px; }
+    .pp-co { font-weight: 700; font-size: 15px; font-family: 'Space Grotesk', sans-serif; }
+    .pp-area { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); margin: 2px 0 8px; }
+    .pp-jobs { list-style: none; margin: 0; padding: 0; }
+    .pp-jobs li { border-top: 1px solid var(--bdr); }
+    .pp-job { width: 100%; display: flex; gap: 8px; align-items: center; padding: 7px 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .pp-job:hover .pp-tt { text-decoration: underline; }
+    .pp-tt { flex: 1; min-width: 0; }
+    .pp-tag { font-family: var(--font-mono); font-size: 10px; padding: 1px 7px; border-radius: 999px; background: var(--purl); color: var(--purt); white-space: nowrap; }
+    .pp-sc { font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+    .mv-map .leaflet-control-attribution { font-size: 10px; }
+    [data-theme="dark"] .mv-map .leaflet-control-attribution { background: rgba(13,12,10,.7) !important; color: #B5AFA3; }
+    [data-theme="dark"] .mv-map .leaflet-bar a { background: #1F1D19; color: #F5F2EB; }
+    @media (max-width: 900px) {
+      .mv-wrap { grid-template-columns: 1fr; overflow-y: auto; }
+      .mv-map { min-height: 380px; }
+      .mv-side { max-height: 460px; }
+    }
+  </style>
+  <div class="board-header">
+    <h2 class="board-title">Map</h2>
+  </div>
+  <div class="mv-wrap">
+    <div class="mv-map">
+      <div id="mv-map" role="region" aria-label="Map of your jobs"></div>
+      <div class="mv-ask" id="mv-ask">
+        <span aria-hidden="true">📍</span>
+        <span class="t"><span id="mv-ask-txt">See which jobs are closest to you</span><small>Your location stays on this device.</small></span>
+        <button class="mv-btn" type="button" id="mv-locate">Use my location</button>
+      </div>
+    </div>
+    <aside class="mv-side" aria-label="Jobs by distance">
+      <div class="mv-head"><b id="mv-title">Your jobs on the map</b><span id="mv-count"></span></div>
+      <div class="mv-chips" role="group" aria-label="Show">
+        {% for g in ['All', 'To review', 'Shortlisted', 'Applied', 'Interviewing', 'Offer'] %}
+        <button class="mv-chip" type="button" data-g="{{ '' if g == 'All' else g }}" aria-pressed="{{ 'true' if g == 'All' else 'false' }}">{{ g }}</button>
+        {% endfor %}
+      </div>
+      {% if map_nearby %}
+      <label class="mv-toggle"><input type="checkbox" id="mv-others"> Also show other openings nearby</label>
+      {% endif %}
+      <ol class="mv-list" id="mv-list"></ol>
+      {% if map_unplaced %}<p class="mv-note">{{ map_unplaced }} job{{ 's' if map_unplaced != 1 }} on your board {{ 'have' if map_unplaced != 1 else 'has' }} no city (remote or just "India"), so {{ 'they aren\'t' if map_unplaced != 1 else 'it isn\'t' }} on the map.</p>{% endif %}
+      <p class="mv-note">Pins mark the area a job is listed in, not the exact office.</p>
+    </aside>
+  </div>
+  <script type="application/json" id="mv-mine">{{ map_pins|tojson }}</script>
+  <script type="application/json" id="mv-near">{{ map_nearby|tojson }}</script>
   {% elif view_mode == 'career' %}
   <style>
     .cs-wrap { flex: 1; overflow-y: auto; min-height: 0; padding-right: 8px; display: flex; flex-direction: column; gap: 18px; }
@@ -8386,6 +8488,171 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 {% endif %}
 
+{% if view_mode == 'map' %}
+<script src="/static/vendor/leaflet/leaflet.js?v=1.9.4"></script>
+<script>
+(function () {
+  if (!window.L) return;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function data(id) { try { return JSON.parse(document.getElementById(id).textContent) || []; } catch (e) { return []; } }
+  var mine = data('mv-mine').map(function (p) { p.mine = true; return p; });
+  var near = data('mv-near').map(function (p) { p.mine = false; return p; });
+  var group = '', showOthers = false, me = null, meMarker = null, markers = [];
+  var CITY_ZOOM = 10;
+  var listEl = document.getElementById('mv-list'), titleEl = document.getElementById('mv-title'), countEl = document.getElementById('mv-count');
+  var ask = document.getElementById('mv-ask'), askTxt = document.getElementById('mv-ask-txt'), locBtn = document.getElementById('mv-locate');
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function km(a, b) {
+    var R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function fmtKm(d) { return d < 1 ? '< 1 km' : d < 10 ? d.toFixed(1) + ' km' : Math.round(d).toLocaleString('en-IN') + ' km'; }
+  function where(p) { return p.area === p.city ? p.city : p.area + ', ' + p.city; }
+
+  // Each visible pin with the jobs that pass the filter
+  function visible() {
+    var out = [];
+    mine.forEach(function (p) {
+      var jobs = p.jobs.filter(function (j) { return !group || j.group === group; });
+      if (jobs.length) out.push({ p: p, jobs: jobs, n: jobs.length, mine: true });
+    });
+    if (showOthers && !group) near.forEach(function (p) { out.push({ p: p, jobs: p.roles, n: p.count, mine: false }); });
+    return out;
+  }
+
+  var map = L.map('mv-map', { scrollWheelZoom: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, className: 'osm-tiles', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  var layer = L.layerGroup().addTo(map);
+
+  function popupHtml(v) {
+    var h = '<div class="pp-co">' + esc(v.p.company) + '</div><div class="pp-area">' + esc(where(v.p)) +
+            (me ? ' · ' + fmtKm(km(me, v.p)) + ' away' : '') + (v.mine ? '' : ' · not on your board') + '</div><ul class="pp-jobs">';
+    v.jobs.slice(0, 8).forEach(function (j) {
+      if (v.mine) {
+        h += '<li><button class="pp-job" type="button" data-open="' + esc(j.id) + '"><span class="pp-tt">' + esc(j.title) + '</span>' +
+             (j.score != null ? '<span class="pp-sc">' + j.score + '</span>' : '') + '<span class="pp-tag">' + esc(j.group) + '</span></button></li>';
+      } else {
+        h += '<li><a class="pp-job" href="/find?q=' + encodeURIComponent(j.title) + '&location=' + encodeURIComponent(v.p.city) + '"><span class="pp-tt">' + esc(j.title) + '</span><span class="pp-tag">Find</span></a></li>';
+      }
+    });
+    h += '</ul>';
+    if (v.jobs.length > 8) h += '<div class="pp-area">+' + (v.jobs.length - 8) + ' more</div>';
+    return h;
+  }
+
+  function cityGroups(vs) {
+    var g = {};
+    vs.forEach(function (v) {
+      var c = g[v.p.city] || (g[v.p.city] = { city: v.p.city, lat: 0, lng: 0, k: 0, n: 0 });
+      c.lat += v.p.lat; c.lng += v.p.lng; c.k++; c.n += v.n;
+    });
+    return Object.keys(g).map(function (k) { var c = g[k]; c.lat /= c.k; c.lng /= c.k; return c; });
+  }
+
+  function draw() {
+    layer.clearLayers(); markers = [];
+    var vs = visible();
+    if (map.getZoom() < CITY_ZOOM) {
+      cityGroups(vs).forEach(function (c) {
+        var m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'cpin', html: '<div>' + esc(c.city) + ' · ' + c.n + '</div>', iconSize: null }), title: c.city + ': ' + c.n + ' jobs' });
+        m.on('click', function () { map.flyTo([c.lat, c.lng], 12, { duration: reduce ? 0 : 1 }); });
+        layer.addLayer(m);
+      });
+    } else {
+      vs.forEach(function (v) {
+        var m = L.marker([v.p.lat, v.p.lng], { icon: L.divIcon({ className: 'jpin' + (v.mine ? '' : ' other'), html: '<div><span>' + esc(v.p.company.charAt(0).toUpperCase()) + '</span></div>', iconSize: null }),
+                                              title: v.p.company + ': ' + v.n + (v.n === 1 ? ' job' : ' jobs'), zIndexOffset: v.mine ? 500 : 0, riseOnHover: true });
+        m.bindPopup(function () { return popupHtml(v); }, { maxWidth: 300 });
+        m._v = v; layer.addLayer(m); markers.push(m);
+      });
+    }
+  }
+
+  function renderList() {
+    var vs = visible(), center = me || map.getCenter();
+    vs.forEach(function (v) { v.d = km(center, v.p); });
+    vs.sort(function (a, b) { return (b.mine - a.mine) || (a.d - b.d); });
+    if (me) vs.sort(function (a, b) { return a.d - b.d; });
+    var total = vs.filter(function (v) { return v.mine; }).reduce(function (s, v) { return s + v.n; }, 0);
+    titleEl.textContent = me ? 'Your jobs, nearest first' : 'Your jobs on the map';
+    countEl.textContent = total + (total === 1 ? ' job' : ' jobs') + ' at ' + vs.filter(function (v) { return v.mine; }).length + ' places';
+    listEl.innerHTML = '';
+    if (!vs.length) {
+      listEl.innerHTML = '<li class="mv-empty">' + (mine.length ? 'No jobs in this column have a city to pin.' : 'No jobs with a city on your board yet. Jobs you save from Find Jobs show up here.') + '</li>';
+      return;
+    }
+    vs.slice(0, 60).forEach(function (v) {
+      var li = document.createElement('li');
+      li.innerHTML = '<button class="mv-item' + (v.mine ? ' mine' : '') + '" type="button"><span class="mv-av" aria-hidden="true">' + esc(v.p.company.charAt(0).toUpperCase()) + '</span>' +
+        '<span class="mv-t"><b>' + esc(v.p.company) + '</b><span>' + esc(v.jobs[0].title) + (v.n > 1 ? ' and ' + (v.n - 1) + ' more' : '') + (v.mine ? '' : ' · not on your board') + '</span></span>' +
+        '<span class="mv-d">' + (me ? fmtKm(v.d) : esc(v.p.area)) + '</span></button>';
+      li.firstChild.addEventListener('click', function () { focusPin(v.p); });
+      listEl.appendChild(li);
+    });
+  }
+
+  function focusPin(p) {
+    var open = function () { var m = markers.filter(function (x) { return x._v.p === p; })[0]; if (m) m.openPopup(); };
+    if (map.getZoom() < 13) { map.once('moveend', function () { setTimeout(open, 50); }); map.flyTo([p.lat, p.lng], 14, { duration: reduce ? 0 : .8 }); }
+    else { map.panTo([p.lat, p.lng]); open(); }
+  }
+
+  // Jobs on the board open their usual details popup
+  document.getElementById('mv-map').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-open]');
+    if (b && typeof openJobModal === 'function') { e.preventDefault(); openJobModal(b.getAttribute('data-open')); }
+  });
+
+  function setMe(lat, lng) {
+    me = { lat: lat, lng: lng };
+    ask.classList.add('gone');
+    if (meMarker) meMarker.remove();
+    meMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'me-pin', html: '<div></div>', iconSize: [16, 16] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+    var vs = visible(); vs.forEach(function (v) { v.d = km(me, v.p); }); vs.sort(function (a, b) { return a.d - b.d; });
+    if (vs.length && vs[0].d > 25) map.flyToBounds(L.latLngBounds([[lat, lng], [vs[0].p.lat, vs[0].p.lng]]).pad(.3), { duration: reduce ? 0 : 1.1, maxZoom: 11 });
+    else map.flyTo([lat, lng], 12, { duration: reduce ? 0 : 1.1 });
+    renderList();
+  }
+  function locate() {
+    if (!navigator.geolocation) { askTxt.textContent = "This browser can't share a location."; locBtn.hidden = true; return; }
+    askTxt.textContent = 'Finding you…';
+    navigator.geolocation.getCurrentPosition(function (pos) { setMe(pos.coords.latitude, pos.coords.longitude); }, function (err) {
+      askTxt.textContent = err && err.code === 1 ? 'Location is off. You can still explore the map.' : "Couldn't find your location.";
+      locBtn.textContent = 'Try again';
+    }, { timeout: 12000, maximumAge: 600000 });
+  }
+  locBtn.addEventListener('click', locate);
+
+  document.querySelectorAll('.mv-chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      group = b.dataset.g;
+      document.querySelectorAll('.mv-chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      draw(); renderList();
+    });
+  });
+  var others = document.getElementById('mv-others');
+  if (others) others.addEventListener('change', function () { showOthers = others.checked; draw(); renderList(); });
+
+  var last = map.getZoom() < CITY_ZOOM;
+  map.on('zoomend', function () { var now = map.getZoom() < CITY_ZOOM; if (now !== last) { last = now; draw(); } });
+  map.on('moveend', function () { if (!me) renderList(); });
+
+  // Start framed on the board's jobs
+  if (mine.length) {
+    var b = L.latLngBounds(mine.map(function (p) { return [p.lat, p.lng]; }));
+    map.fitBounds(b.pad(.2), { maxZoom: 11 });
+  }
+  draw(); renderList();
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(function (st) { if (st.state !== 'denied') locate(); else askTxt.textContent = 'Location is off for this site. You can still explore the map.'; }, locate);
+  } else { locate(); }
+})();
+</script>
+{% endif %}
 {% if view_mode == 'career' %}
 <script>
 // ── Career Switch: suggested paths and live openings for each ──
