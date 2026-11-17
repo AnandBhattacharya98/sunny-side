@@ -113,3 +113,21 @@ def test_staging_is_labelled_and_not_indexed(monkeypatch):
 def test_production_has_no_staging_label():
     r = dashboard.app.test_client().get("/login")
     assert "X-Robots-Tag" not in r.headers and b"env-ribbon" not in r.data
+
+
+def test_restart_skips_migrations_when_schema_code_is_unchanged(monkeypatch):
+    """A restart against an already-migrated database must not re-run ~100 migration queries."""
+    import db
+    init_db(DB_PATH)
+    db._schema_fingerprint()  # worked out from the real code before anything is patched
+    monkeypatch.setattr(db, "_migrated", set())
+    calls = []
+    real = db.migrate_db
+    monkeypatch.setattr(db, "migrate_db", lambda c: calls.append(1) or real(c))
+    db.init_db(DB_PATH).close()
+    assert calls == []
+    # A changed schema fingerprint (new migration code) runs them again
+    monkeypatch.setattr(db, "_migrated", set())
+    monkeypatch.setattr(db, "_schema_fingerprint", lambda: "changed")
+    db.init_db(DB_PATH).close()
+    assert calls == [1]
