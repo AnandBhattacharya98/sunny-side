@@ -564,6 +564,32 @@ MIGRATION_LOCK_TIMEOUT = int(os.getenv("MIGRATION_LOCK_TIMEOUT", "30"))
 
 def init_db(db_path: str = DB_PATH):
     conn = get_conn(db_path)
+    if db_path in _migrated:
+        return conn
+    started = time.monotonic()
+    if IS_POSTGRES:
+        # Workers start together on every deploy, and on an empty database both would try to create
+        # the same tables (one then crashes and gunicorn stops). Let one create and migrate while the
+        # other waits, and give up instead of hanging if a table stays locked (the deploy then fails
+        # and the previous version keeps serving).
+        conn.execute(f"SET lock_timeout = '{MIGRATION_LOCK_TIMEOUT}s'")
+        conn.execute("SELECT pg_advisory_lock(%s)" % MIGRATION_LOCK_ID)
+        conn.commit()
+        try:
+            _create_and_migrate(conn)
+        finally:
+            conn.rollback()
+            conn.execute("SELECT pg_advisory_unlock(%s)" % MIGRATION_LOCK_ID)
+            conn.execute("RESET lock_timeout")
+            conn.commit()
+    else:
+        _create_and_migrate(conn)
+    _migrated.add(db_path)
+    print(f"Database ready in {time.monotonic() - started:.1f}s", flush=True)
+    return conn
+
+
+def _create_and_migrate(conn) -> None:
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS jobs (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -648,26 +674,7 @@ def init_db(db_path: str = DB_PATH):
         );
     """)
     conn.commit()
-    if db_path not in _migrated:
-        started = time.monotonic()
-        if IS_POSTGRES:
-            # Workers start together on every deploy: let one run the migrations while the other waits,
-            # and give up instead of hanging if a table stays locked (the deploy then fails and the
-            # previous version keeps serving).
-            conn.execute(f"SET lock_timeout = '{MIGRATION_LOCK_TIMEOUT}s'")
-            conn.execute("SELECT pg_advisory_lock(%s)" % MIGRATION_LOCK_ID)
-            try:
-                migrate_db(conn)
-            finally:
-                conn.rollback()
-                conn.execute("SELECT pg_advisory_unlock(%s)" % MIGRATION_LOCK_ID)
-                conn.execute("RESET lock_timeout")
-                conn.commit()
-        else:
-            migrate_db(conn)
-        _migrated.add(db_path)
-        print(f"Database ready in {time.monotonic() - started:.1f}s", flush=True)
-    return conn
+    migrate_db(conn)
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
