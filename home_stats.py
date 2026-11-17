@@ -255,16 +255,51 @@ BOARD_GROUPS = {
 }
 
 
+_LEAD = re.compile(r"\b(lead|principal|head|director|vp|vice president|group product manager|gpm|staff|chief)\b", re.I)
+_SENIOR = re.compile(r"\b(senior|sr\.?)\b|\b(manager|engineer) (ii|iii|2|3)\b", re.I)
+_ENTRY = re.compile(r"\b(associate|apm)\b", re.I)
+
+
+_SRC_LABEL = {"linkedin": "LinkedIn", "direct": "Company site", "recruiter": "Recruiter post",
+              "email": "Email", "gmail": "Email", "inbox": "Email", "whatsapp": "WhatsApp"}
+
+
+def level_of(title: str) -> str:
+    """Rough seniority from a job title, for the Map's Level filter."""
+    t = title or ""
+    if _LEAD.search(t):
+        return "Lead+"
+    if _SENIOR.search(t):
+        return "Senior"
+    if _FRESHER.search(t) or _ENTRY.search(t):
+        return "Entry"
+    return "Mid"
+
+
+def _age_days(*stamps, now: datetime | None = None):
+    now = now or datetime.now()
+    for st in stamps:
+        if not st:
+            continue
+        try:
+            d = datetime.fromisoformat(str(st)[:19].replace("Z", ""))
+        except ValueError:
+            continue
+        return max(0, (now - d).days)
+    return None
+
+
 def board_pins(conn, uid: int):
     """One pin per company per area from this person's own board (archived jobs left out).
     Returns (pins, jobs_without_a_place)."""
     rows = conn.execute(
-        "SELECT job_id, title, company, location, status, ai_score FROM jobs "
+        "SELECT job_id, title, company, location, status, ai_score, posted_at, scraped_at, source FROM jobs "
         "WHERE user_id = ? AND COALESCE(status, 'new') != 'archived' "
         "ORDER BY COALESCE(ai_score, 0) DESC LIMIT 2000", (uid,)).fetchall()
     pins, unplaced = {}, 0
     for r in rows:
         job_id, title, company, location, status, score = r[0], r[1], r[2], r[3], r[4], r[5]
+        posted, scraped, source = r[6], r[7], r[8]
         place = place_of(location or "")
         if not place:
             unplaced += 1
@@ -279,6 +314,10 @@ def board_pins(conn, uid: int):
             "id": str(job_id), "title": (title or "")[:100],
             "group": BOARD_GROUPS.get(status or "new", "To review"),
             "score": round(float(score), 1) if score else None,
+            "level": level_of(title or ""),
+            "fam": family_of(title or "") or "Other",
+            "age": _age_days(posted, scraped),
+            "src": _SRC_LABEL.get((source or "").lower(), "Other"),
         })
     return list(pins.values()), unplaced
 
