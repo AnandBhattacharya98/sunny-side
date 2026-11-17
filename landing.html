@@ -534,7 +534,8 @@ section { position: relative; }
 .near-sub { color: var(--mut); margin-top: 10px; max-width: 580px; }
 .near-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 36px; }
 .map-wrap { position: relative; border-radius: 20px; overflow: hidden; border: 1px solid var(--bdr); box-shadow: var(--shadow-lg); background: var(--sur2); min-height: 480px; isolation: isolate; }
-#jobs-map { position: absolute; inset: 0; z-index: 0; background: var(--sur2); }
+#jobs-map { position: absolute; inset: 0; z-index: 0; background: #F4ECDA; }
+[data-theme="dark"] #jobs-map { background: #17140F; }
 .map-ask { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 500; width: min(92%, 380px);
            display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--sur);
            border: 1px solid var(--bdr-strong); box-shadow: var(--shadow-lg); transition: opacity .35s, transform .35s var(--spring); }
@@ -579,7 +580,8 @@ section { position: relative; }
             border: 2px solid var(--ink); box-shadow: 0 0 0 6px rgba(255, 167, 0, .25); transition: transform .25s var(--spring); }
 .cpin:hover div { transform: translate(-50%, -50%) scale(1.1); }
 .map-wrap .leaflet-container .me-pin, .map-wrap .leaflet-container .cpin, .map-wrap .leaflet-container .jpin { background: none; border: 0; }
-.me-pin div { width: 18px; height: 18px; border-radius: 50%; background: #2F7BF6; border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(47, 123, 246, .22); }
+.me-pin div { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 3px solid var(--yolk); box-shadow: 0 0 0 8px rgba(255, 167, 0, .28); }
+[data-theme="dark"] .me-pin div { background: var(--paper); }
 .map-wrap .leaflet-popup-content-wrapper { border-radius: 16px; background: var(--sur); color: var(--txt); box-shadow: var(--shadow-lg); }
 .map-wrap .leaflet-popup-tip { background: var(--sur); }
 .map-wrap .leaflet-popup-content { margin: 14px 16px; font-family: var(--font-sans); font-size: 13.5px; line-height: 1.35; min-width: 220px; }
@@ -595,13 +597,12 @@ section { position: relative; }
 .map-wrap .leaflet-container a.btn-p { color: var(--ink); }
 .map-wrap .leaflet-container a.lnk { color: var(--mut); }
 .map-wrap .leaflet-container { font-family: var(--font-sans); }
-/* OpenStreetMap tiles, softened to the page's warm palette; inverted into a night map in dark mode */
-.map-wrap .osm-tiles { filter: grayscale(.85) sepia(.18) brightness(1.04) contrast(.92); }
-[data-theme="dark"] .map-wrap .osm-tiles { filter: grayscale(1) invert(1) brightness(.82) contrast(.9) sepia(.12); }
+.map-wrap .leaflet-bar { border: 1px solid var(--bdr-strong) !important; border-radius: 12px !important; overflow: hidden; box-shadow: none !important; }
+.map-wrap .leaflet-bar a { background: var(--sur); color: var(--txt); width: 32px; height: 32px; line-height: 32px; border-color: var(--bdr) !important; }
+.map-wrap .leaflet-bar a:hover { background: var(--glow); }
 .map-wrap .leaflet-control-attribution { font-size: 10px; }
 [data-theme="dark"] .leaflet-control-attribution { background: rgba(13, 12, 10, .7) !important; color: #B5AFA3; }
 [data-theme="dark"] .leaflet-control-attribution a { color: #FFB938; }
-[data-theme="dark"] .leaflet-bar a { background: #1F1D19; color: #F5F2EB; border-color: rgba(245, 242, 235, .1); }
 @media (max-width: 960px) {
   .near-grid { grid-template-columns: 1fr; }
   .map-wrap { min-height: 420px; }
@@ -796,6 +797,7 @@ section { position: relative; }
       <p class="map-note">Pins mark the area a role is listed in, not the exact office.</p>
     </div>
     <script type="application/json" id="pins-data">{{ live.pins|tojson }}</script>
+    <script type="application/json" id="places-data">{{ map_places|tojson }}</script>
   </section>
   {% endif %}
 
@@ -1268,6 +1270,7 @@ section { position: relative; }
 
   /* ---------- Jobs near you ---------- */
   var mapEl = document.getElementById('jobs-map');
+  var PLACES = []; try { PLACES = JSON.parse(document.getElementById('places-data').textContent) || []; } catch (e) {}
   var dataEl = document.getElementById('pins-data');
   if (!mapEl || !dataEl) return;
   var pins = [];
@@ -1426,11 +1429,8 @@ section { position: relative; }
 
   function start() {
     map = L.map(mapEl, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false, zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
-    // OpenStreetMap's own tiles: no key needed. Tinted warm in CSS, and inverted for dark mode.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, className: 'osm-tiles',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    // Our own illustrated map in the site's colours (static/site/sunnymap.js): no tile server, no key.
+    SunnyMap.paint(map, PLACES);
     map.on('focus', function () { map.scrollWheelZoom.enable(); });
     map.on('blur', function () { map.scrollWheelZoom.disable(); });
     var last = map.getZoom() < CITY_ZOOM;
@@ -1452,8 +1452,15 @@ section { position: relative; }
   whenSeen(mapEl, function () {
     var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/static/vendor/leaflet/leaflet.css?v=1.9.4';
     document.head.appendChild(css);
+    var css2 = document.createElement('link'); css2.rel = 'stylesheet'; css2.href = '/static/site/sunnymap.css?v=1';
+    document.head.appendChild(css2);
     var js = document.createElement('script'); js.src = '/static/vendor/leaflet/leaflet.js?v=1.9.4';
-    js.onload = function () { mapEl.getBoundingClientRect(); start(); };
+    js.onload = function () {
+      var js2 = document.createElement('script'); js2.src = '/static/site/sunnymap.js?v=1';
+      js2.onload = function () { mapEl.getBoundingClientRect(); start(); };
+      js2.onerror = js.onerror;
+      document.body.appendChild(js2);
+    };
     js.onerror = function () { askTxt.textContent = "The map didn't load. The list on the right still works."; locBtn.hidden = true; };
     document.body.appendChild(js);
   }, '300px 0px');
