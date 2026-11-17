@@ -1,0 +1,25 @@
+name: Check staging after deploy
+
+# After a push to the staging branch, wait for Render to finish deploying that exact commit to the
+# staging site, then open its key pages. Needs the repository variable STAGING_URL
+# (Settings > Secrets and variables > Actions > Variables), e.g. https://sunny-side-staging.onrender.com
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  smoke-staging:
+    runs-on: ubuntu-latest
+    if: ${{ vars.STAGING_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Wait for this commit on staging, then open the key pages
+        env:
+          SMOKE_EXPECT_VERSION: ${{ github.sha }}
+          SMOKE_WAIT_SECONDS: "1200"
+          SMOKE_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+        run: python tools/smoke_test.py "${{ vars.STAGING_URL }}"

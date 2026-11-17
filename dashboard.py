@@ -22,6 +22,7 @@ import legal
 import recruiter as rec
 import learning
 import learning_videos
+import flags
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -156,6 +157,9 @@ def check_csrf():
     if request.path.startswith("/api/"):
         return jsonify({"ok": False, "error": "Your session expired. Reload the page and try again."}), 403
     return "Your session expired. Go back, reload the page and try again.", 403
+
+# Which copy of the site this is: "production" (default) or "staging". Staging shows a banner and isn't indexed.
+APP_ENV = (os.getenv("APP_ENV") or "production").strip().lower()
 
 # The "Dev Mode" fake Google/LinkedIn sign-in lets anyone log in as any email.
 # It only works when explicitly enabled for local testing.
@@ -338,6 +342,34 @@ def require_login():
     if page_user and request.path.startswith("/api/voice/") and session.get("user_id") \
             and page_user != str(session.get("user_id")):
         return jsonify({"ok": False, "error": "Signed in as someone else", "account_changed": True}), 401
+
+@app.before_request
+def feature_gate():
+    """Pages and APIs of a feature switched off in the Admin Console (flags.py) act as if they weren't there."""
+    key = flags.flag_for_path(request.path)
+    if not key or flags.enabled(key, is_admin()):
+        return
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "This feature is switched off right now.", "feature_off": key}), 404
+    return redirect("/")
+
+
+def _feature_on(key: str) -> bool:
+    from flask import has_request_context
+    return flags.enabled(key, has_request_context() and is_admin())
+
+
+@app.context_processor
+def _inject_flags():
+    return {"feature": _feature_on, "app_env": APP_ENV}
+
+
+@app.after_request
+def _staging_noindex(response):
+    if APP_ENV != "production":
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -1356,10 +1388,12 @@ def admin_users():
         admin_stats["recruiters"] = sum(1 for u in users if u.get("account_type") == "recruiter")
         admin_stats["live_posts"] = live_posts
         stats = _stats(conn)
+        feature_flags = flags.listing(conn)
     finally:
         conn.close()
     return render_template("dashboard.html", view_mode="users", users=users, stats=stats, error=error, notice=notice,
-                           logins=logins, admin_stats=admin_stats, filter_user=filter_user, pending_posts=pending)
+                           logins=logins, admin_stats=admin_stats, filter_user=filter_user, pending_posts=pending,
+                           feature_flags=feature_flags, flag_labels=flags.STATE_LABELS)
 
 
 @app.route("/api/admin/users/<int:user_id>/disable", methods=["POST"])
@@ -1380,6 +1414,25 @@ def admin_set_disabled(user_id):
         conn.close()
     _disabled_cache.pop(user_id, None)
     return jsonify({"ok": True, "disabled": bool(disabled)})
+
+
+@app.route("/api/admin/flags/<key>", methods=["POST"])
+def admin_set_flag(key):
+    """Switches a feature on for everyone, for the admin only, or off. Every worker picks it up within seconds."""
+    if not is_admin():
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    new_state = (request.get_json(silent=True) or {}).get("state")
+    if key not in flags.FLAGS:
+        return jsonify({"ok": False, "error": "No such feature."}), 404
+    if new_state not in flags.STATES:
+        return jsonify({"ok": False, "error": "Pick on, admin or off."}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        flags.set_state(conn, key, new_state)
+    finally:
+        conn.close()
+    app.logger.info("Feature %s switched to %s", key, new_state)
+    return jsonify({"ok": True, "key": key, "state": new_state})
 
 
 @app.route("/api/admin/users/<int:user_id>/reset-password", methods=["POST"])
@@ -1810,7 +1863,8 @@ def healthz():
     except Exception as e:
         app.logger.error("Health check failed: %s", e)
         return jsonify({"ok": False}), 503
-    return jsonify({"ok": True})
+    # Render sets RENDER_GIT_COMMIT, so this also tells you which version is live
+    return jsonify({"ok": True, "env": APP_ENV, "version": (os.getenv("RENDER_GIT_COMMIT") or "")[:7]})
 
 
 # ── API ────────────────────────────────────────────────────────────────────

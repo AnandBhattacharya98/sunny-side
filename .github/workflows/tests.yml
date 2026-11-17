@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
 
 jobs:
@@ -28,3 +28,40 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m py_compile *.py
       - run: python -m pytest -q tests
+
+  smoke:
+    # Starts the site the way Render does (gunicorn + Postgres) and opens the key pages.
+    # A pull request can't merge with this red, so a change that breaks a page never reaches staging or live.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sunny_smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sunny_smoke
+      FLASK_SECRET_KEY: smoke-test-secret
+      ADMIN_PASSWORD: smoke-admin-pass
+      SMOKE_ADMIN_PASSWORD: smoke-admin-pass
+      SESSION_COOKIE_SECURE: "0"
+      PORT: "8000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Start the site like Render does
+        run: |
+          START=$(grep '^web:' Procfile | cut -d: -f2-)
+          nohup $START > gunicorn.log 2>&1 &
+      - name: Open the key pages
+        run: python tools/smoke_test.py http://localhost:8000
+      - name: Server log
+        if: always()
+        run: cat gunicorn.log
