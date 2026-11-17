@@ -70,17 +70,46 @@ _PLACES = [
     ("Manyata", "Bengaluru", 13.0475, 77.6200, r"manyata|hebbal|nagawara"),
     ("Bengaluru East", "Bengaluru", 12.9900, 77.7000, r"bengaluru east|bangalore east"),
     ("Bengaluru", "Bengaluru", 12.9716, 77.5946, r"bengaluru|bangalore"),
-    ("HITEC City", "Hyderabad", 17.4435, 78.3772, r"hitec|madhapur|gachibowli"),
-    ("Hyderabad", "Hyderabad", 17.3850, 78.4867, r"hyderabad|secunderabad"),
+    ("Jayanagar", "Bengaluru", 12.9250, 77.5938, r"jayanagar|jp nagar|banashankari"),
+    ("MG Road", "Bengaluru", 12.9756, 77.6066, r"mg road|brigade road|residency road|richmond"),
+    ("Yeshwanthpur", "Bengaluru", 13.0285, 77.5409, r"yeshwanthpur|malleshwaram|rajajinagar|peenya"),
+    ("Sarjapur Road", "Bengaluru", 12.8990, 77.7060, r"sarjapur"),
+    ("HITEC City", "Hyderabad", 17.4435, 78.3772, r"hitec|madhapur|kondapur"),
+    ("Gachibowli", "Hyderabad", 17.4401, 78.3489, r"gachibowli|nanakramguda|financial district"),
+    ("Banjara Hills", "Hyderabad", 17.4156, 78.4347, r"banjara|jubilee hills"),
+    ("Begumpet", "Hyderabad", 17.4440, 78.4620, r"begumpet|secunderabad"),
+    ("Hyderabad", "Hyderabad", 17.3850, 78.4867, r"hyderabad"),
+    ("Andheri", "Mumbai", 19.1197, 72.8468, r"andheri|jogeshwari"),
+    ("BKC", "Mumbai", 19.0660, 72.8680, r"bandra|\bbkc\b|kurla"),
+    ("Powai", "Mumbai", 19.1176, 72.9060, r"powai|vikhroli|ghatkopar"),
+    ("Lower Parel", "Mumbai", 18.9950, 72.8300, r"lower parel|worli|prabhadevi|dadar"),
+    ("Goregaon", "Mumbai", 19.1663, 72.8526, r"goregaon|malad"),
+    ("Nariman Point", "Mumbai", 18.9256, 72.8242, r"nariman|fort,|churchgate|colaba"),
     ("Navi Mumbai", "Mumbai", 19.0330, 73.0297, r"navi mumbai"),
     ("Thane", "Mumbai", 19.2183, 72.9781, r"\bthane\b"),
     ("Mumbai", "Mumbai", 19.0760, 72.8777, r"mumbai"),
-    ("Pune", "Pune", 18.5204, 73.8567, r"\bpune\b|hinjewadi"),
+    ("Hinjewadi", "Pune", 18.5913, 73.7389, r"hinjewadi|hinjawadi|wakad"),
+    ("Kharadi", "Pune", 18.5515, 73.9400, r"kharadi|viman nagar|yerwada|yerawada"),
+    ("Baner", "Pune", 18.5590, 73.7868, r"\bbaner\b|balewadi|aundh"),
+    ("Magarpatta", "Pune", 18.5140, 73.9270, r"magarpatta|hadapsar"),
+    ("Pune", "Pune", 18.5204, 73.8567, r"\bpune\b"),
+    ("Cyber City", "Gurugram", 28.4950, 77.0890, r"cyber ?city|dlf phase|udyog vihar"),
+    ("Golf Course Road", "Gurugram", 28.4520, 77.0960, r"golf course|sohna road"),
     ("Gurugram", "Gurugram", 28.4595, 77.0266, r"gurugram|gurgaon"),
+    ("Noida Sector 62", "Noida", 28.6270, 77.3730, r"sector[- ]6[2-4]\b.*noida|noida.*sector[- ]6[2-4]\b"),
     ("Noida", "Noida", 28.5355, 77.3910, r"\bnoida\b"),
+    ("Connaught Place", "Delhi", 28.6315, 77.2167, r"connaught"),
+    ("Okhla", "Delhi", 28.5310, 77.2710, r"okhla|nehru place|saket|jasola"),
+    ("Aerocity", "Delhi", 28.5490, 77.1200, r"aerocity"),
     ("New Delhi", "Delhi", 28.6139, 77.2090, r"\bdelhi\b"),
+    ("OMR", "Chennai", 12.9010, 80.2279, r"\bomr\b|sholinganallur|old mahabalipuram|siruseri|perungudi|thoraipakkam"),
+    ("Guindy", "Chennai", 13.0067, 80.2206, r"guindy|t\.? ?nagar|nungambakkam|teynampet"),
+    ("Porur", "Chennai", 13.0350, 80.1580, r"porur|ambattur"),
     ("Chennai", "Chennai", 13.0827, 80.2707, r"chennai"),
+    ("Salt Lake", "Kolkata", 22.5760, 88.4330, r"salt lake|sector v\b|bidhannagar"),
+    ("New Town", "Kolkata", 22.5920, 88.4840, r"new ?town|rajarhat"),
     ("Kolkata", "Kolkata", 22.5726, 88.3639, r"kolkata"),
+    ("GIFT City", "Ahmedabad", 23.1590, 72.6840, r"gift city|gandhinagar"),
     ("Ahmedabad", "Ahmedabad", 23.0225, 72.5714, r"ahmedabad"),
     ("Jaipur", "Jaipur", 26.9124, 75.7873, r"jaipur"),
     ("Kochi", "Kochi", 9.9312, 76.2673, r"kochi|cochin"),
@@ -109,11 +138,15 @@ def place_of(location: str):
     return None
 
 
-def _spread(lat: float, lng: float, key: str):
-    """Move a pin a fixed, made-up distance from the area centre, the same for the same company every time."""
+AREA_SPREAD_KM = 2.0
+
+
+def _spread(lat: float, lng: float, key: str, km: float = PIN_SPREAD_KM):
+    """Move a pin a fixed, made-up distance from the area centre, the same for the same company every time.
+    Spread evenly over a disc (not a ring), smaller for a named locality than for a whole city."""
     h = hashlib.sha1(key.encode()).digest()
     angle = h[0] / 255 * 2 * math.pi
-    dist = (0.25 + 0.75 * (h[1] / 255)) * PIN_SPREAD_KM
+    dist = math.sqrt(0.02 + 0.98 * (h[1] / 255)) * km
     dlat = dist / 111.0 * math.cos(angle)
     dlng = dist / (111.0 * math.cos(math.radians(lat))) * math.sin(angle)
     return round(lat + dlat, 5), round(lng + dlng, 5)
@@ -129,7 +162,7 @@ def _pins(seen: dict) -> list:
         area, city, lat, lng = p
         k = (ckey, area)
         if k not in pins:
-            plat, plng = _spread(lat, lng, ckey + "|" + area)
+            plat, plng = _spread(lat, lng, ckey + "|" + area, PIN_SPREAD_KM if area == city else AREA_SPREAD_KM)
             pins[k] = {"company": company, "area": area, "city": city, "lat": plat, "lng": plng, "roles": [], "fresh": scraped}
         pin = pins[k]
         if len(pin["roles"]) < 8:
@@ -308,7 +341,7 @@ def board_pins(conn, uid: int):
         company = (company or "Unknown").strip()
         k = (_norm(company), area)
         if k not in pins:
-            plat, plng = _spread(lat, lng, _norm(company) + "|" + area)
+            plat, plng = _spread(lat, lng, _norm(company) + "|" + area, PIN_SPREAD_KM if area == city else AREA_SPREAD_KM)
             pins[k] = {"company": company, "area": area, "city": city, "lat": plat, "lng": plng, "jobs": []}
         pins[k]["jobs"].append({
             "id": str(job_id), "title": (title or "")[:100],

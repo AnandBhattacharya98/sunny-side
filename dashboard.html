@@ -2126,7 +2126,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   <div class="wr-list fj-list" id="fj-list"></div>
   {% elif view_mode == 'map' %}
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css?v=1.9.4">
-  <link rel="stylesheet" href="/static/site/sunnymap.css?v=1">
+  <link rel="stylesheet" href="/static/site/sunnymap.css?v=2">
   <style>
     .mv-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr); gap: 14px; }
     .mv-map { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--bdr); background: var(--sur2); min-height: 420px; isolation: isolate; }
@@ -8558,7 +8558,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 {% if view_mode == 'map' %}
 <script src="/static/vendor/leaflet/leaflet.js?v=1.9.4"></script>
-<script src="/static/site/sunnymap.js?v=1"></script>
+<script src="/static/site/sunnymap.js?v=2"></script>
 <script>
 (function () {
   if (!window.L) return;
