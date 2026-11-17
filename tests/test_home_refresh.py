@@ -139,6 +139,8 @@ def test_board_pins_are_your_own_jobs(conn):
     pins, unplaced = home_stats.board_pins(conn, 1)
     mine = [p for p in pins if p["company"] == "Flipkart"]
     assert len(mine) == 1 and {j["group"] for j in mine[0]["jobs"]} >= {"Applied"}
+    j = mine[0]["jobs"][0]
+    assert {"level", "fam", "age", "src"} <= set(j)
     assert not any(p["company"] == "Other Co" for p in pins)
     assert unplaced >= 1
 
@@ -170,3 +172,17 @@ def test_maps_use_own_illustration_not_tile_servers():
     assert os.path.exists(os.path.join(root, "static/vendor/geo/india-map.json"))
     names = {p["name"] for p in home_stats.map_places()}
     assert {"Bengaluru", "Mumbai", "Koramangala"} <= names
+
+
+def test_level_of_titles():
+    assert home_stats.level_of("Senior Product Manager") == "Senior"
+    assert home_stats.level_of("Group Product Manager") == "Lead+"
+    assert home_stats.level_of("Associate Product Manager") == "Entry"
+    assert home_stats.level_of("Product Manager") == "Mid"
+
+
+def test_map_view_has_score_colours_and_filters():
+    src = open(dashboard.__file__.replace("dashboard.py", "dashboard.html"), encoding="utf-8").read()
+    for el in ('data-band="strong"', 'id="mv-city"', 'id="mv-level"', 'id="mv-fam"', 'id="mv-age"',
+               'id="mv-src"', 'id="mv-dist"', 'id="mv-sort"', 'id="mv-q"', "mv-legend"):
+        assert el in src

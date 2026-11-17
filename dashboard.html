@@ -2126,9 +2126,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   <div class="wr-list fj-list" id="fj-list"></div>
   {% elif view_mode == 'map' %}
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css?v=1.9.4">
-  <link rel="stylesheet" href="/static/site/sunnymap.css?v=1">
+  <link rel="stylesheet" href="/static/site/sunnymap.css?v=2">
   <style>
-    .mv-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 14px; }
+    .mv-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr); gap: 14px; }
     .mv-map { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--bdr); background: var(--sur2); min-height: 420px; isolation: isolate; }
     #mv-map { position: absolute; inset: 0; z-index: 0; background: #F4ECDA; }
     [data-theme="dark"] #mv-map { background: #17140F; }
@@ -2187,10 +2187,58 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     .pp-sc { font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
     .mv-map .leaflet-control-attribution { font-size: 10px; }
     [data-theme="dark"] .mv-map .leaflet-control-attribution { background: rgba(13,12,10,.7) !important; color: #B5AFA3; }
+    .mv-wrap { --b-strong: #1E9E5A; --b-good: #FFA700; --b-fair: #EE7340; --b-low: #A9A194; }
+    [data-theme="dark"] .mv-wrap { --b-strong: #3CC47C; --b-good: #FFB224; --b-fair: #F08A5D; --b-low: #6F695F; }
+    .b-strong { background: var(--b-strong); } .b-good { background: var(--b-good); } .b-fair { background: var(--b-fair); } .b-low { background: var(--b-low); }
+    .b-none { background: var(--sur); box-shadow: inset 0 0 0 1.5px var(--hin); }
+    .mv-bands { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 10px; }
+    .mv-lbl, .mv-filters label span { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--hin); }
+    .mv-lbl { margin-right: 2px; }
+    .mv-band { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 4px 10px 4px 7px; border-radius: 999px; border: 1px solid var(--bdr-strong); background: var(--sur); color: var(--txt); cursor: pointer; }
+    .mv-band i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+    .mv-band small { color: var(--hin); font-family: var(--font-mono); font-size: 10px; }
+    .mv-band[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+    .mv-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .mv-filters label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .mv-filters select, .mv-q { font: inherit; font-size: 12.5px; padding: 6px 4px 6px 7px; text-overflow: ellipsis; border-radius: 9px; border: 1px solid var(--bdr-strong); background: var(--field, var(--sur)); color: var(--txt); min-width: 0; width: 100%; }
+    .mv-filters select:disabled { opacity: .5; }
+    .mv-filters select.on { border-color: var(--yolk); box-shadow: 0 0 0 1px var(--yolk); }
+    .mv-row { display: flex; gap: 8px; margin: 8px 0; }
+    .mv-q { flex: 1; }
+    .mv-reset { font: inherit; font-size: 12px; background: none; border: 0; color: var(--mut); text-decoration: underline; cursor: pointer; }
+    .mv-hollow { width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed var(--hin); display: inline-block; }
+    .mv-item .mv-av, .mv-item.mine .mv-av { font-family: var(--font-mono); font-size: 11.5px; color: #0D0C0A; }
+    .mv-item.mine .mv-av.b-strong { background: var(--b-strong); } .mv-item.mine .mv-av.b-good { background: var(--b-good); } .mv-item.mine .mv-av.b-fair { background: var(--b-fair); } .mv-item.mine .mv-av.b-low { background: var(--b-low); } .mv-item.mine .mv-av.b-none { background: var(--sur); }
+    .mv-item .mv-av.b-low { color: #fff; } .mv-item .mv-av.b-strong { color: #fff; }
+    [data-theme="dark"] .mv-item .mv-av.b-strong, [data-theme="dark"] .mv-item .mv-av.b-low { color: #0D0C0A; }
+    .mv-item .mv-av.b-none { color: var(--mut); }
+    .mv-meta { font-family: var(--font-mono); font-size: 10px; color: var(--hin); }
+    .dpin { background: none; border: 0; }
+    .dpin div { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); width: var(--s); height: var(--s); border-radius: 50%; background: var(--c); border: 2px solid var(--sur);
+                box-shadow: 0 0 0 1px rgba(13,12,10,.55), 0 4px 10px -4px rgba(13,12,10,.6); display: grid; place-items: center; font: 700 10.5px 'Space Grotesk', sans-serif; color: #0D0C0A; transition: transform .15s; }
+    .dpin.b-low-p div, .dpin.b-strong-p div { color: #fff; }
+    [data-theme="dark"] .dpin.b-low-p div, [data-theme="dark"] .dpin.b-strong-p div { color: #0D0C0A; }
+    .dpin.none div { background: var(--sur); box-shadow: 0 0 0 1.5px var(--hin); color: var(--mut); }
+    .dpin.other div { background: transparent; border: 1.5px dashed var(--hin); box-shadow: none; }
+    .dpin:hover div { transform: translate(-50%, -50%) scale(1.25); }
+    .cpin div { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 5px 10px 6px !important; background: var(--sur) !important; color: var(--txt) !important; border: 1.5px solid var(--bdr-strong) !important; box-shadow: 0 6px 16px -8px rgba(13,12,10,.5) !important; }
+    .cpin b { font: 700 12.5px 'Space Grotesk', sans-serif; }
+    .cpin b small { font-family: var(--font-mono); font-weight: 400; color: var(--hin); margin-left: 4px; }
+    .cpin .bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; min-width: 60px; background: var(--sur2); }
+    .cpin .bar i { display: block; height: 100%; }
+    .mv-legend { position: absolute; left: 10px; bottom: 10px; z-index: 450; background: var(--sur); border: 1px solid var(--bdr-strong); border-radius: 12px; padding: 7px 10px; font-size: 11.5px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 10px 24px -14px rgba(0,0,0,.4); }
+    .mv-legend b { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--hin); font-weight: 400; }
+    .mv-legend span { display: flex; align-items: center; gap: 6px; }
+    .mv-legend i { width: 10px; height: 10px; border-radius: 50%; }
+    .mv-legend em { font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--hin); margin-left: auto; padding-left: 8px; }
+    .mv-ask { left: auto; right: 12px; transform: none; width: min(70%, 340px); }
+    .mv-ask.gone { transform: translateY(16px); }
+    @media (max-width: 600px) { .mv-legend { font-size: 10.5px; padding: 5px 8px; gap: 1px; } .mv-legend small { display: none; } }
+    @media (max-width: 1250px) { .mv-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 900px) { .mv-ask { left: 50%; right: auto; transform: translateX(-50%); width: 92%; bottom: 100px; } .mv-ask.gone { transform: translate(-50%, 16px); } .mv-side { max-height: none; } .mv-list { max-height: 420px; } }
     @media (max-width: 900px) {
       .mv-wrap { grid-template-columns: 1fr; overflow-y: auto; }
       .mv-map { min-height: 380px; }
-      .mv-side { max-height: 460px; }
     }
   </style>
   <div class="board-header">
@@ -2205,19 +2253,36 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         <button class="mv-btn" type="button" id="mv-locate">Use my location</button>
       </div>
     </div>
-    <aside class="mv-side" aria-label="Jobs by distance">
+    <aside class="mv-side" aria-label="Jobs on the map">
       <div class="mv-head"><b id="mv-title">Your jobs on the map</b><span id="mv-count"></span></div>
-      <div class="mv-chips" role="group" aria-label="Show">
-        {% for g in ['All', 'To review', 'Shortlisted', 'Applied', 'Interviewing', 'Offer'] %}
-        <button class="mv-chip" type="button" data-g="{{ '' if g == 'All' else g }}" aria-pressed="{{ 'true' if g == 'All' else 'false' }}">{{ g }}</button>
-        {% endfor %}
+      <div class="mv-bands" role="group" aria-label="Match score">
+        <span class="mv-lbl">Match</span>
+        <button class="mv-band" type="button" data-band="strong" aria-pressed="true"><i class="b-strong"></i>Strong <small>8+</small></button>
+        <button class="mv-band" type="button" data-band="good" aria-pressed="true"><i class="b-good"></i>Good <small>6.5+</small></button>
+        <button class="mv-band" type="button" data-band="fair" aria-pressed="true"><i class="b-fair"></i>Fair <small>5+</small></button>
+        <button class="mv-band" type="button" data-band="low" aria-pressed="true"><i class="b-low"></i>Low <small>&lt;5</small></button>
+        <button class="mv-band" type="button" data-band="none" aria-pressed="true"><i class="b-none"></i>Not scored</button>
+      </div>
+      <div class="mv-filters">
+        <label><span>Status</span><select id="mv-status"><option value="">All</option>{% for g in ['To review', 'Shortlisted', 'Applied', 'Interviewing', 'Offer', 'Closed'] %}<option>{{ g }}</option>{% endfor %}</select></label>
+        <label><span>Location</span><select id="mv-city"><option value="">All</option></select></label>
+        <label><span>Level</span><select id="mv-level"><option value="">Any</option><option>Entry</option><option>Mid</option><option>Senior</option><option>Lead+</option></select></label>
+        <label><span>Role</span><select id="mv-fam"><option value="">Any</option></select></label>
+        <label><span>Added</span><select id="mv-age"><option value="">Any</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+        <label><span>Source</span><select id="mv-src"><option value="">Any</option></select></label>
+        <label><span>Distance</span><select id="mv-dist" disabled title="Share your location to use this"><option value="">Any</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option><option value="25">Within 25 km</option><option value="50">Within 50 km</option></select></label>
+        <label><span>Sort</span><select id="mv-sort"><option value="score">Best match</option><option value="near">Nearest</option><option value="new">Newest</option></select></label>
+      </div>
+      <div class="mv-row">
+        <input class="mv-q" id="mv-q" type="search" placeholder="Search company or title" aria-label="Search company or title">
+        <button class="mv-reset" type="button" id="mv-reset">Reset</button>
       </div>
       {% if map_nearby %}
-      <label class="mv-toggle"><input type="checkbox" id="mv-others"> Also show other openings nearby</label>
+      <label class="mv-toggle"><input type="checkbox" id="mv-others"> Also show other openings nearby <span class="mv-hollow" aria-hidden="true"></span></label>
       {% endif %}
       <ol class="mv-list" id="mv-list"></ol>
       {% if map_unplaced %}<p class="mv-note">{{ map_unplaced }} job{{ 's' if map_unplaced != 1 }} on your board {{ 'have' if map_unplaced != 1 else 'has' }} no city (remote or just "India"), so {{ 'they aren\'t' if map_unplaced != 1 else 'it isn\'t' }} on the map.</p>{% endif %}
-      <p class="mv-note">Pins mark the area a job is listed in, not the exact office.</p>
+      <p class="mv-note">Colour = your best match score at that spot. Pins mark the area a job is listed in, not the exact office.</p>
     </aside>
   </div>
   <script type="application/json" id="mv-mine">{{ map_pins|tojson }}</script>
@@ -2504,7 +2569,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       <div class="cs-filters" id="cs-filters" role="group" aria-label="Filter openings">
         <label class="cs-fl"><span>Date posted</span>
           <select id="cs-f-days" data-search onchange="careerFilterChanged(this)">
-            <option value="">Any time</option><option value="1">Past 24 hours</option><option value="3">Past 3 days</option>
+            <option value="">Any</option><option value="1">Past 24 hours</option><option value="3">Past 3 days</option>
             <option value="7">Past week</option><option value="30">Past month</option>
           </select></label>
         <label class="cs-fl"><span>Work mode</span>
@@ -8493,18 +8558,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 {% if view_mode == 'map' %}
 <script src="/static/vendor/leaflet/leaflet.js?v=1.9.4"></script>
-<script src="/static/site/sunnymap.js?v=1"></script>
+<script src="/static/site/sunnymap.js?v=2"></script>
 <script>
 (function () {
   if (!window.L) return;
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function data(id) { try { return JSON.parse(document.getElementById(id).textContent) || []; } catch (e) { return []; } }
+  function $(id) { return document.getElementById(id); }
   var mine = data('mv-mine').map(function (p) { p.mine = true; return p; });
   var near = data('mv-near').map(function (p) { p.mine = false; return p; });
-  var group = '', showOthers = false, me = null, meMarker = null, markers = [];
+  var me = null, meMarker = null, markers = [], showOthers = false;
   var CITY_ZOOM = 10;
-  var listEl = document.getElementById('mv-list'), titleEl = document.getElementById('mv-title'), countEl = document.getElementById('mv-count');
-  var ask = document.getElementById('mv-ask'), askTxt = document.getElementById('mv-ask-txt'), locBtn = document.getElementById('mv-locate');
+  var BANDS = [['strong', 'Strong', '8+'], ['good', 'Good', '6.5 to 8'], ['fair', 'Fair', '5 to 6.5'], ['low', 'Low', 'under 5'], ['none', 'Not scored', '']];
+  var RANK = { strong: 4, good: 3, fair: 2, low: 1, none: 0 };
+  var f = { bands: { strong: 1, good: 1, fair: 1, low: 1, none: 1 }, status: '', city: '', level: '', fam: '', age: '', src: '', dist: '', sort: 'score', q: '' };
+  var listEl = $('mv-list'), titleEl = $('mv-title'), countEl = $('mv-count');
+  var ask = $('mv-ask'), askTxt = $('mv-ask-txt'), locBtn = $('mv-locate');
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function km(a, b) {
@@ -8514,15 +8583,67 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function fmtKm(d) { return d < 1 ? '< 1 km' : d < 10 ? d.toFixed(1) + ' km' : Math.round(d).toLocaleString('en-IN') + ' km'; }
   function where(p) { return p.area === p.city ? p.city : p.area + ', ' + p.city; }
+  function band(s) { return s == null ? 'none' : s >= 8 ? 'strong' : s >= 6.5 ? 'good' : s >= 5 ? 'fair' : 'low'; }
+  function fmtAge(a) { return a == null ? '' : a === 0 ? 'today' : a === 1 ? '1 day ago' : a < 60 ? a + ' days ago' : Math.round(a / 30) + ' months ago'; }
 
-  // Each visible pin with the jobs that pass the filter
+  // Fill the Location, Role and Source menus from the board itself, with counts
+  (function fillMenus() {
+    var cities = {}, fams = {}, srcs = {};
+    mine.forEach(function (p) {
+      cities[p.city] = (cities[p.city] || 0) + p.jobs.length;
+      if (p.area !== p.city) { var k = p.city + '|' + p.area; cities[k] = (cities[k] || 0) + p.jobs.length; }
+      p.jobs.forEach(function (j) { fams[j.fam] = (fams[j.fam] || 0) + 1; srcs[j.src] = (srcs[j.src] || 0) + 1; });
+    });
+    var byCity = Object.keys(cities).filter(function (k) { return k.indexOf('|') < 0; }).sort(function (a, b) { return cities[b] - cities[a]; });
+    var cityEl = $('mv-city');
+    byCity.forEach(function (c) {
+      cityEl.insertAdjacentHTML('beforeend', '<option value="' + esc(c) + '">' + esc(c) + ' (' + cities[c] + ')</option>');
+      Object.keys(cities).filter(function (k) { return k.indexOf(c + '|') === 0; }).sort(function (a, b) { return cities[b] - cities[a]; }).forEach(function (k) {
+        cityEl.insertAdjacentHTML('beforeend', '<option value="' + esc(k) + '">   ' + esc(k.split('|')[1]) + ' (' + cities[k] + ')</option>');
+      });
+    });
+    function fill(id, counts) {
+      Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (k) { $(id).insertAdjacentHTML('beforeend', '<option value="' + esc(k) + '">' + esc(k) + ' (' + counts[k] + ')</option>'); });
+    }
+    fill('mv-fam', fams); fill('mv-src', srcs);
+  })();
+
+  function jobPasses(j) {
+    if (!f.bands[band(j.score)]) return false;
+    if (f.status && j.group !== f.status) return false;
+    if (f.level && j.level !== f.level) return false;
+    if (f.fam && j.fam !== f.fam) return false;
+    if (f.src && j.src !== f.src) return false;
+    if (f.age && (j.age == null || j.age > +f.age)) return false;
+    return true;
+  }
+  function placePasses(p) {
+    if (f.city) {
+      var parts = f.city.split('|');
+      if (p.city !== parts[0] || (parts[1] && p.area !== parts[1])) return false;
+    }
+    if (f.dist && me && km(me, p) > +f.dist) return false;
+    return true;
+  }
+  function textPasses(p, j) { return !f.q || (p.company + ' ' + j.title).toLowerCase().indexOf(f.q) >= 0; }
+  function othersOn() { return showOthers && !f.status && !f.level && !f.fam && !f.src && !f.age && f.bands.none; }
+
+  // Each visible place with the jobs that pass every filter, best match first
   function visible() {
     var out = [];
     mine.forEach(function (p) {
-      var jobs = p.jobs.filter(function (j) { return !group || j.group === group; });
-      if (jobs.length) out.push({ p: p, jobs: jobs, n: jobs.length, mine: true });
+      if (!placePasses(p)) return;
+      var jobs = p.jobs.filter(function (j) { return jobPasses(j) && textPasses(p, j); });
+      if (!jobs.length) return;
+      jobs.sort(function (a, b) { return (b.score || 0) - (a.score || 0); });
+      var ages = jobs.map(function (j) { return j.age; }).filter(function (a) { return a != null; });
+      out.push({ p: p, jobs: jobs, n: jobs.length, mine: true, best: jobs[0].score, band: band(jobs[0].score), age: ages.length ? Math.min.apply(null, ages) : null });
     });
-    if (showOthers && !group) near.forEach(function (p) { out.push({ p: p, jobs: p.roles, n: p.count, mine: false }); });
+    if (othersOn()) near.forEach(function (p) {
+      if (!placePasses(p)) return;
+      var jobs = p.roles.filter(function (j) { return textPasses(p, j); });
+      if (jobs.length) out.push({ p: p, jobs: jobs, n: jobs.length, mine: false, best: null, band: 'other', age: null });
+    });
     return out;
   }
 
@@ -8530,14 +8651,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Our own illustrated map in the site's colours (static/site/sunnymap.js): no tile server, no key.
   if (window.SunnyMap) SunnyMap.paint(map, data('mv-places'));
   var layer = L.layerGroup().addTo(map);
+  var legend = document.createElement('div'); legend.className = 'mv-legend'; legend.setAttribute('aria-hidden', 'true');
+  document.querySelector('.mv-map').appendChild(legend);
 
   function popupHtml(v) {
     var h = '<div class="pp-co">' + esc(v.p.company) + '</div><div class="pp-area">' + esc(where(v.p)) +
             (me ? ' · ' + fmtKm(km(me, v.p)) + ' away' : '') + (v.mine ? '' : ' · not on your board') + '</div><ul class="pp-jobs">';
     v.jobs.slice(0, 8).forEach(function (j) {
       if (v.mine) {
-        h += '<li><button class="pp-job" type="button" data-open="' + esc(j.id) + '"><span class="pp-tt">' + esc(j.title) + '</span>' +
-             (j.score != null ? '<span class="pp-sc">' + j.score + '</span>' : '') + '<span class="pp-tag">' + esc(j.group) + '</span></button></li>';
+        h += '<li><button class="pp-job" type="button" data-open="' + esc(j.id) + '"><span class="pp-dot b-' + band(j.score) + '" style="width:9px;height:9px;border-radius:50%;flex:none"></span><span class="pp-tt">' + esc(j.title) +
+             '<span class="mv-meta" style="display:block">' + esc(j.level) + (j.age != null ? ' · added ' + fmtAge(j.age) : '') + '</span></span>' +
+             '<span class="pp-sc">' + (j.score != null ? j.score : '–') + '</span><span class="pp-tag">' + esc(j.group) + '</span></button></li>';
       } else {
         h += '<li><a class="pp-job" href="/find?q=' + encodeURIComponent(j.title) + '&location=' + encodeURIComponent(v.p.city) + '"><span class="pp-tt">' + esc(j.title) + '</span><span class="pp-tag">Find</span></a></li>';
       }
@@ -8550,49 +8674,84 @@ document.addEventListener('DOMContentLoaded', () => {
   function cityGroups(vs) {
     var g = {};
     vs.forEach(function (v) {
-      var c = g[v.p.city] || (g[v.p.city] = { city: v.p.city, lat: 0, lng: 0, k: 0, n: 0 });
+      var c = g[v.p.city] || (g[v.p.city] = { city: v.p.city, lat: 0, lng: 0, k: 0, n: 0, b: { strong: 0, good: 0, fair: 0, low: 0, none: 0, other: 0 } });
       c.lat += v.p.lat; c.lng += v.p.lng; c.k++; c.n += v.n;
+      if (v.mine) v.jobs.forEach(function (j) { c.b[band(j.score)]++; }); else c.b.other += v.n;
     });
     return Object.keys(g).map(function (k) { var c = g[k]; c.lat /= c.k; c.lng /= c.k; return c; });
+  }
+  function bar(b, n) {
+    return '<span class="bar">' + ['strong', 'good', 'fair', 'low', 'none'].map(function (k) {
+      return b[k] ? '<i class="b-' + k + '" style="width:' + (100 * b[k] / n).toFixed(1) + '%"></i>' : '';
+    }).join('') + '</span>';
+  }
+
+  function drawLegend(vs) {
+    var c = { strong: 0, good: 0, fair: 0, low: 0, none: 0 };
+    vs.forEach(function (v) { if (v.mine) v.jobs.forEach(function (j) { c[band(j.score)]++; }); });
+    legend.innerHTML = '<b>Match score</b>' + BANDS.map(function (b) {
+      return '<span><i class="b-' + b[0] + '"></i>' + b[1] + (b[2] ? ' <small style="color:var(--hin)">' + b[2] + '</small>' : '') + '<em>' + c[b[0]] + '</em></span>';
+    }).join('') + (othersOn() ? '<span><i class="mv-hollow" style="width:10px;height:10px"></i>Other openings</span>' : '');
   }
 
   function draw() {
     layer.clearLayers(); markers = [];
     var vs = visible();
+    drawLegend(vs);
     if (map.getZoom() < CITY_ZOOM) {
       cityGroups(vs).forEach(function (c) {
-        var m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'cpin', html: '<div>' + esc(c.city) + ' · ' + c.n + '</div>', iconSize: null }), title: c.city + ': ' + c.n + ' jobs' });
+        var mineN = c.n - c.b.other;
+        var html = '<div><b>' + esc(c.city) + '<small>' + c.n + '</small></b>' + (mineN ? bar(c.b, mineN) : '') + '</div>';
+        var m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'cpin', html: html, iconSize: null }),
+          title: c.city + ': ' + c.n + ' jobs, ' + c.b.strong + ' strong matches', zIndexOffset: c.b.strong * 10 + c.n });
         m.on('click', function () { map.flyTo([c.lat, c.lng], 12, { duration: reduce ? 0 : 1 }); });
         layer.addLayer(m);
       });
     } else {
       vs.forEach(function (v) {
-        var m = L.marker([v.p.lat, v.p.lng], { icon: L.divIcon({ className: 'jpin' + (v.mine ? '' : ' other'), html: '<div><span>' + esc(v.p.company.charAt(0).toUpperCase()) + '</span></div>', iconSize: null }),
-                                              title: v.p.company + ': ' + v.n + (v.n === 1 ? ' job' : ' jobs'), zIndexOffset: v.mine ? 500 : 0, riseOnHover: true });
-        m.bindPopup(function () { return popupHtml(v); }, { maxWidth: 300 });
+        var s = v.n >= 5 ? 26 : v.n >= 2 ? 21 : 15;
+        var col = v.band === 'other' ? 'transparent' : v.band === 'none' ? 'var(--sur)' : 'var(--b-' + v.band + ')';
+        var cls = 'dpin' + (v.band === 'other' ? ' other' : v.band === 'none' ? ' none' : ' b-' + v.band + '-p');
+        var m = L.marker([v.p.lat, v.p.lng], {
+          icon: L.divIcon({ className: cls, html: '<div style="--s:' + s + 'px;--c:' + col + '">' + (v.n > 1 ? v.n : '') + '</div>', iconSize: [0, 0] }),
+          title: v.p.company + ': ' + v.n + (v.n === 1 ? ' job' : ' jobs') + (v.best != null ? ', best match ' + v.best : ''),
+          zIndexOffset: (v.mine ? 200 : 0) + (RANK[v.band] || 0) * 100, riseOnHover: true });
+        m.bindPopup(function () { return popupHtml(v); }, { maxWidth: 320 });
         m._v = v; layer.addLayer(m); markers.push(m);
       });
     }
   }
 
-  function renderList() {
-    var vs = visible(), center = me || map.getCenter();
+  function sorted(vs) {
+    var center = me || map.getCenter();
     vs.forEach(function (v) { v.d = km(center, v.p); });
-    vs.sort(function (a, b) { return (b.mine - a.mine) || (a.d - b.d); });
-    if (me) vs.sort(function (a, b) { return a.d - b.d; });
-    var total = vs.filter(function (v) { return v.mine; }).reduce(function (s, v) { return s + v.n; }, 0);
-    titleEl.textContent = me ? 'Your jobs, nearest first' : 'Your jobs on the map';
-    countEl.textContent = total + (total === 1 ? ' job' : ' jobs') + ' at ' + vs.filter(function (v) { return v.mine; }).length + ' places';
+    var by = {
+      score: function (a, b) { return (b.mine - a.mine) || ((b.best || 0) - (a.best || 0)) || (a.d - b.d); },
+      near: function (a, b) { return a.d - b.d; },
+      'new': function (a, b) { return (a.age == null ? 1e9 : a.age) - (b.age == null ? 1e9 : b.age) || ((b.best || 0) - (a.best || 0)); }
+    };
+    return vs.sort(by[f.sort] || by.score);
+  }
+
+  function renderList() {
+    var vs = sorted(visible());
+    var mineVs = vs.filter(function (v) { return v.mine; });
+    var total = mineVs.reduce(function (s, v) { return s + v.n; }, 0);
+    var strong = mineVs.reduce(function (s, v) { return s + v.jobs.filter(function (j) { return band(j.score) === 'strong'; }).length; }, 0);
+    titleEl.textContent = f.sort === 'near' && me ? 'Your jobs, nearest first' : f.sort === 'new' ? 'Your jobs, newest first' : 'Your jobs, best match first';
+    countEl.textContent = total + (total === 1 ? ' job' : ' jobs') + ' at ' + mineVs.length + ' places · ' + strong + ' strong';
     listEl.innerHTML = '';
     if (!vs.length) {
-      listEl.innerHTML = '<li class="mv-empty">' + (mine.length ? 'No jobs in this column have a city to pin.' : 'No jobs with a city on your board yet. Jobs you save from Find Jobs show up here.') + '</li>';
+      listEl.innerHTML = '<li class="mv-empty">' + (mine.length ? 'No jobs match these filters. Try Reset.' : 'No jobs with a city on your board yet. Jobs you save from Find Jobs show up here.') + '</li>';
       return;
     }
-    vs.slice(0, 60).forEach(function (v) {
+    vs.slice(0, 80).forEach(function (v) {
       var li = document.createElement('li');
-      li.innerHTML = '<button class="mv-item' + (v.mine ? ' mine' : '') + '" type="button"><span class="mv-av" aria-hidden="true">' + esc(v.p.company.charAt(0).toUpperCase()) + '</span>' +
+      var badge = v.mine ? (v.best != null ? v.best.toFixed(1) : '–') : '·';
+      var right = (me ? fmtKm(v.d) : esc(v.p.area)) + (v.age != null ? '<br>' + fmtAge(v.age) : '');
+      li.innerHTML = '<button class="mv-item' + (v.mine ? ' mine' : '') + '" type="button"><span class="mv-av b-' + (v.mine ? v.band : 'none') + '" title="Best match score">' + badge + '</span>' +
         '<span class="mv-t"><b>' + esc(v.p.company) + '</b><span>' + esc(v.jobs[0].title) + (v.n > 1 ? ' and ' + (v.n - 1) + ' more' : '') + (v.mine ? '' : ' · not on your board') + '</span></span>' +
-        '<span class="mv-d">' + (me ? fmtKm(v.d) : esc(v.p.area)) + '</span></button>';
+        '<span class="mv-d">' + right + '</span></button>';
       li.firstChild.addEventListener('click', function () { focusPin(v.p); });
       listEl.appendChild(li);
     });
@@ -8605,19 +8764,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Jobs on the board open their usual details popup
-  document.getElementById('mv-map').addEventListener('click', function (e) {
+  $('mv-map').addEventListener('click', function (e) {
     var b = e.target.closest('[data-open]');
     if (b && typeof openJobModal === 'function') { e.preventDefault(); openJobModal(b.getAttribute('data-open')); }
   });
 
+  function frame() {
+    var vs = visible();
+    if (!vs.length) return;
+    var b = L.latLngBounds(vs.map(function (v) { return [v.p.lat, v.p.lng]; }));
+    map.flyToBounds(b.pad(.2), { maxZoom: 13, duration: reduce ? 0 : .8 });
+  }
+  function refresh() { draw(); renderList(); }
+
   function setMe(lat, lng) {
     me = { lat: lat, lng: lng };
     ask.classList.add('gone');
+    $('mv-dist').disabled = false; $('mv-dist').title = '';
     if (meMarker) meMarker.remove();
     meMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'me-pin', html: '<div></div>', iconSize: [16, 16] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
     var vs = visible(); vs.forEach(function (v) { v.d = km(me, v.p); }); vs.sort(function (a, b) { return a.d - b.d; });
     if (vs.length && vs[0].d > 25) map.flyToBounds(L.latLngBounds([[lat, lng], [vs[0].p.lat, vs[0].p.lng]]).pad(.3), { duration: reduce ? 0 : 1.1, maxZoom: 11 });
-    else map.flyTo([lat, lng], 12, { duration: reduce ? 0 : 1.1 });
+    else map.flyTo([lat, lng], 11, { duration: reduce ? 0 : 1.1 });
     renderList();
   }
   function locate() {
@@ -8630,26 +8798,53 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   locBtn.addEventListener('click', locate);
 
-  document.querySelectorAll('.mv-chip').forEach(function (b) {
+  // Filters
+  document.querySelectorAll('.mv-band').forEach(function (b) {
     b.addEventListener('click', function () {
-      group = b.dataset.g;
-      document.querySelectorAll('.mv-chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      draw(); renderList();
+      var k = b.dataset.band, on = b.getAttribute('aria-pressed') !== 'true';
+      var allOn = Object.keys(f.bands).every(function (x) { return f.bands[x]; });
+      if (allOn && !on) {   // first click on a full set: show only that band
+        Object.keys(f.bands).forEach(function (x) { f.bands[x] = x === k ? 1 : 0; });
+      } else {
+        f.bands[k] = on ? 1 : 0;
+        if (!Object.keys(f.bands).some(function (x) { return f.bands[x]; })) Object.keys(f.bands).forEach(function (x) { f.bands[x] = 1; });
+      }
+      document.querySelectorAll('.mv-band').forEach(function (x) { x.setAttribute('aria-pressed', String(!!f.bands[x.dataset.band])); });
+      refresh();
     });
   });
-  var others = document.getElementById('mv-others');
-  if (others) others.addEventListener('change', function () { showOthers = others.checked; draw(); renderList(); });
+  [['mv-status', 'status'], ['mv-city', 'city'], ['mv-level', 'level'], ['mv-fam', 'fam'], ['mv-age', 'age'], ['mv-src', 'src'], ['mv-dist', 'dist'], ['mv-sort', 'sort']].forEach(function (pair) {
+    var el = $(pair[0]);
+    el.addEventListener('change', function () {
+      f[pair[1]] = el.value;
+      if (pair[1] !== 'sort') el.classList.toggle('on', !!el.value);
+      if (pair[1] === 'sort' && el.value === 'near' && !me) locate();
+      refresh();
+      if (pair[1] === 'city' || pair[1] === 'dist') frame();
+    });
+  });
+  var qt;
+  $('mv-q').addEventListener('input', function () { clearTimeout(qt); var v = this.value; qt = setTimeout(function () { f.q = v.trim().toLowerCase(); refresh(); }, 150); });
+  $('mv-reset').addEventListener('click', function () {
+    f = { bands: { strong: 1, good: 1, fair: 1, low: 1, none: 1 }, status: '', city: '', level: '', fam: '', age: '', src: '', dist: '', sort: f.sort, q: '' };
+    document.querySelectorAll('.mv-filters select').forEach(function (s) { if (s.id !== 'mv-sort') { s.value = ''; s.classList.remove('on'); } });
+    document.querySelectorAll('.mv-band').forEach(function (x) { x.setAttribute('aria-pressed', 'true'); });
+    $('mv-q').value = '';
+    refresh();
+  });
+  var others = $('mv-others');
+  if (others) others.addEventListener('change', function () { showOthers = others.checked; refresh(); });
 
   var last = map.getZoom() < CITY_ZOOM;
   map.on('zoomend', function () { var now = map.getZoom() < CITY_ZOOM; if (now !== last) { last = now; draw(); } });
-  map.on('moveend', function () { if (!me) renderList(); });
+  map.on('moveend', function () { if (!me && f.sort === 'near') renderList(); });
 
   // Start framed on the board's jobs
   if (mine.length) {
     var b = L.latLngBounds(mine.map(function (p) { return [p.lat, p.lng]; }));
     map.fitBounds(b.pad(.2), { maxZoom: 11 });
   }
-  draw(); renderList();
+  refresh();
   if (navigator.permissions && navigator.permissions.query) {
     navigator.permissions.query({ name: 'geolocation' }).then(function (st) { if (st.state !== 'denied') locate(); else askTxt.textContent = 'Location is off for this site. You can still explore the map.'; }, locate);
   } else { locate(); }
