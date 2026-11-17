@@ -86,8 +86,8 @@ Render then waits for the GitHub checks on `main` before deploying.
 2. Fill in the values it asks for:
    - `ADMIN_PASSWORD`: a password for staging's admin (different from live's).
    - `DATABASE_URL`: a **separate** Postgres database, never the live one. A free
-     [Neon](https://neon.tech) project works. If you leave it empty, staging uses a SQLite file that
-     starts fresh on every deploy, which is fine for clicking around.
+     [Neon](https://neon.tech) project works. Don't leave it empty: the SQLite fallback stays
+     "database is locked" on Render's disk, and Postgres matches the live site anyway.
    - `GEMINI_API_KEY`, `LIVEKIT_*`: copy them from the live service if you want Sunny's voice and AI
      scoring on staging. Leave them empty otherwise.
 3. Apply. The staging address will look like `https://sunny-side-staging.onrender.com`.
