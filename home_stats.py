@@ -312,3 +312,14 @@ class _NoClose:
 
 def conn_factory_passthrough(conn):
     return _NoClose(conn)
+
+
+def map_places() -> list:
+    """Every city and area the map knows, for the illustrated base map's names."""
+    out, seen = [], set()
+    for area, city, lat, lng, _ in _PLACES:
+        if area in seen or area in ("Bengaluru East",):
+            continue
+        seen.add(area)
+        out.append({"name": area, "lat": lat, "lng": lng, "kind": "city" if area == city or area == "New Delhi" else "area"})
+    return out

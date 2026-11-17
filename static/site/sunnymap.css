@@ -1,0 +1,34 @@
+/* Sunny Side's own illustrated map: no street tiles, just land, state lines and places,
+   drawn in the site's colours. Used by the homepage map and the signed-in Map view. */
+.sunnymap {
+  --map-sea: #EFE7D6; --map-dot: rgba(13, 12, 10, .075); --map-other: #E6DCC6; --map-land: #FFFDF8;
+  --map-edge: rgba(13, 12, 10, .55); --map-state: rgba(13, 12, 10, .2); --map-label: #57534B; --map-city: #0D0C0A;
+  --map-halo: rgba(255, 167, 0, .10); --map-halo-edge: rgba(255, 167, 0, .55);
+  background-color: var(--map-sea) !important;
+  background-image: radial-gradient(var(--map-dot) 1px, transparent 1.2px) !important;
+  background-size: 14px 14px !important;
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+}
+[data-theme="dark"] .sunnymap {
+  --map-sea: #12100D; --map-dot: rgba(245, 242, 235, .06); --map-other: #1B1814; --map-land: #25211B;
+  --map-edge: rgba(245, 242, 235, .5); --map-state: rgba(245, 242, 235, .15); --map-label: #B5AFA3; --map-city: #F5F2EB;
+  --map-halo: rgba(255, 167, 0, .10); --map-halo-edge: rgba(255, 167, 0, .5);
+}
+.sunnymap .sm-other { fill: var(--map-other); fill-opacity: 1; stroke: none; }
+.sunnymap .sm-land { fill: var(--map-land); fill-opacity: 1; stroke: var(--map-edge); stroke-width: 1.3; stroke-linejoin: round; }
+.sunnymap .sm-state { fill: none; stroke: var(--map-state); stroke-width: 1; stroke-dasharray: 3 4; }
+.sunnymap .sm-halo { fill: var(--map-halo); fill-opacity: 1; stroke: var(--map-halo-edge); stroke-width: 1.2; stroke-dasharray: 2 4; }
+.sunnymap .sm-lbl { background: none; border: 0; }
+.sunnymap .sm-lbl div { transform: translate(-50%, -50%); white-space: nowrap; display: flex; align-items: center; gap: 5px; pointer-events: none; }
+.sunnymap .sm-lbl i { width: 6px; height: 6px; border-radius: 50%; background: var(--map-city); flex: none; }
+.sunnymap .sm-lbl span { font: 600 11px/1 'Space Mono', ui-monospace, monospace; color: var(--map-label); letter-spacing: .02em; }
+.sunnymap .sm-lbl.area span { font-weight: 400; font-size: 10.5px; }
+.sunnymap .sm-lbl.area i { background: var(--yolk, #FFA700); }
+.sunnymap .sm-lbl.state span { font: 400 9.5px/1 'Space Mono', ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+/* Show more names as you zoom in */
+.sunnymap .sm-lbl.minor, .sunnymap .sm-lbl.area { display: none; }
+.sunnymap[data-z="mid"] .sm-lbl.minor, .sunnymap[data-z="near"] .sm-lbl.minor { display: block; }
+.sunnymap[data-z="near"] .sm-lbl.area { display: block; }
+.sunnymap[data-z="near"] .sm-lbl.state, .sunnymap[data-z="mid"] .sm-lbl.state { display: none; }
+.sunnymap .leaflet-control-attribution { background: transparent !important; color: var(--map-label); font-size: 10px; }
+.sunnymap .leaflet-control-attribution a { color: inherit; }

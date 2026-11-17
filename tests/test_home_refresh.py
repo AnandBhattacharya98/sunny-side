@@ -158,3 +158,15 @@ def test_map_view_needs_the_switch(conn):
     assert 'href="/map"' in signed_in(7301).get("/progress").get_data(as_text=True)
     conn.execute("DELETE FROM users WHERE id = 7301")
     conn.commit()
+
+
+def test_maps_use_own_illustration_not_tile_servers():
+    """Both maps draw our own shapes; no third-party tile server is contacted."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ("landing.html", "dashboard.html", "static/site/sunnymap.js"):
+        src = open(os.path.join(root, name), encoding="utf-8").read()
+        assert "tileLayer" not in src and "openstreetmap" not in src.lower() and "cartocdn" not in src
+    assert os.path.exists(os.path.join(root, "static/vendor/geo/india-map.json"))
+    names = {p["name"] for p in home_stats.map_places()}
+    assert {"Bengaluru", "Mumbai", "Koramangala"} <= names

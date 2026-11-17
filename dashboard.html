@@ -2126,13 +2126,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   <div class="wr-list fj-list" id="fj-list"></div>
   {% elif view_mode == 'map' %}
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css?v=1.9.4">
+  <link rel="stylesheet" href="/static/site/sunnymap.css?v=1">
   <style>
     .mv-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 14px; }
     .mv-map { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--bdr); background: var(--sur2); min-height: 420px; isolation: isolate; }
     #mv-map { position: absolute; inset: 0; z-index: 0; background: #F4ECDA; }
     [data-theme="dark"] #mv-map { background: #17140F; }
-    .mv-map .osm-tiles { filter: grayscale(1) sepia(.45) saturate(1.05) hue-rotate(-6deg) contrast(.62) brightness(1.15); opacity: .5; }
-    [data-theme="dark"] .mv-map .osm-tiles { filter: grayscale(1) invert(1) sepia(.45) saturate(1.1) hue-rotate(-8deg) contrast(.72) brightness(.72); opacity: .55; }
     .mv-map .leaflet-bar { border: 1px solid var(--bdr-strong) !important; border-radius: 12px !important; overflow: hidden; box-shadow: none !important; }
     .mv-map .leaflet-bar a { background: var(--sur); color: var(--txt); width: 32px; height: 32px; line-height: 32px; }
     .mv-ask { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 500; width: min(92%, 380px); display: flex; align-items: center; gap: 10px;
@@ -2222,6 +2221,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     </aside>
   </div>
   <script type="application/json" id="mv-mine">{{ map_pins|tojson }}</script>
+  <script type="application/json" id="mv-places">{{ map_places|tojson }}</script>
   <script type="application/json" id="mv-near">{{ map_nearby|tojson }}</script>
   {% elif view_mode == 'career' %}
   <style>
@@ -8493,6 +8493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 {% if view_mode == 'map' %}
 <script src="/static/vendor/leaflet/leaflet.js?v=1.9.4"></script>
+<script src="/static/site/sunnymap.js?v=1"></script>
 <script>
 (function () {
   if (!window.L) return;
@@ -8525,10 +8526,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return out;
   }
 
-  var map = L.map('mv-map', { scrollWheelZoom: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, className: 'osm-tiles', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+  var map = L.map('mv-map', { scrollWheelZoom: true, minZoom: 4, maxZoom: 14 }).setView([21.5, 79], 5);
+  // Our own illustrated map in the site's colours (static/site/sunnymap.js): no tile server, no key.
+  if (window.SunnyMap) SunnyMap.paint(map, data('mv-places'));
   var layer = L.layerGroup().addTo(map);
 
   function popupHtml(v) {

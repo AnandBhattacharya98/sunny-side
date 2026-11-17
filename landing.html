@@ -597,9 +597,6 @@ section { position: relative; }
 .map-wrap .leaflet-container a.btn-p { color: var(--ink); }
 .map-wrap .leaflet-container a.lnk { color: var(--mut); }
 .map-wrap .leaflet-container { font-family: var(--font-sans); }
-/* OpenStreetMap tiles, softened to the page's warm palette; inverted into a night map in dark mode */
-.map-wrap .osm-tiles { filter: grayscale(1) sepia(.45) saturate(1.05) hue-rotate(-6deg) contrast(.62) brightness(1.15); opacity: .5; }
-[data-theme="dark"] .map-wrap .osm-tiles { filter: grayscale(1) invert(1) sepia(.45) saturate(1.1) hue-rotate(-8deg) contrast(.72) brightness(.72); opacity: .55; }
 .map-wrap .leaflet-bar { border: 1px solid var(--bdr-strong) !important; border-radius: 12px !important; overflow: hidden; box-shadow: none !important; }
 .map-wrap .leaflet-bar a { background: var(--sur); color: var(--txt); width: 32px; height: 32px; line-height: 32px; border-color: var(--bdr) !important; }
 .map-wrap .leaflet-bar a:hover { background: var(--glow); }
@@ -800,6 +797,7 @@ section { position: relative; }
       <p class="map-note">Pins mark the area a role is listed in, not the exact office.</p>
     </div>
     <script type="application/json" id="pins-data">{{ live.pins|tojson }}</script>
+    <script type="application/json" id="places-data">{{ map_places|tojson }}</script>
   </section>
   {% endif %}
 
@@ -1272,6 +1270,7 @@ section { position: relative; }
 
   /* ---------- Jobs near you ---------- */
   var mapEl = document.getElementById('jobs-map');
+  var PLACES = []; try { PLACES = JSON.parse(document.getElementById('places-data').textContent) || []; } catch (e) {}
   var dataEl = document.getElementById('pins-data');
   if (!mapEl || !dataEl) return;
   var pins = [];
@@ -1430,11 +1429,8 @@ section { position: relative; }
 
   function start() {
     map = L.map(mapEl, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false, zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
-    // OpenStreetMap's own tiles: no key needed. Tinted warm in CSS, and inverted for dark mode.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, className: 'osm-tiles',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    // Our own illustrated map in the site's colours (static/site/sunnymap.js): no tile server, no key.
+    SunnyMap.paint(map, PLACES);
     map.on('focus', function () { map.scrollWheelZoom.enable(); });
     map.on('blur', function () { map.scrollWheelZoom.disable(); });
     var last = map.getZoom() < CITY_ZOOM;
@@ -1456,8 +1452,15 @@ section { position: relative; }
   whenSeen(mapEl, function () {
     var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/static/vendor/leaflet/leaflet.css?v=1.9.4';
     document.head.appendChild(css);
+    var css2 = document.createElement('link'); css2.rel = 'stylesheet'; css2.href = '/static/site/sunnymap.css?v=1';
+    document.head.appendChild(css2);
     var js = document.createElement('script'); js.src = '/static/vendor/leaflet/leaflet.js?v=1.9.4';
-    js.onload = function () { mapEl.getBoundingClientRect(); start(); };
+    js.onload = function () {
+      var js2 = document.createElement('script'); js2.src = '/static/site/sunnymap.js?v=1';
+      js2.onload = function () { mapEl.getBoundingClientRect(); start(); };
+      js2.onerror = js.onerror;
+      document.body.appendChild(js2);
+    };
     js.onerror = function () { askTxt.textContent = "The map didn't load. The list on the right still works."; locBtn.hidden = true; };
     document.body.appendChild(js);
   }, '300px 0px');
