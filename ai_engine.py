@@ -279,6 +279,36 @@ def _normalize_ai_score(data) -> dict:
     }
 
 
+SKILLS_LEXICON = [
+    "python", "sql", "javascript", "java", "c++", "c#", "go", "rust", "ruby", "php", "typescript",
+    "product roadmapping", "product management", "user research", "agile", "scrum", "kanban", "jira", "confluence",
+    "stakeholder management", "go-to-market", "gtm", "market research", "ab testing", "a/b testing", "data analytics",
+    "tableau", "power bi", "looker", "mixpanel", "amplitude", "figma", "sketch", "wireframing", "prototyping",
+    "machine learning", "deep learning", "nlp", "llm", "conversational ai", "prompt engineering", "retell", "deepgram",
+    "bfsi", "fintech", "saas", "edtech", "healthcare", "e-commerce", "retail", "cloud computing", "aws", "gcp", "azure",
+    "docker", "kubernetes", "git", "github", "ci/cd", "devops",
+    "react", "node.js", "django", "flask", "spring", "html", "css", "excel", "statistics", "spark", "airflow",
+    "salesforce", "hubspot", "crm", "seo", "sem", "content marketing", "performance marketing", "copywriting",
+    "b2b", "b2c", "lead generation", "negotiation", "account management", "financial modeling", "accounting",
+    "supply chain", "operations", "logistics", "project management", "six sigma", "user experience", "ux", "ui",
+    "adobe", "photoshop", "illustrator", "communication", "leadership", "customer success", "recruiting"
+]
+
+
+def find_job_skills(title: str, description: str) -> set:
+    """Lexicon skills a posting's title or description names, lowercased."""
+    text = f"{title or ''}\n{description or ''}".lower()
+    found = {w for w in SKILLS_LEXICON if re.search(rf"\b{re.escape(w)}\b", text)}
+    # "go" on its own is the language; "go-to-market" and "go live" aren't.
+    if "go" in found and not re.search(r"\b(golang|go\s*\(lang\)|go\b(?![- ]to|\s+live))", text):
+        found.discard("go")
+    return found
+
+
+def skill_label(skill: str) -> str:
+    return skill.upper() if len(skill) <= 3 else skill.title()
+
+
 def score_job(title: str, company: str, description: str, resume_text: str = None, api_key: str = None, user_id: int = 1,
               force_local: bool = False) -> dict:
     if not resume_text:
@@ -334,28 +364,8 @@ def score_job(title: str, company: str, description: str, resume_text: str = Non
         [d.lower().strip() for d in resume_profile.get("domains", [])]
     )
 
-    skills_lexicon = [
-        "python", "sql", "javascript", "java", "c++", "c#", "go", "rust", "ruby", "php", "typescript",
-        "product roadmapping", "product management", "user research", "agile", "scrum", "kanban", "jira", "confluence",
-        "stakeholder management", "go-to-market", "gtm", "market research", "ab testing", "a/b testing", "data analytics",
-        "tableau", "power bi", "looker", "mixpanel", "amplitude", "figma", "sketch", "wireframing", "prototyping",
-        "machine learning", "deep learning", "nlp", "llm", "conversational ai", "prompt engineering", "retell", "deepgram",
-        "bfsi", "fintech", "saas", "edtech", "healthcare", "e-commerce", "retail", "cloud computing", "aws", "gcp", "azure",
-        "docker", "kubernetes", "git", "github", "ci/cd", "devops",
-        "react", "node.js", "django", "flask", "spring", "html", "css", "excel", "statistics", "spark", "airflow",
-        "salesforce", "hubspot", "crm", "seo", "sem", "content marketing", "performance marketing", "copywriting",
-        "b2b", "b2c", "lead generation", "negotiation", "account management", "financial modeling", "accounting",
-        "supply chain", "operations", "logistics", "project management", "six sigma", "user experience", "ux", "ui",
-        "adobe", "photoshop", "illustrator", "communication", "leadership", "customer success", "recruiting"
-    ]
 
-    job_skills = set()
-    desc_lower = description.lower()
-    title_lower = title.lower()
-    for word in skills_lexicon:
-        pattern = rf"\b{re.escape(word)}\b"
-        if re.search(pattern, desc_lower) or re.search(pattern, title_lower):
-            job_skills.add(word)
+    job_skills = find_job_skills(title, description)
 
     matched = []
     missing = []

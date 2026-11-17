@@ -84,7 +84,7 @@ def test_company_boards_keep_matching_india_roles(conn, fake_boards):
         ("Paytm", "Associate Product Manager"),
     }
     gh = next(j for j in jobs if j["company"] == "Razorpay")
-    assert gh["description"] == "Own the\nads\nroadmap."
+    assert gh["description"] == "Own the ads roadmap."
     assert gh["url"] == "https://job-boards.greenhouse.io/x/jobs/7001"
     assert gh["source"] == "direct" and gh["job_id"].endswith("_u1")
     assert any("boards-api.eu.greenhouse.io/v1/boards/groww" in u for u in fake_boards)

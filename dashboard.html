@@ -2207,6 +2207,137 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       .cs-path { transform: none !important; }
     }
     @media (max-width: 768px) { .cs-track { flex-basis: 100%; width: 100%; } }
+
+    /* Filters for live openings */
+    .cs-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 12px; }
+    .cs-fl { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .cs-fl > span { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--hin); }
+    .cs-fl select, .cs-ftext { appearance: none; -webkit-appearance: none; font: inherit; font-size: 12.5px; color: var(--txt); background: var(--sur);
+      border: 1px solid var(--bdr-strong); border-radius: 10px; padding: 7px 28px 7px 10px; outline: none; cursor: pointer; min-width: 0; max-width: 100%;
+      background-image: linear-gradient(45deg, transparent 50%, var(--mut) 50%), linear-gradient(135deg, var(--mut) 50%, transparent 50%);
+      background-position: right 13px center, right 9px center; background-size: 4px 4px; background-repeat: no-repeat; transition: border-color .15s, box-shadow .15s; }
+    .cs-ftext { background-image: none; padding-right: 10px; cursor: text; width: 200px; }
+    .cs-fl select:focus, .cs-ftext:focus { border-color: var(--yolk); }
+    .cs-fl select.set { border-color: var(--yolk); box-shadow: 0 0 0 1px var(--yolk) inset; background-color: var(--purl); }
+    .cs-chk { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--txt); padding: 7px 12px; border-radius: 10px;
+      border: 1px solid var(--bdr-strong); background: var(--sur); cursor: pointer; user-select: none; transition: border-color .15s, background .15s; }
+    .cs-chk input { accent-color: var(--yolk); margin: 0; }
+    .cs-chk:has(input:checked) { border-color: var(--yolk); background: var(--purl); }
+    .cs-fclear { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--mut); background: none; border: 0; padding: 8px 6px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    .cs-fclear[hidden] { display: none; }
+    .cs-fcount { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); margin: 0 0 10px; }
+    .cs-ftoggle { display: none; }
+    @media (max-width: 768px) {
+      .cs-ftoggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: 11.5px; font-weight: 700;
+        border-radius: 999px; padding: 8px 14px; border: 1px solid var(--bdr-strong); background: var(--sur); color: var(--txt); cursor: pointer; }
+      .cs-ftoggle::after { content: "▾"; transition: transform .2s; }
+      .cs-ftoggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+      #cs-fbadge:not(:empty) { background: var(--yolk); color: var(--ink); border-radius: 999px; padding: 0 7px; font-size: 10.5px; }
+      .cs-filters { display: none; grid-template-columns: 1fr 1fr; animation: csRise .3s cubic-bezier(.2,.8,.2,1) both; }
+      .cs-filters.open { display: grid; }
+      .cs-fl select, .cs-ftext { width: 100%; }
+      .cs-fclear { grid-column: 1 / -1; justify-self: start; }
+    }
+
+    /* Result cards open the details panel */
+    .cs-card { cursor: pointer; position: relative; transition: border-color .15s, transform .2s, box-shadow .2s; }
+    .cs-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -20px rgba(42,35,21,.45); }
+    .cs-card:focus-visible { outline: 2px solid var(--yolk); outline-offset: 2px; }
+    .cs-card .wr-title { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--txt); }
+    .cs-card:hover .wr-title { text-decoration: underline; text-decoration-color: var(--yolk); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+    .cs-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cs-chip { font-family: var(--font-mono); font-size: 10px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--bdr-strong); color: var(--txt); white-space: nowrap; }
+    .cs-chip.pay { background: var(--purl); border-color: transparent; }
+    .cs-chip.match { border-color: transparent; font-weight: 700; color: var(--ink); background: var(--yolk); }
+    .cs-chip.match.mid { background: var(--purl); color: var(--purt); }
+    .cs-chip.match.low { background: transparent; color: var(--mut); border-color: var(--bdr-strong); }
+    .cs-ext { font-family: var(--font-mono); font-size: 11px; color: var(--hin); text-decoration: none; padding: 4px 6px; border-radius: 6px; }
+    .cs-ext:hover { color: var(--purt); }
+
+    /* Details panel */
+    .cs-sheet { position: fixed; inset: 0; z-index: 11600; display: flex; justify-content: flex-end; }
+    .cs-sheet[hidden] { display: none; }
+    .cs-scrim { position: absolute; inset: 0; background: rgba(13,12,10,.42); backdrop-filter: blur(3px); animation: csFadeIn .25s ease both; }
+    .cs-panel { position: relative; width: min(640px, 100%); height: 100%; background: var(--bg); color: var(--txt); border-left: 1px solid var(--bdr);
+      display: flex; flex-direction: column; box-shadow: -24px 0 60px -30px rgba(0,0,0,.45); animation: csSlideIn .38s cubic-bezier(.2,.8,.2,1) both; outline: none; }
+    .cs-sheet.closing .cs-panel { animation: csSlideOut .24s cubic-bezier(.5,0,.75,0) forwards; }
+    .cs-sheet.closing .cs-scrim { animation: csFadeOut .24s ease forwards; }
+    .cs-d-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--bdr); display: flex; flex-direction: column; gap: 8px; }
+    .cs-d-top { display: flex; align-items: flex-start; gap: 12px; }
+    .cs-d-title { font-family: var(--font-sans); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; margin: 0; flex: 1; }
+    .cs-d-sub { font-size: 13px; color: var(--mut); }
+    .cs-d-sub b { color: var(--txt); font-weight: 600; }
+    .cs-d-body { flex: 1; overflow-y: auto; padding: 18px 22px 28px; display: flex; flex-direction: column; gap: 18px; overscroll-behavior: contain; }
+    .cs-d-foot { padding: 12px 22px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--bdr); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; background: var(--bg); }
+    .cs-d-foot a.cs-btn { text-decoration: none; }
+    .cs-box { border: 1px solid var(--bdr); border-radius: 14px; background: var(--sur); padding: 14px 16px; }
+    .cs-box h3 { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+    .cs-box h3 .n { font-weight: 400; color: var(--hin); letter-spacing: .04em; }
+    .cs-box h3 a { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--purt); text-decoration: none; font-weight: 700; }
+    .cs-box h3 a:hover { text-decoration: underline; }
+    .cs-match { display: flex; gap: 16px; align-items: center; }
+    .cs-ring { flex: 0 0 auto; width: 92px; height: 92px; position: relative; }
+    .cs-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .cs-ring .bg { stroke: var(--bdr); }
+    .cs-ring .fg { stroke: var(--yolk); stroke-linecap: round; transition: stroke-dashoffset 1.1s cubic-bezier(.2,.8,.2,1); }
+    .cs-ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-sans); font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+    .cs-ring b small { font-size: 12px; font-weight: 600; color: var(--mut); }
+    .cs-verdict { font-family: var(--font-sans); font-size: 17px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 4px; }
+    .cs-msum { font-size: 13px; line-height: 1.5; color: var(--mut); margin: 0; }
+    .cs-mode-note { font-family: var(--font-mono); font-size: 10px; color: var(--hin); margin-top: 8px; }
+    .cs-have { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cs-have span { font-size: 12px; border-radius: 999px; padding: 3px 10px; background: color-mix(in srgb, var(--ok-txt) 12%, transparent); color: var(--ok-txt); font-weight: 600; }
+    .cs-have span::before { content: "✓ "; }
+    .cs-miss { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .cs-miss li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--bdr-strong);
+      animation: csRise .4s calc(var(--k, 0) * 60ms + 150ms) cubic-bezier(.2,.8,.2,1) both; }
+    .cs-miss .sk { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cs-miss .imp { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--purl); color: var(--purt); font-weight: 700; }
+    .cs-miss .imp.nice { background: transparent; border: 1px solid var(--bdr-strong); color: var(--mut); }
+    .cs-miss .why { grid-column: 1; font-size: 12.5px; color: var(--mut); line-height: 1.45; }
+    .cs-miss .go { grid-column: 2; grid-row: 1 / span 2; font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap;
+      border-radius: 999px; padding: 7px 12px; background: var(--txt); color: var(--bg); transition: transform .15s, box-shadow .2s; }
+    .cs-miss .go:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(255,167,0,.8); }
+    .cs-none { font-size: 13px; color: var(--mut); margin: 0; }
+    .cs-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 4px; }
+    .cs-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; margin: 0; }
+    .cs-facts div { display: flex; flex-direction: column; gap: 2px; }
+    .cs-facts dt { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--hin); }
+    .cs-facts dd { margin: 0; font-size: 13px; font-weight: 600; }
+    .cs-desc { font-size: 13.5px; line-height: 1.6; color: var(--txt); position: relative; }
+    .cs-desc p { margin: 0 0 8px; }
+    .cs-desc h4 { font-family: var(--font-sans); font-size: 14px; font-weight: 700; margin: 14px 0 6px; }
+    .cs-desc ul { margin: 0 0 8px; padding-left: 18px; }
+    .cs-desc li { margin-bottom: 3px; }
+    .cs-desc.clamped { max-height: 340px; overflow: hidden; }
+    .cs-desc.clamped::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: linear-gradient(transparent, var(--sur)); }
+    .cs-more { margin-top: 8px; }
+    .cs-skel-line { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--bdr) 25%, var(--sur) 50%, var(--bdr) 75%); background-size: 200% 100%; animation: csShimmer 1.2s linear infinite; margin-bottom: 10px; }
+    @keyframes csShimmer { to { background-position: -200% 0; } }
+    @keyframes csSlideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes csSlideOut { to { transform: translateX(40px); opacity: 0; } }
+    @keyframes csFadeIn { from { opacity: 0; } }
+    @keyframes csFadeOut { to { opacity: 0; } }
+    @media (max-width: 768px) {
+      .cs-sheet { align-items: flex-end; }
+      .cs-panel { width: 100%; height: 92vh; height: 92dvh; border-left: 0; border-radius: 18px 18px 0 0; animation-name: csSlideUp; }
+      .cs-sheet.closing .cs-panel { animation-name: csSlideDown; }
+      .cs-d-head { padding: 16px 16px 12px; }
+      .cs-d-body { padding: 14px 16px 24px; }
+      .cs-d-foot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+      .cs-d-foot .cs-btn { flex: 1; text-align: center; }
+      .cs-d-title { font-size: 18px; }
+      .cs-ring { width: 76px; height: 76px; }
+      .cs-miss li { grid-template-columns: 1fr; }
+      .cs-miss .go { grid-column: 1; grid-row: auto; justify-self: start; }
+    }
+    @keyframes csSlideUp { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes csSlideDown { to { transform: translateY(60px); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .cs-panel, .cs-scrim, .cs-miss li, .cs-skel-line, .cs-sheet.closing .cs-panel, .cs-sheet.closing .cs-scrim { animation: none !important; }
+      .cs-ring .fg, .cs-card { transition: none; }
+      .cs-card:hover { transform: none; }
+    }
   </style>
   <div class="board-header">
     <h2 class="board-title">Career Switch</h2>
@@ -2254,6 +2385,41 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         <input type="search" id="cs-location" placeholder="Anywhere in India" aria-label="Location" maxlength="60" autocomplete="off" style="flex:0 1 180px;">
         <button type="submit" class="cs-btn">Find openings</button>
       </form>
+      <button type="button" class="cs-ftoggle" id="cs-ftoggle" aria-expanded="false" aria-controls="cs-filters" onclick="toggleCareerFilters()">Filters<span id="cs-fbadge"></span></button>
+      <div class="cs-filters" id="cs-filters" role="group" aria-label="Filter openings">
+        <label class="cs-fl"><span>Date posted</span>
+          <select id="cs-f-days" data-search onchange="careerFilterChanged(this)">
+            <option value="">Any time</option><option value="1">Past 24 hours</option><option value="3">Past 3 days</option>
+            <option value="7">Past week</option><option value="30">Past month</option>
+          </select></label>
+        <label class="cs-fl"><span>Work mode</span>
+          <select id="cs-f-mode" data-search onchange="careerFilterChanged(this)">
+            <option value="">Any</option><option value="remote">Remote</option><option value="onsite">On-site or hybrid</option>
+          </select></label>
+        <label class="cs-fl"><span>Level</span>
+          <select id="cs-f-level" onchange="careerFilterChanged(this)">
+            <option value="">Any level</option><option value="intern">Internship</option><option value="entry">Entry</option>
+            <option value="mid">Mid</option><option value="senior">Senior</option><option value="lead">Lead and above</option>
+          </select></label>
+        <label class="cs-fl"><span>Job type</span>
+          <select id="cs-f-type" onchange="careerFilterChanged(this)">
+            <option value="">Any type</option><option value="full-time">Full-time</option><option value="part-time">Part-time</option>
+            <option value="contract">Contract</option><option value="internship">Internship</option>
+          </select></label>
+        <label class="cs-fl"><span>Source</span>
+          <select id="cs-f-source" onchange="careerFilterChanged(this)">
+            <option value="">All sources</option><option value="linkedin">LinkedIn</option><option value="direct">Company sites</option>
+            <option value="remotive">Remotive</option><option value="jobicy">Jobicy</option><option value="arbeitnow">Arbeitnow</option>
+          </select></label>
+        <label class="cs-fl"><span>Sort by</span>
+          <select id="cs-f-sort" onchange="careerFilterChanged(this)">
+            <option value="">Relevance</option><option value="new">Newest first</option><option value="match">Best match</option>
+          </select></label>
+        <label class="cs-fl cs-fsearch"><span>Company or keyword</span>
+          <input type="search" class="cs-ftext" id="cs-f-text" placeholder="e.g. Swiggy" maxlength="60" autocomplete="off" oninput="careerFilterChanged(this)"></label>
+        <label class="cs-chk"><input type="checkbox" id="cs-f-pay" onchange="careerFilterChanged(this)"> Pay listed</label>
+        <button type="button" class="cs-fclear" id="cs-f-clear" hidden onclick="clearCareerFilters()">Clear filters</button>
+      </div>
     </section>
 
     <section id="cs-results" class="web-results" hidden aria-live="polite" style="margin:0;">
@@ -2267,9 +2433,29 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
           <button type="button" class="wr-close" onclick="closeCareerResults()" aria-label="Close openings">&times;</button>
         </div>
       </div>
+      <p class="cs-fcount" id="cs-fcount" hidden></p>
       <div class="wr-list" id="cs-list"></div>
       <div class="wr-foot" id="cs-foot"></div>
     </section>
+  </div>
+
+  <div class="cs-sheet" id="cs-sheet" hidden>
+    <div class="cs-scrim" onclick="closeCareerDetails()"></div>
+    <aside class="cs-panel" id="cs-panel" role="dialog" aria-modal="true" aria-labelledby="cs-d-title" tabindex="-1">
+      <header class="cs-d-head">
+        <div class="cs-d-top">
+          <h2 class="cs-d-title" id="cs-d-title"></h2>
+          <button type="button" class="wr-close" onclick="closeCareerDetails()" aria-label="Close details">&times;</button>
+        </div>
+        <div class="cs-d-sub" id="cs-d-sub"></div>
+        <div class="cs-chips" id="cs-d-chips"></div>
+      </header>
+      <div class="cs-d-body" id="cs-d-body"></div>
+      <footer class="cs-d-foot">
+        <a class="cs-btn ghost" id="cs-d-apply" href="#" target="_blank" rel="noopener noreferrer">Open posting ↗</a>
+        <button type="button" class="cs-btn" id="cs-d-add" onclick="addCareerFromDetails(this)">Add to board</button>
+      </footer>
+    </aside>
   </div>
   {% elif view_mode == 'calls' %}
   <style>
@@ -8145,7 +8331,7 @@ document.addEventListener('DOMContentLoaded', () => {
 {% if view_mode == 'career' %}
 <script>
 // ── Career Switch: suggested paths and live openings for each ──
-const CAREER = { paths: [], results: [], added: 0, seq: 0, active: null };
+const CAREER = { paths: [], results: [], data: null, last: null, added: 0, seq: 0, detailSeq: 0, open: null, opener: null, active: null };
 const CS_SOURCE_LABEL = { linkedin: 'LinkedIn', direct: 'Company site', remotive: 'Remotive', jobicy: 'Jobicy', arbeitnow: 'Arbeitnow' };
 
 function csAge(iso) {
@@ -8288,23 +8474,39 @@ function exploreCareerField() {
   searchCareerJobs(q, document.getElementById('cs-location').value.trim(), q);
 }
 
+const CS_LEVEL_LABEL = { intern: 'Internship', entry: 'Entry level', mid: 'Mid level', senior: 'Senior', lead: 'Lead+' };
+const CS_TYPE_LABEL = { 'full-time': 'Full-time', 'part-time': 'Part-time', contract: 'Contract', internship: 'Internship' };
+const CS_DAYS_LABEL = { 1: 'past 24 hours', 3: 'past 3 days', 7: 'past week', 30: 'past month' };
+
+function csVal(id) { return document.getElementById(id).value; }
+
+function careerSearchFilters() {
+  return { days: csVal('cs-f-days'), mode: csVal('cs-f-mode') };
+}
+
 async function searchCareerJobs(q, loc, label) {
   const seq = ++CAREER.seq;
+  CAREER.last = { q, loc, label };
   const panel = document.getElementById('cs-results');
   const list = document.getElementById('cs-list');
   const foot = document.getElementById('cs-foot');
-  document.getElementById('cs-query').innerHTML = `${esc(label)}<em>${esc(loc || 'India')}</em>`;
+  const f = careerSearchFilters();
+  const where = f.mode === 'remote' ? 'Remote' : (loc || 'India');
+  document.getElementById('cs-query').innerHTML = `${esc(label)}<em>${esc(where)}${f.days ? ' · ' + esc(CS_DAYS_LABEL[f.days]) : ''}</em>`;
   foot.textContent = 'Searching LinkedIn and company career pages…';
+  document.getElementById('cs-fcount').hidden = true;
   list.innerHTML = '<div class="wr-skel"></div>'.repeat(3);
   panel.hidden = false;
   panel.scrollIntoView({ behavior: CS_CALM.matches ? 'auto' : 'smooth', block: 'start' });
   try {
-    const res = await fetch(`/api/career-switch/jobs?q=${encodeURIComponent(q)}&location=${encodeURIComponent(loc)}`);
+    const params = new URLSearchParams({ q, location: loc, days: f.days, mode: f.mode });
+    const res = await fetch(`/api/career-switch/jobs?${params}`);
     const data = await res.json();
     if (seq !== CAREER.seq) return;
     if (!data.ok) throw new Error(data.error || 'Search failed.');
     CAREER.results = data.results;
-    renderCareerResults(data);
+    CAREER.data = data;
+    renderCareerResults();
   } catch (e) {
     if (seq !== CAREER.seq) return;
     list.innerHTML = `<div class="wr-empty">${esc(e.message || 'Search failed.')} Try again in a moment.</div>`;
@@ -8312,29 +8514,137 @@ async function searchCareerJobs(q, loc, label) {
   }
 }
 
-function renderCareerResults(data) {
+// Level, type, source, pay, keyword and sort work on the results already loaded;
+// date posted and work mode change what the sources are asked for, so they search again.
+function careerFilterChanged(el) {
+  if (el && el.tagName === 'SELECT') el.classList.toggle('set', !!el.value);
+  syncCareerClear();
+  if (el && el.hasAttribute('data-search')) {
+    if (CAREER.last && !document.getElementById('cs-results').hidden) searchCareerJobs(CAREER.last.q, CAREER.last.loc, CAREER.last.label);
+    return;
+  }
+  if (CAREER.data) renderCareerResults();
+}
+
+function careerFiltersActive() {
+  return ['cs-f-days', 'cs-f-mode', 'cs-f-level', 'cs-f-type', 'cs-f-source', 'cs-f-sort', 'cs-f-text'].some(id => csVal(id).trim())
+    || document.getElementById('cs-f-pay').checked;
+}
+
+function syncCareerClear() {
+  document.getElementById('cs-f-clear').hidden = !careerFiltersActive();
+  const n = ['cs-f-days', 'cs-f-mode', 'cs-f-level', 'cs-f-type', 'cs-f-source', 'cs-f-text'].filter(id => csVal(id).trim()).length
+    + (document.getElementById('cs-f-pay').checked ? 1 : 0);
+  document.getElementById('cs-fbadge').textContent = n ? String(n) : '';
+}
+
+function toggleCareerFilters() {
+  const box = document.getElementById('cs-filters');
+  const open = box.classList.toggle('open');
+  document.getElementById('cs-ftoggle').setAttribute('aria-expanded', open);
+}
+
+function clearCareerFilters() {
+  const searchWasSet = !!(csVal('cs-f-days') || csVal('cs-f-mode'));
+  document.querySelectorAll('#cs-filters select').forEach(s => { s.value = ''; s.classList.remove('set'); });
+  document.getElementById('cs-f-text').value = '';
+  document.getElementById('cs-f-pay').checked = false;
+  syncCareerClear();
+  if (searchWasSet && CAREER.last && !document.getElementById('cs-results').hidden) searchCareerJobs(CAREER.last.q, CAREER.last.loc, CAREER.last.label);
+  else if (CAREER.data) renderCareerResults();
+}
+
+function visibleCareerResults() {
+  const level = csVal('cs-f-level'), type = csVal('cs-f-type'), source = csVal('cs-f-source'), sort = csVal('cs-f-sort');
+  const text = csVal('cs-f-text').trim().toLowerCase();
+  const pay = document.getElementById('cs-f-pay').checked;
+  let rows = CAREER.results.map((r, i) => ({ r, i })).filter(({ r }) =>
+    (!level || r.level === level) && (!type || r.type === type) && (!source || r.source === source) && (!pay || r.salary)
+    && (!text || `${r.title} ${r.company} ${r.location} ${r.snippet || ''}`.toLowerCase().includes(text)));
+  if (sort === 'new') rows.sort((a, b) => (Date.parse(b.r.posted_at) || 0) - (Date.parse(a.r.posted_at) || 0));
+  if (sort === 'match') rows.sort((a, b) => (b.r.match ?? -1) - (a.r.match ?? -1));
+  return rows;
+}
+
+function csMatchChip(m) {
+  if (m == null) return '';
+  const cls = m >= 70 ? '' : m >= 45 ? ' mid' : ' low';
+  return `<span class="cs-chip match${cls}" title="Quick match from the posting's text. Open it for the full comparison.">${m}% match</span>`;
+}
+
+function csFactChips(r) {
+  return [
+    r.remote ? '<span class="cs-chip">Remote</span>' : '',
+    r.salary ? `<span class="cs-chip pay">${esc(r.salary)}</span>` : '',
+    r.level && r.level !== 'mid' ? `<span class="cs-chip">${esc(CS_LEVEL_LABEL[r.level] || r.level)}</span>` : '',
+    r.type && r.type !== 'full-time' ? `<span class="cs-chip">${esc(CS_TYPE_LABEL[r.type] || r.type)}</span>` : '',
+  ].join('');
+}
+
+function renderCareerResults() {
+  const data = CAREER.data;
   const list = document.getElementById('cs-list');
-  if (!data.results.length) {
-    list.innerHTML = '<div class="wr-empty">Nothing open for this right now. Try another path, or clear the location.</div>';
+  const rows = visibleCareerResults();
+  const count = document.getElementById('cs-fcount');
+  const total = data.results.length;
+  count.hidden = !total || rows.length === total;
+  count.textContent = `Showing ${rows.length} of ${total} after your filters.`;
+  if (!total) {
+    const filtered = data.days || data.mode;
+    list.innerHTML = `<div class="wr-empty">Nothing open for this right now. ${filtered ? 'Try a wider date range or any work mode.' : 'Try another path, or clear the location.'}</div>`;
+  } else if (!rows.length) {
+    list.innerHTML = '<div class="wr-empty">No openings match these filters. <button type="button" class="cs-fclear" onclick="clearCareerFilters()">Clear filters</button></div>';
   } else {
-    list.innerHTML = data.results.map((r, i) => `
-      <article class="wr-item" style="animation-delay:${Math.min(i, 8) * 35}ms">
-        <a class="wr-title" href="${/^https?:\/\//i.test(r.url) ? esc(r.url) : '#'}" target="_blank" rel="noopener noreferrer" title="Open the posting">${esc(r.title)}<span class="wr-arrow" aria-hidden="true">↗</span></a>
+    list.innerHTML = rows.map(({ r, i }, k) => `
+      <article class="wr-item cs-card" data-i="${i}" style="animation-delay:${Math.min(k, 8) * 35}ms" onclick="careerCardClick(event, ${i})">
+        <button type="button" class="wr-title" onclick="openCareerDetails(${i})" title="See full details and how you compare">${esc(r.title)}</button>
         <div class="wr-sub"><b>${esc(r.company)}</b> · ${esc(r.location)}</div>
+        <div class="cs-chips">${csMatchChip(r.match)}${csFactChips(r)}</div>
         <div class="wr-meta">
           <span class="wr-src">${esc(CS_SOURCE_LABEL[r.source] || r.source)}</span>
           <span class="wr-age">${esc(csAge(r.posted_at))}</span>
           <span class="wr-spacer"></span>
+          <a class="cs-ext" href="${/^https?:\/\//i.test(r.url) ? esc(r.url) : '#'}" target="_blank" rel="noopener noreferrer" title="Open the original posting" aria-label="Open the original posting">↗</a>
           <button type="button" class="wr-add" data-i="${i}" onclick="addCareerResult(this)" ${r.on_board ? 'disabled' : ''}>${r.on_board ? 'On board' : 'Add to board'}</button>
         </div>
       </article>`).join('');
   }
-  const n = data.results.length;
   const failed = (data.failed || []).map(f => CS_SOURCE_LABEL[f] || f);
-  let text = `${n} ${n === 1 ? 'opening' : 'openings'} from LinkedIn and company career pages`;
+  let text = `${total} ${total === 1 ? 'opening' : 'openings'} from LinkedIn and company career pages`;
   if (data.hidden) text += `. Hid ${data.hidden} that ${data.hidden === 1 ? 'looks' : 'look'} like ${data.current_role ? 'your current ' + data.current_role + ' search' : 'your current search'}`;
+  if (data.older) text += `. Left out ${data.older} posted earlier or without a date`;
   if (failed.length) text += `. ${failed.join(' and ')} didn't answer this time`;
   document.getElementById('cs-foot').textContent = text + '.';
+}
+
+function careerCardClick(e, i) {
+  if (e.target.closest('button, a')) return;
+  openCareerDetails(i);
+}
+
+async function addCareerJob(r, btn) {
+  const res = await fetch('/api/jobs/search/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: r.source, ref: r.ref, title: r.title, company: r.company, location: r.location, url: r.url, posted_at: r.posted_at }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Could not add it.');
+  r.on_board = true;
+  if (!data.already) {
+    careerBurst(btn);
+    CAREER.added++;
+    const link = document.getElementById('cs-reload');
+    link.textContent = `See ${CAREER.added} on board`;
+    link.hidden = false;
+    toast('Added to your Inbox. Scoring it now.');
+  }
+  // Keep the card's button in step with the details panel
+  document.querySelectorAll(`#cs-list .wr-add[data-i="${CAREER.results.indexOf(r)}"]`).forEach(b => {
+    b.disabled = true;
+    b.textContent = data.already ? 'On board' : 'Added ✓';
+    b.classList.toggle('done', !data.already);
+  });
+  return data;
 }
 
 async function addCareerResult(btn) {
@@ -8343,28 +8653,214 @@ async function addCareerResult(btn) {
   btn.disabled = true;
   btn.textContent = 'Adding…';
   try {
-    const res = await fetch('/api/jobs/search/add', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: r.source, ref: r.ref, title: r.title, company: r.company, location: r.location, url: r.url, posted_at: r.posted_at }),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Could not add it.');
-    r.on_board = true;
-    btn.textContent = data.already ? 'On board' : 'Added ✓';
-    btn.classList.toggle('done', !data.already);
-    if (!data.already) {
-      careerBurst(btn);
-      CAREER.added++;
-      const link = document.getElementById('cs-reload');
-      link.textContent = `See ${CAREER.added} on board`;
-      link.hidden = false;
-      toast('Added to your Inbox. Scoring it now.');
-    }
+    await addCareerJob(r, btn);
   } catch (e) {
     btn.disabled = false;
     btn.textContent = 'Add to board';
     toast(e.message || 'Could not add it.');
   }
+}
+
+// ── Job details: the full posting and how the resume compares ──
+function csLearnAll(missing) {
+  return '/learn?' + missing.map(m => 'skill=' + encodeURIComponent(m.skill)).join('&') + '&from=career-switch';
+}
+
+function csDescriptionHtml(text) {
+  const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  let html = '', inList = false;
+  for (const line of lines) {
+    const bullet = /^[•\-*·▪●◦]\s*/.test(line);
+    if (bullet) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${esc(line.replace(/^[•\-*·▪●◦]\s*/, ''))}</li>`;
+      continue;
+    }
+    if (inList) { html += '</ul>'; inList = false; }
+    const heading = line.length <= 60 && (/:$/.test(line) || (!/[.!?]$/.test(line) && line.split(' ').length <= 6));
+    html += heading ? `<h4>${esc(line.replace(/:$/, ''))}</h4>` : `<p>${esc(line)}</p>`;
+  }
+  return html + (inList ? '</ul>' : '');
+}
+
+function csDetailsChips(j, match) {
+  return [
+    match != null ? csMatchChip(match) : '',
+    csFactChips({ ...j, level: j.level, type: j.type }),
+    `<span class="cs-chip">${esc(CS_SOURCE_LABEL[j.source] || j.source)}</span>`,
+    j.posted_at && csAge(j.posted_at) ? `<span class="cs-chip">Posted ${esc(csAge(j.posted_at))}</span>` : '',
+  ].join('');
+}
+
+function openCareerDetails(i) {
+  const r = CAREER.results[i];
+  if (!r) return;
+  const seq = ++CAREER.detailSeq;
+  CAREER.open = i;
+  CAREER.opener = document.activeElement;
+  const sheet = document.getElementById('cs-sheet');
+  sheet.classList.remove('closing');
+  sheet.hidden = false;
+  document.getElementById('cs-d-title').textContent = r.title;
+  document.getElementById('cs-d-sub').innerHTML = `<b>${esc(r.company)}</b> · ${esc(r.location)}`;
+  document.getElementById('cs-d-chips').innerHTML = csDetailsChips(r, r.match);
+  const apply = document.getElementById('cs-d-apply');
+  apply.href = /^https?:\/\//i.test(r.url) ? r.url : '#';
+  apply.textContent = `Open on ${CS_SOURCE_LABEL[r.source] || 'the site'} ↗`;
+  syncDetailsAdd(r);
+  document.getElementById('cs-d-body').innerHTML = `
+    <div class="cs-box"><div class="cs-skel-line" style="width:40%"></div><div class="cs-skel-line"></div><div class="cs-skel-line" style="width:80%"></div></div>
+    <div class="cs-box"><div class="cs-skel-line" style="width:30%"></div><div class="cs-skel-line"></div><div class="cs-skel-line" style="width:65%"></div></div>
+    <p class="cs-mode-note" style="text-align:center">Reading the posting and comparing it with your resume…</p>`;
+  document.getElementById('cs-d-body').scrollTop = 0;
+  document.getElementById('cs-panel').focus();
+  document.addEventListener('keydown', careerDetailsKeys);
+  loadCareerDetails(r, seq);
+}
+
+function syncDetailsAdd(r) {
+  const add = document.getElementById('cs-d-add');
+  add.disabled = !!r.on_board;
+  add.textContent = r.on_board ? 'On your board' : 'Add to board';
+}
+
+async function loadCareerDetails(r, seq) {
+  const body = document.getElementById('cs-d-body');
+  try {
+    const res = await fetch('/api/career-switch/details', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: r.source, ref: r.ref, title: r.title, company: r.company, location: r.location, posted_at: r.posted_at }),
+    });
+    const data = await res.json();
+    if (seq !== CAREER.detailSeq) return;
+    if (!data.ok) throw new Error(data.error || 'Could not load this posting.');
+    if (data.job.on_board) r.on_board = true;
+    renderCareerDetails(r, data);
+  } catch (e) {
+    if (seq !== CAREER.detailSeq) return;
+    body.innerHTML = `<div class="wr-empty">${esc(e.message || 'Could not load this posting.')} You can still open it on the original site.</div>`;
+  }
+}
+
+function renderCareerDetails(r, data) {
+  const j = data.job, c = data.compare;
+  syncDetailsAdd(r);
+  document.getElementById('cs-d-chips').innerHTML = csDetailsChips(j, c.score);
+  const missing = c.missing || [], matched = c.matched || [];
+  const exp = c.experience || {};
+  const facts = [
+    ['Level', CS_LEVEL_LABEL[j.level] || j.level],
+    ['Job type', CS_TYPE_LABEL[j.type] || j.type],
+    ['Work mode', j.remote ? 'Remote' : 'On-site or hybrid'],
+    ['Pay', j.salary || 'Not listed'],
+    ['Experience asked', exp.required ? `${exp.required}+ years` : 'Not stated'],
+    ['Your experience', exp.yours != null ? `About ${exp.yours} ${exp.yours === 1 ? 'year' : 'years'}` : 'Not on resume'],
+    ['Posted', csAge(j.posted_at) || 'Not stated'],
+    ...Object.entries(j.criteria || {}).filter(([k]) => !/seniority|employment type/i.test(k)),
+  ];
+  const circ = 2 * Math.PI * 40;
+  const modeNote = !data.has_resume
+    ? 'Add your resume in Settings to get a real comparison.'
+    : c.mode === 'ai' ? 'Compared by AI against your resume.' : 'Quick comparison from the skills in the posting and your resume. Add a Gemini key in Profile Settings for a deeper read.';
+  document.getElementById('cs-d-body').innerHTML = `
+    <section class="cs-box" aria-label="How you compare">
+      <div class="cs-match">
+        <div class="cs-ring" role="img" aria-label="${c.score}% match">
+          <svg viewBox="0 0 92 92"><circle class="bg" cx="46" cy="46" r="40" fill="none" stroke-width="8"></circle>
+            <circle class="fg" id="cs-ring-fg" cx="46" cy="46" r="40" fill="none" stroke-width="8" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"></circle></svg>
+          <b>${c.score}<small>%</small></b>
+        </div>
+        <div>
+          <div class="cs-verdict">${esc(c.verdict)}</div>
+          <p class="cs-msum">${esc(c.summary)}</p>
+        </div>
+      </div>
+      <div class="cs-mode-note">${esc(modeNote)}</div>
+    </section>
+
+    <section class="cs-box" aria-labelledby="cs-miss-h">
+      <h3 id="cs-miss-h">What's missing <span class="n">${missing.length}</span>${missing.length > 1 ? `<a href="${esc(csLearnAll(missing))}">Learn all ${missing.length} →</a>` : ''}</h3>
+      ${missing.length ? `<ul class="cs-miss">${missing.map((m, k) => `
+        <li style="--k:${k}">
+          <span class="sk">${esc(m.skill)} <span class="imp${m.importance === 'nice' ? ' nice' : ''}">${m.importance === 'nice' ? 'Nice to have' : 'Must have'}</span></span>
+          ${m.why ? `<span class="why">${esc(m.why)}</span>` : ''}
+          <a class="go" href="${esc(m.learn_url)}">Start learning →</a>
+        </li>`).join('')}</ul>`
+        : `<p class="cs-none">${data.has_resume ? 'Nothing obvious. Your resume covers the skills this posting names.' : 'Add your resume in Settings to see your gaps.'}</p>`}
+    </section>
+
+    ${matched.length ? `<section class="cs-box" aria-labelledby="cs-have-h">
+      <h3 id="cs-have-h">You already have <span class="n">${matched.length}</span></h3>
+      <div class="cs-have">${matched.map(s => `<span>${esc(s)}</span>`).join('')}</div>
+    </section>` : ''}
+
+    ${(c.strengths || []).length || (c.tips || []).length ? `<section class="cs-box" aria-labelledby="cs-tips-h">
+      <h3 id="cs-tips-h">How to position yourself</h3>
+      <ul class="cs-list">${[...(c.strengths || []), ...(c.tips || [])].map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+    </section>` : ''}
+
+    <section class="cs-box" aria-labelledby="cs-facts-h">
+      <h3 id="cs-facts-h">About the role</h3>
+      <dl class="cs-facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    </section>
+
+    <section class="cs-box" aria-labelledby="cs-desc-h">
+      <h3 id="cs-desc-h">Full job description</h3>
+      ${j.description
+        ? `<div class="cs-desc" id="cs-desc">${csDescriptionHtml(j.description)}</div>
+           <button type="button" class="cs-btn ghost cs-more" id="cs-more" hidden onclick="toggleCareerDesc(this)">Show full description</button>`
+        : `<p class="cs-none">${esc(CS_SOURCE_LABEL[j.source] || 'This site')} didn't share the full text here. Open the posting to read all of it.</p>`}
+    </section>`;
+  const desc = document.getElementById('cs-desc');
+  if (desc && desc.scrollHeight > 420) {
+    desc.classList.add('clamped');
+    document.getElementById('cs-more').hidden = false;
+  }
+  const ring = document.getElementById('cs-ring-fg');
+  requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.strokeDashoffset = circ * (1 - c.score / 100); }));
+}
+
+function toggleCareerDesc(btn) {
+  const desc = document.getElementById('cs-desc');
+  const open = desc.classList.toggle('clamped');
+  btn.textContent = open ? 'Show full description' : 'Show less';
+}
+
+async function addCareerFromDetails(btn) {
+  const r = CAREER.results[CAREER.open];
+  if (!r || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const data = await addCareerJob(r, btn);
+    btn.textContent = data.already ? 'On your board' : 'Added ✓';
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Add to board';
+    toast(e.message || 'Could not add it.');
+  }
+}
+
+function careerDetailsKeys(e) {
+  if (e.key === 'Escape') { closeCareerDetails(); return; }
+  if (e.key !== 'Tab') return;
+  const panel = document.getElementById('cs-panel');
+  const items = [...panel.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function closeCareerDetails() {
+  const sheet = document.getElementById('cs-sheet');
+  if (sheet.hidden) return;
+  CAREER.detailSeq++;
+  document.removeEventListener('keydown', careerDetailsKeys);
+  const done = () => { sheet.hidden = true; sheet.classList.remove('closing'); };
+  if (CS_CALM.matches) done();
+  else { sheet.classList.add('closing'); setTimeout(done, 240); }
+  if (CAREER.opener && document.contains(CAREER.opener)) CAREER.opener.focus();
 }
 
 function closeCareerResults() {

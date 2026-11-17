@@ -2644,6 +2644,52 @@ def career_switch_paths():
     return jsonify({"ok": True, "current_role": current, **found})
 
 
+_CS_DAYS = {"1": 1, "3": 3, "7": 7, "30": 30}
+
+
+def _resume_profile(conn, uid, resume_text):
+    """The parsed resume (skills, years), with years filled in locally when the parse lacks them."""
+    row = conn.execute("SELECT resume_profile_json FROM users WHERE id = ?", (uid,)).fetchone()
+    try:
+        profile = json.loads(row[0]) if row and row[0] else {}
+    except (TypeError, ValueError):
+        profile = {}
+    if not isinstance(profile, dict):
+        profile = {}
+    if resume_text and (not profile.get("skills") or not profile.get("years_experience")):
+        from resume_parser import parse_resume_local
+        local = parse_resume_local(resume_text)
+        for k in ("skills", "tools", "domains", "years_experience"):
+            profile[k] = profile.get(k) or local.get(k)
+    return profile
+
+
+def _posted_within(iso, days):
+    if not iso:
+        return False
+    try:
+        then = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if then.tzinfo is None:
+        then = then.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - then).total_seconds() <= days * 86400 + 3600
+
+
+def _describe_result(r, resume_text, profile):
+    """Filter facts for one search result: remote, pay, level, type and a quick match from its own text."""
+    from job_compare import job_level, job_type, local_compare
+    desc = r.get("description") or ""
+    r["remote"] = bool(r.get("remote")) or jobmeta.is_remote(r.get("location"), r.get("title"), desc)
+    r["salary"] = r.get("salary") or jobmeta.extract_salary(f"{r.get('title') or ''}\n{desc}")
+    r["level"] = job_level(r.get("title") or "")
+    r["type"] = job_type(r.get("title") or "", desc)
+    r["match"] = None
+    if resume_text and len(desc) > 200:
+        r["match"] = local_compare(r["title"], r.get("company", ""), desc, resume_text, profile)["score"]
+    return r
+
+
 @app.route("/api/career-switch/jobs", methods=["GET"])
 def career_switch_jobs():
     from career_switch import is_current_track
@@ -2651,31 +2697,112 @@ def career_switch_jobs():
     uid = get_user_id()
     query = (request.args.get("q") or "").strip()[:80]
     location = (request.args.get("location") or "").strip()[:60]
+    days = _CS_DAYS.get(request.args.get("days") or "", 0)
+    mode = request.args.get("mode") if request.args.get("mode") in ("remote", "onsite") else ""
     if len(query) < 2:
         return jsonify({"ok": False, "error": "Pick a path or type a field to explore."}), 400
     if not ve.rate_limiter.allow(uid, "web_search", 10):
         return jsonify({"ok": False, "error": "That's a lot of searches. Give it a minute and try again."}), 429
 
     conn = get_conn(DB_PATH)
-    current, _, _ = _career_context(conn, uid)
-    rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
-    conn.close()
-    found = search_web_jobs(query, location, boards=_user_boards(uid))
+    try:
+        current, resume, _ = _career_context(conn, uid)
+        profile = _resume_profile(conn, uid, resume)
+        rows = conn.execute("SELECT url, LOWER(title), LOWER(company) FROM jobs WHERE user_id = ?", (uid,)).fetchall()
+    finally:
+        conn.close()
+    found = search_web_jobs(query, location, remote_only=mode == "remote", boards=_user_boards(uid), days=days or 30)
     _remember_search_results(uid, found["results"])
     for r in found["results"]:
+        _describe_result(r, resume, profile)
         r["snippet"] = _snippet_text(r.pop("description", "") or "")
     on_board_urls = {r[0] for r in rows if r[0]}
     on_board_pairs = {(r[1], r[2]) for r in rows}
     results = []
-    hidden = 0
+    hidden = older = 0
     for r in found["results"]:
         if is_current_track(r["title"], current, query):
             hidden += 1
             continue
+        if days and not _posted_within(r.get("posted_at"), days):
+            older += 1
+            continue
+        if mode == "onsite" and r["remote"]:
+            continue
         r["on_board"] = r["url"] in on_board_urls or (r["title"].lower(), r["company"].lower()) in on_board_pairs
         results.append(r)
     return jsonify({"ok": True, "query": query, "location": location, "current_role": current,
-                    "results": results, "failed": found["failed"], "hidden": hidden})
+                    "days": days, "mode": mode, "results": results, "failed": found["failed"],
+                    "hidden": hidden, "older": older})
+
+
+def _posting_for_details(uid, data):
+    """The posting a details request points at, re-read from its source rather than trusted from the browser."""
+    from scraper import find_board_posting, fetch_linkedin_posting, SOURCE_HOSTS
+    source = data.get("source")
+    ref = str(data.get("ref") or "")[:300]
+    if source == "direct":
+        job = find_board_posting(ref, boards=_user_boards(uid))
+        if not job:
+            return None
+        return {**job, "ref": ref, "criteria": {}}
+    if source == "linkedin":
+        url = ref.strip()
+        if not _LINKEDIN_JOB_URL.match(url):
+            return None
+        got = fetch_linkedin_posting(url)
+        return {"source": "linkedin", "ref": url, "url": url,
+                "title": str(data.get("title") or "").strip()[:200], "company": str(data.get("company") or "").strip()[:120],
+                "location": str(data.get("location") or "").strip()[:120], "posted_at": str(data.get("posted_at") or "")[:40],
+                "description": got["description"], "criteria": got["criteria"]}
+    if source in SEARCH_REMOTE_SOURCES:
+        cached = _recall_search_result(uid, ref)
+        if not cached or not _url_on_host(cached.get("url", ""), SOURCE_HOSTS[source]):
+            return None
+        return {**cached, "criteria": {}}
+    return None
+
+
+@app.route("/api/career-switch/details", methods=["POST"])
+def career_switch_details():
+    """A posting's full text plus how the user's resume compares, for the details panel."""
+    import job_compare
+    uid = get_user_id()
+    data = request.get_json(silent=True) or {}
+    if not ve.rate_limiter.allow(uid, "job_details", 30):
+        return jsonify({"ok": False, "error": "You've opened a lot of postings. Give it a minute."}), 429
+    try:
+        job = _posting_for_details(uid, data)
+    except Exception as e:
+        print(f"[career details] {e}")
+        job = None
+    if not job or not job.get("title"):
+        return jsonify({"ok": False, "error": "That posting couldn't be loaded. Search again to refresh it."}), 404
+
+    conn = get_conn(DB_PATH)
+    try:
+        _, resume, key = _career_context(conn, uid)
+        profile = _resume_profile(conn, uid, resume)
+        on_board = conn.execute("SELECT job_id FROM jobs WHERE user_id = ? AND (url = ? OR (LOWER(title) = ? AND LOWER(company) = ?))",
+                                (uid, job["url"], job["title"].lower(), (job.get("company") or "").lower())).fetchone()
+    finally:
+        conn.close()
+    desc = job.get("description") or ""
+    criteria = job.get("criteria") or {}
+    details = {
+        "source": job["source"], "ref": job["ref"], "url": job["url"], "title": job["title"],
+        "company": job.get("company") or "", "location": job.get("location") or "", "posted_at": job.get("posted_at") or "",
+        "description": desc,
+        "salary": job.get("salary") or jobmeta.extract_salary(f"{job['title']}\n{desc}"),
+        "remote": bool(job.get("remote")) or jobmeta.is_remote(job.get("location"), job["title"], desc),
+        "level": job_compare.job_level(job["title"], criteria),
+        "type": job_compare.job_type(job["title"], desc, criteria),
+        "criteria": criteria,
+        "on_board": bool(on_board),
+    }
+    compare = job_compare.compare(uid, f"{job['source']}:{job['ref']}", job["title"], details["company"], desc,
+                                  resume, profile, api_key=key)
+    return jsonify({"ok": True, "job": details, "compare": compare, "has_resume": bool(resume)})
 
 
 # ── Call log (calls.py) ────────────────────────────────────────────────────

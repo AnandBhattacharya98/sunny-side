@@ -275,8 +275,18 @@ def _is_india_location(location: str) -> bool:
     return any(h in loc for h in INDIA_LOCATION_HINTS)
 
 
+_BLOCK_TAGS = ["p", "div", "br", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "section"]
+
+
 def _html_to_text(html: str) -> str:
-    return BeautifulSoup(html or "", "html.parser").get_text(separator="\n", strip=True)
+    """Readable text from posting HTML: one line per paragraph or bullet, inline tags kept inline."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    for li in soup.find_all("li"):
+        li.insert(0, "• ")
+    for tag in soup.find_all(_BLOCK_TAGS):
+        tag.insert_after("\n")
+    lines = (re.sub(r"[ \t\xa0]+", " ", line).strip() for line in soup.get_text().splitlines())
+    return "\n".join(line for line in lines if line and line != "•")
 
 
 def _fetch_board_postings(cfg: dict) -> list[dict]:
@@ -459,10 +469,11 @@ def linkedin_job_id(url: str) -> str:
     return f"li_{re.sub(r'[^0-9]', '', url[-20:])}"
 
 
-def search_linkedin(query: str, location: str = "", limit: int = 15, remote: bool = False) -> list[dict]:
+def search_linkedin(query: str, location: str = "", limit: int = 15, remote: bool = False, days: int = 30) -> list[dict]:
     import urllib.parse
+    window = max(1, min(int(days or 30), 30)) * 86400
     params = (f"keywords={urllib.parse.quote_plus(query)}"
-              f"&location={urllib.parse.quote_plus(location or 'India')}&f_TPR=r2592000"
+              f"&location={urllib.parse.quote_plus(location or 'India')}&f_TPR=r{window}"
               + ("&f_WT=2" if remote else ""))
     resp = requests.get(f"https://www.linkedin.com/jobs/search?{params}", headers=HEADERS, timeout=12)
     cards = BeautifulSoup(resp.text, "html.parser").select("div.base-card")
@@ -638,7 +649,8 @@ REMOTE_SOURCES = {"remotive", "jobicy", "arbeitnow"}
 SOURCE_HOSTS = {"remotive": ("remotive.com",), "jobicy": ("jobicy.com",), "arbeitnow": ("arbeitnow.com",)}
 
 
-def search_web_jobs(query: str, location: str = "", remote_only: bool = False, boards: list[dict] | None = None) -> dict:
+def search_web_jobs(query: str, location: str = "", remote_only: bool = False, boards: list[dict] | None = None,
+                    days: int = 30) -> dict:
     """Searches LinkedIn, company feeds and remote-job boards at once.
 
     Returns results plus the sources that failed. Remote boards only list remote
@@ -650,7 +662,7 @@ def search_web_jobs(query: str, location: str = "", remote_only: bool = False, b
     results, failed = [], []
     where = "" if loc.lower() == "remote" else loc
     remote = remote_only or loc.lower() == "remote"
-    fns = {"linkedin": lambda: search_linkedin(query, where, remote=remote),
+    fns = {"linkedin": lambda: search_linkedin(query, where, remote=remote, days=days),
            "direct": lambda: search_company_boards(query, where, boards=boards),
            "remotive": lambda: search_remotive(query, where),
            "jobicy": lambda: search_jobicy(query, where),
@@ -701,6 +713,34 @@ def find_board_posting(ref: str, boards: list[dict] | None = None) -> dict | Non
                 "posted_at": p["posted_at"],
             }
     return None
+
+
+def fetch_linkedin_posting(url: str) -> dict:
+    """A LinkedIn posting's full text and its criteria list (seniority, employment type and so on).
+
+    Uses the public guest endpoint for one posting, then the posting page itself."""
+    m = re.search(r"(\d{6,})/?$", url.split("?")[0])
+    pages = []
+    if m:
+        pages.append(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{m.group(1)}")
+    pages.append(url)
+    for page in pages:
+        try:
+            resp = requests.get(page, headers=HEADERS, timeout=10)
+        except requests.RequestException:
+            continue
+        soup = BeautifulSoup(resp.text, "html.parser")
+        body = soup.select_one("div.show-more-less-html__markup") or soup.select_one("div.description__text")
+        if not body:
+            continue
+        criteria = {}
+        for item in soup.select("li.description__job-criteria-item"):
+            k = item.select_one("h3")
+            v = item.select_one("span")
+            if k and v:
+                criteria[k.get_text(strip=True)] = v.get_text(strip=True)
+        return {"description": _html_to_text(str(body))[:6000], "criteria": criteria}
+    return {"description": "", "criteria": {}}
 
 
 def _fetch_description(url: str) -> str:
