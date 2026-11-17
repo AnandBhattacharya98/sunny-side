@@ -3,6 +3,7 @@ db.py — Single source of truth for database setup and helpers.
 All tables are created here; every module imports from here.
 """
 
+import functools
 import sqlite3
 import time
 import os
@@ -589,7 +590,42 @@ def init_db(db_path: str = DB_PATH):
     return conn
 
 
+SCHEMA_KEY = "schema_fingerprint"
+
+
+@functools.lru_cache(maxsize=None)
+def _schema_fingerprint() -> str:
+    """Changes whenever the table-creating or migration code changes. Worked out once per process."""
+    import hashlib
+    import inspect
+    import recruiter
+    import learning
+    import flags
+    parts = [inspect.getsource(f) for f in (_create_tables, migrate_db, recruiter.migrate, learning.migrate, flags.migrate)]
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
+
+
 def _create_and_migrate(conn) -> None:
+    """Creates and migrates the tables, unless this exact schema code already ran against this database.
+    Then only the admin password is applied, so a restart costs a couple of queries instead of ~100
+    (about 18 seconds against a remote Postgres)."""
+    fingerprint = _schema_fingerprint()
+    try:
+        row = conn.execute("SELECT value FROM app_meta WHERE key = ?", (SCHEMA_KEY,)).fetchone()
+    except Exception:
+        conn.rollback()  # no app_meta yet: a new database
+        row = None
+    if row and row[0] == fingerprint:
+        _ensure_admin(conn)
+        return
+    _create_tables(conn)
+    migrate_db(conn)
+    conn.execute("DELETE FROM app_meta WHERE key = ?", (SCHEMA_KEY,))
+    conn.execute("INSERT INTO app_meta (key, value) VALUES (?, ?)", (SCHEMA_KEY, fingerprint))
+    conn.commit()
+
+
+def _create_tables(conn) -> None:
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS jobs (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -674,7 +710,6 @@ def _create_and_migrate(conn) -> None:
         );
     """)
     conn.commit()
-    migrate_db(conn)
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
