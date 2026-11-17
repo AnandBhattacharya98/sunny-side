@@ -406,8 +406,239 @@ section { position: relative; }
   .paths .p2 { stroke-dashoffset: 0; }
 }
 </style>
+{% if fresh %}
+<style>
+/* ===== Homepage refresh (flag: home_refresh) ===== */
+/* Live numbers under the hero buttons */
+.live-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 26px; margin-top: 26px; }
+.live-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em;
+              text-transform: uppercase; color: var(--accent-txt); background: var(--glow); border-radius: 999px; padding: 5px 11px; }
+.live-badge .live { width: 7px; height: 7px; border-radius: 50%; background: var(--yolk); position: relative; }
+.live-badge .live::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--yolk); animation: ping 1.8s var(--ease) infinite; }
+.ls { display: flex; flex-direction: column; line-height: 1.1; }
+.ls b { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.ls span { font-family: var(--font-mono); font-size: 11.5px; color: var(--hin); margin-top: 3px; }
+
+/* Mini product screens in How it works */
+.step-mock { position: relative; height: 128px; margin: 0 0 18px; border-radius: 16px; background: var(--sur); border: 1px solid var(--bdr);
+             box-shadow: var(--shadow); overflow: hidden; padding: 14px; font-size: 12.5px; }
+.m-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--sur2); }
+.m-row + .m-row { margin-top: 8px; }
+.m-ico { width: 22px; height: 22px; flex: none; border-radius: 6px; display: grid; place-items: center; background: var(--yolk); color: var(--ink); font-size: 12px; }
+.m-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-txt small { color: var(--hin); font-family: var(--font-mono); font-size: 10.5px; margin-left: 4px; }
+.m-pill { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border-radius: 999px; background: var(--glow); color: var(--accent-txt); }
+/* 1: an email arrives and turns into a card on the board */
+.mock-mail .m-new { opacity: 0; transform: translateY(-14px); }
+.step.in .mock-mail .m-new { animation: m-drop .7s var(--spring) .5s forwards; }
+.mock-mail .m-card { border: 1.5px dashed var(--bdr-strong); background: transparent; opacity: .55; }
+.step.in .mock-mail .m-card { animation: m-solid .5s var(--ease) 1.3s forwards; }
+@keyframes m-drop { to { opacity: 1; transform: none; } }
+@keyframes m-solid { to { opacity: 1; border-style: solid; border-color: var(--yolk); background: var(--sur2); } }
+/* 2: a fit score fills, with what matches and what's missing */
+.mock-fit { display: flex; align-items: center; gap: 14px; }
+.ring { --p: 0; width: 84px; height: 84px; flex: none; border-radius: 50%; display: grid; place-items: center;
+        background: conic-gradient(var(--yolk) calc(var(--p) * 1%), var(--sur2) 0); transition: --p 1.4s var(--ease); }
+.ring b { width: 64px; height: 64px; border-radius: 50%; background: var(--sur); display: grid; place-items: center; font-size: 20px; letter-spacing: -.03em; }
+@property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
+.step.in .ring { --p: 84; }
+.fit-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.fit-tags span { font-family: var(--font-mono); font-size: 10.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--bdr); opacity: 0; transform: scale(.7); }
+.fit-tags .ok { background: var(--glow); border-color: transparent; color: var(--accent-txt); }
+.fit-tags .miss { color: var(--hin); text-decoration: line-through; }
+.step.in .fit-tags span { animation: m-pop .45s var(--spring) forwards; }
+.step.in .fit-tags span:nth-child(1) { animation-delay: .6s; } .step.in .fit-tags span:nth-child(2) { animation-delay: .75s; }
+.step.in .fit-tags span:nth-child(3) { animation-delay: .9s; } .step.in .fit-tags span:nth-child(4) { animation-delay: 1.05s; }
+@keyframes m-pop { to { opacity: 1; transform: none; } }
+/* 3: a note writes itself */
+.mock-note .m-line { height: 8px; border-radius: 4px; background: var(--sur2); margin-top: 9px; transform-origin: left; transform: scaleX(0); }
+.mock-note .m-line.short { width: 60%; }
+.step.in .mock-note .m-line { animation: m-type .7s var(--ease) forwards; }
+.step.in .mock-note .m-line:nth-of-type(2) { animation-delay: .5s; } .step.in .mock-note .m-line:nth-of-type(3) { animation-delay: .9s; }
+.step.in .mock-note .m-line:nth-of-type(4) { animation-delay: 1.3s; }
+.mock-note .m-send { position: absolute; right: 14px; bottom: 12px; font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+                     background: var(--ink); color: var(--paper); opacity: 0; }
+[data-theme="dark"] .mock-note .m-send { background: var(--paper); color: var(--ink); }
+.step.in .mock-note .m-send { animation: m-pop .45s var(--spring) 1.9s forwards; }
+@keyframes m-type { to { transform: scaleX(1); } }
+
+/* Who's hiring + browse */
+.hiring { padding: 24px 0 96px; }
+.hiring h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; max-width: 680px; }
+.hiring-sub { color: var(--mut); margin-top: 10px; max-width: 560px; }
+.hiring-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; margin-top: 40px; }
+.board-card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+.board-card h3 { font-size: 13px; font-family: var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--hin); font-weight: 400; margin-bottom: 14px; }
+.lb { list-style: none; }
+.lb li { display: grid; grid-template-columns: 22px 34px 1fr auto; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--bdr); }
+.lb li:first-child { border-top: 0; }
+.lb .rk { font-family: var(--font-mono); font-size: 12px; color: var(--hin); }
+.lb .av { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; background: var(--sur2); }
+.lb li:first-child .av { background: var(--yolk); color: var(--ink); }
+.lb .nm { min-width: 0; }
+.lb .nm div { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb .bar { height: 5px; border-radius: 3px; background: var(--sur2); margin-top: 6px; overflow: hidden; }
+.lb .bar i { display: block; height: 100%; width: var(--w); background: var(--yolk); border-radius: 3px; transform-origin: left; transform: scaleX(0); transition: transform 1s var(--ease); }
+.lb.in .bar i, .calm .lb .bar i { transform: scaleX(1); }
+.lb li:nth-child(2) .bar i { transition-delay: .08s; } .lb li:nth-child(3) .bar i { transition-delay: .16s; }
+.lb li:nth-child(4) .bar i { transition-delay: .24s; } .lb li:nth-child(5) .bar i { transition-delay: .32s; } .lb li:nth-child(6) .bar i { transition-delay: .4s; }
+.lb .ct { font-family: var(--font-mono); font-size: 12px; color: var(--mut); }
+.browse + .browse { margin-top: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.bchip { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 999px; border: 1px solid var(--bdr-strong);
+         color: var(--txt); text-decoration: none; font-size: 14px; transition: transform .3s var(--spring), background .2s, border-color .2s; }
+.bchip small { font-family: var(--font-mono); font-size: 11px; color: var(--hin); }
+.bchip:hover, .bchip:focus-visible { transform: translateY(-2px); background: var(--glow); border-color: var(--yolk); }
+.promises { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.promise { display: flex; gap: 10px; align-items: flex-start; padding: 16px 18px; border-radius: 14px; border: 1px dashed var(--bdr-strong); font-size: 14.5px; color: var(--mut); }
+.promise b { color: var(--txt); display: block; font-weight: 600; }
+.promise .pi { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--glow); display: grid; place-items: center; color: var(--accent-txt); font-size: 13px; }
+
+/* Sunny's welcome on a first visit */
+.hello { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--bg); cursor: pointer;
+         transition: opacity .5s var(--ease), visibility .5s; }
+.hello.bye { opacity: 0; visibility: hidden; }
+.hello-in { text-align: center; padding: 24px; }
+.hello svg { width: 96px; height: 96px; overflow: visible; animation: hello-rise .9s var(--spring) both; }
+.hello svg .hr { transform-origin: 50px 50px; animation: spin 14s linear infinite; }
+.hello h2 { font-size: clamp(30px, 6vw, 44px); letter-spacing: -.035em; margin-top: 18px; animation: hello-up .7s var(--ease) .25s both; }
+.hello p { font-family: var(--font-mono); font-size: 12.5px; color: var(--hin); margin-top: 10px; animation: hello-up .7s var(--ease) .45s both; }
+.hello p::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+@keyframes hello-rise { from { transform: translateY(40px) scale(.6); opacity: 0; } }
+@keyframes hello-up { from { transform: translateY(14px); opacity: 0; } }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+@media (max-width: 820px) {
+  .hiring-grid, .promises { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .live-stats { gap: 10px 20px; }
+  .ls b { font-size: 22px; }
+  .hiring { padding: 8px 0 72px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mock-mail .m-new, .fit-tags span, .mock-note .m-send { opacity: 1; transform: none; }
+  .mock-mail .m-card { opacity: 1; border-style: solid; }
+  .mock-note .m-line { transform: none; }
+  .ring { --p: 84; transition: none; }
+  .lb .bar i { transform: none; transition: none; }
+}
+</style>
+{% endif %}
+{% if fresh and live and live.pins %}
+<style>
+/* Jobs near you: the map */
+.near { padding: 88px 0 40px; }
+.near h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; max-width: 680px; }
+.near-sub { color: var(--mut); margin-top: 10px; max-width: 580px; }
+.near-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 36px; }
+.map-wrap { position: relative; border-radius: 20px; overflow: hidden; border: 1px solid var(--bdr); box-shadow: var(--shadow-lg); background: var(--sur2); min-height: 480px; isolation: isolate; }
+#jobs-map { position: absolute; inset: 0; z-index: 0; background: var(--sur2); }
+.map-ask { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 500; width: min(92%, 380px);
+           display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--sur);
+           border: 1px solid var(--bdr-strong); box-shadow: var(--shadow-lg); transition: opacity .35s, transform .35s var(--spring); }
+.map-ask.gone { opacity: 0; transform: translate(-50%, 20px); pointer-events: none; }
+.map-ask .pin-ico { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--yolk); display: grid; place-items: center; font-size: 17px; }
+.map-ask div { flex: 1; min-width: 0; font-size: 14px; line-height: 1.3; }
+.map-ask small { display: block; color: var(--hin); font-family: var(--font-mono); font-size: 10.5px; margin-top: 3px; }
+.map-ask .btn { flex: none; padding: 8px 12px; font-size: 13px; }
+.near-list { display: flex; flex-direction: column; background: var(--sur); border: 1px solid var(--bdr); border-radius: 20px; padding: 18px; box-shadow: var(--shadow); min-height: 480px; max-height: 560px; }
+.near-head b { display: block; font-size: 17px; letter-spacing: -.02em; }
+.near-head span { font-family: var(--font-mono); font-size: 11.5px; color: var(--hin); }
+.near-filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 10px; }
+.nf { font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--bdr-strong); background: transparent; color: var(--txt); cursor: pointer; }
+.nf[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+[data-theme="dark"] .nf[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.near-items { list-style: none; overflow-y: auto; flex: 1; margin: 0 -6px; padding: 0 6px; }
+.near-items li + li { border-top: 1px solid var(--bdr); }
+.ni { width: 100%; display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 10px 4px; text-align: left;
+      background: none; border: 0; color: inherit; font: inherit; cursor: pointer; border-radius: 10px; }
+.ni:hover, .ni:focus-visible { background: var(--sur2); }
+.ni .av { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; background: var(--sur2); }
+.ni:hover .av { background: var(--yolk); color: var(--ink); }
+.ni .t { min-width: 0; }
+.ni .t b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ni .t span { display: block; font-size: 12.5px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ni .d { font-family: var(--font-mono); font-size: 11px; color: var(--hin); text-align: right; }
+.near-empty { color: var(--mut); font-size: 14px; padding: 16px 4px; }
+.near-cta { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bdr); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--mut); }
+.map-note { font-family: var(--font-mono); font-size: 11.5px; color: var(--hin); margin-top: 12px; }
+/* Pins */
+.jpin { width: 34px !important; height: 34px !important; margin: -34px 0 0 -17px !important; }
+.jpin div { width: 34px; height: 34px; border-radius: 50% 50% 50% 6px; transform: rotate(-45deg); background: var(--sur); border: 2px solid var(--ink);
+            display: grid; place-items: center; box-shadow: 0 6px 14px -6px rgba(13, 12, 10, .5); transition: transform .25s var(--spring), background .2s; }
+.jpin div span { transform: rotate(45deg); font: 700 13px var(--font-sans); color: var(--ink); }
+.jpin.hot div { background: var(--yolk); }
+.jpin:hover div, .jpin.on div { transform: rotate(-45deg) scale(1.18); background: var(--yolk); }
+[data-theme="dark"] .jpin div { border-color: var(--paper); background: #2a2722; }
+[data-theme="dark"] .jpin div span { color: var(--paper); }
+[data-theme="dark"] .jpin.hot div, [data-theme="dark"] .jpin:hover div, [data-theme="dark"] .jpin.on div { background: var(--yolk); }
+[data-theme="dark"] .jpin.hot div span, [data-theme="dark"] .jpin:hover div span, [data-theme="dark"] .jpin.on div span { color: var(--ink); }
+.cpin div { transform: translate(-50%, -50%); border-radius: 999px; background: var(--yolk); color: var(--ink); font: 700 13px var(--font-sans); padding: 6px 11px; white-space: nowrap;
+            border: 2px solid var(--ink); box-shadow: 0 0 0 6px rgba(255, 167, 0, .25); transition: transform .25s var(--spring); }
+.cpin:hover div { transform: translate(-50%, -50%) scale(1.1); }
+.map-wrap .leaflet-container .me-pin, .map-wrap .leaflet-container .cpin, .map-wrap .leaflet-container .jpin { background: none; border: 0; }
+.me-pin div { width: 18px; height: 18px; border-radius: 50%; background: #2F7BF6; border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(47, 123, 246, .22); }
+.map-wrap .leaflet-popup-content-wrapper { border-radius: 16px; background: var(--sur); color: var(--txt); box-shadow: var(--shadow-lg); }
+.map-wrap .leaflet-popup-tip { background: var(--sur); }
+.map-wrap .leaflet-popup-content { margin: 14px 16px; font-family: var(--font-sans); font-size: 13.5px; line-height: 1.35; min-width: 220px; }
+.pp-co { font-weight: 700; font-size: 16px; letter-spacing: -.02em; }
+.pp-area { font-family: var(--font-mono); font-size: 11px; color: var(--hin); margin: 2px 0 10px; }
+.pp-roles { list-style: none; margin: 0 0 12px; padding: 0; }
+.pp-roles li { padding: 6px 0; border-top: 1px solid var(--bdr); display: flex; align-items: center; gap: 6px; }
+.pp-roles li.locked { filter: blur(4px); user-select: none; }
+.pp-roles .tg { font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--glow); color: var(--accent-txt); }
+.pp-lock { display: flex; gap: 8px; align-items: center; }
+.pp-lock .btn { padding: 8px 13px; font-size: 13px; }
+.pp-lock a.lnk { font-size: 12.5px; color: var(--mut); }
+.map-wrap .leaflet-container a.btn-p { color: var(--ink); }
+.map-wrap .leaflet-container a.lnk { color: var(--mut); }
+.map-wrap .leaflet-container { font-family: var(--font-sans); }
+.map-wrap .leaflet-control-attribution { font-size: 10px; }
+[data-theme="dark"] .leaflet-control-attribution { background: rgba(13, 12, 10, .7) !important; color: #B5AFA3; }
+[data-theme="dark"] .leaflet-control-attribution a { color: #FFB938; }
+[data-theme="dark"] .leaflet-bar a { background: #1F1D19; color: #F5F2EB; border-color: rgba(245, 242, 235, .1); }
+@media (max-width: 960px) {
+  .near-grid { grid-template-columns: 1fr; }
+  .map-wrap { min-height: 420px; }
+  .near-list { min-height: 0; max-height: 440px; }
+}
+@media (max-width: 560px) {
+  .near { padding: 64px 0 24px; }
+  .map-wrap { min-height: 380px; }
+}
+</style>
+{% endif %}
 </head>
 <body>
+{% if fresh %}
+<div class="hello" id="hello" hidden aria-hidden="true">
+  <div class="hello-in">
+    <svg viewBox="0 0 100 100"><g class="hr" stroke="#FFA700" stroke-width="7" stroke-linecap="round">
+      <line x1="50" y1="3" x2="50" y2="14"/><line x1="50" y1="86" x2="50" y2="97"/><line x1="3" y1="50" x2="14" y2="50"/><line x1="86" y1="50" x2="97" y2="50"/>
+      <line x1="17" y1="17" x2="25" y2="25"/><line x1="75" y1="75" x2="83" y2="83"/><line x1="17" y1="83" x2="25" y2="75"/><line x1="75" y1="25" x2="83" y2="17"/></g>
+      <circle cx="50" cy="50" r="31" fill="#FFA700" stroke="#0D0C0A" stroke-width="2.5"/>
+      <path d="M35.5 47 Q40 41 44.5 47M55.5 47 Q60 41 64.5 47" stroke="#0D0C0A" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <path d="M41 58 Q50 67 59 58" stroke="#0D0C0A" stroke-width="3" stroke-linecap="round" fill="none"/></svg>
+    <h2>Hello! Good to see you.</h2>
+    <p>Sunny is fetching today's jobs</p>
+  </div>
+</div>
+<script>
+  // First visit only, never with reduce motion. Gone in under two seconds, or on any tap or key.
+  (function () {
+    var seen = null;
+    try { seen = localStorage.getItem('ss_hello'); localStorage.setItem('ss_hello', '1'); } catch (e) { seen = '1'; }
+    if (seen || document.documentElement.classList.contains('calm')) return;
+    var el = document.getElementById('hello');
+    el.hidden = false;
+    function bye() { el.classList.add('bye'); setTimeout(function () { el.remove(); }, 600); removeEventListener('keydown', bye); }
+    el.addEventListener('click', bye);
+    addEventListener('keydown', bye);
+    setTimeout(bye, 1700);
+  })();
+</script>
+{% endif %}
 
 <div class="progress" id="progress" aria-hidden="true"></div>
 
@@ -453,6 +684,14 @@ section { position: relative; }
             <a class="btn btn-lg magnetic" href="/login">Log in</a>
           </div>
           <div class="hero-note reveal" style="--d:650ms">Free to use. Your data stays private.</div>
+          {% if fresh and live and live.show %}
+          <div class="live-stats reveal" style="--d:750ms">
+            <span class="live-badge"><span class="live" aria-hidden="true"></span>Live · last {{ live.window_days }} days</span>
+            <div class="ls"><b data-count="{{ live.roles }}">{{ "{:,}".format(live.roles) }}</b><span>open roles found</span></div>
+            <div class="ls"><b data-count="{{ live.companies }}">{{ "{:,}".format(live.companies) }}</b><span>companies hiring</span></div>
+            <div class="ls"><b data-count="{{ live.new_this_week }}">{{ "{:,}".format(live.new_this_week) }}</b><span>new this week</span></div>
+          </div>
+          {% endif %}
         </div>
 
         <div class="sun-stage" aria-hidden="true">
@@ -524,6 +763,38 @@ section { position: relative; }
     </div>
   </div>
 
+  {% if fresh and live and live.pins %}
+  <section class="near" id="near" aria-labelledby="near-title-h">
+    <div class="container">
+      <div class="kicker reveal">Jobs near you</div>
+      <h2 class="reveal split" id="near-title-h" style="--d:60ms">See who's hiring around you, on a map.</h2>
+      <p class="near-sub reveal" style="--d:120ms">Share your location and Sunny shows the open roles closest to you. Sign up free to open any job and add it to your board.</p>
+      <div class="near-grid reveal" style="--d:160ms">
+        <div class="map-wrap">
+          <div id="jobs-map" role="region" aria-label="Map of open roles"></div>
+          <div class="map-ask" id="map-ask">
+            <span class="pin-ico" aria-hidden="true">📍</span>
+            <div><span id="map-ask-txt">See what's hiring near you</span><small>Your location stays on this device.</small></div>
+            <button class="btn btn-p" type="button" id="locate">Use my location</button>
+          </div>
+        </div>
+        <aside class="near-list" aria-label="Open roles near you">
+          <div class="near-head"><b id="near-title">Hiring across India</b><span id="near-count"></span></div>
+          <div class="near-filters" role="group" aria-label="Show">
+            <button class="nf" type="button" data-f="" aria-pressed="true">All</button>
+            <button class="nf" type="button" data-f="fresher" aria-pressed="false">Fresher</button>
+            {% for f in live.families[:4] %}<button class="nf" type="button" data-f="{{ f.name }}" aria-pressed="false">{{ f.name }}</button>{% endfor %}
+          </div>
+          <ol class="near-items" id="near-items"></ol>
+          <div class="near-cta"><span>Open any job with a free account.</span><a class="btn btn-p" href="/signup">Sign up</a></div>
+        </aside>
+      </div>
+      <p class="map-note">Pins mark the area a role is listed in, not the exact office.</p>
+    </div>
+    <script type="application/json" id="pins-data">{{ live.pins|tojson }}</script>
+  </section>
+  {% endif %}
+
   <section class="how" id="how">
     <div class="container">
       <div class="kicker reveal">How it works</div>
@@ -536,6 +807,10 @@ section { position: relative; }
           <div class="step-ico" aria-hidden="true">
             <svg viewBox="0 0 26 26"><rect class="env-letter accent" x="7" y="5" width="12" height="9" rx="1.5"/><rect x="3" y="9" width="20" height="13" rx="2.5"/><path class="env-flap" d="M3.5 10.5 L13 17 L22.5 10.5"/></svg>
           </div>
+          {% if fresh %}<div class="step-mock mock-mail" aria-hidden="true">
+            <div class="m-row m-new"><span class="m-ico">✉</span><span class="m-txt">Interview invite <small>Razorpay · now</small></span></div>
+            <div class="m-row m-card"><span class="m-ico">★</span><span class="m-txt">Product Designer</span><span class="m-pill">Interview</span></div>
+          </div>{% endif %}
           <div class="step-num">01</div>
           <h3>Connect your inbox</h3>
           <p>Applications from LinkedIn, Naukri and others land on your board on their own.</p>
@@ -544,6 +819,10 @@ section { position: relative; }
           <div class="step-ico" aria-hidden="true">
             <svg viewBox="0 0 26 26"><path d="M3 17 A10 10 0 0 1 23 17"/><path class="accent" d="M17 9.5 A10 10 0 0 1 23 17"/><line class="gauge-needle accent" x1="13" y1="17" x2="13" y2="9"/><circle cx="13" cy="17" r="1.6"/></svg>
           </div>
+          {% if fresh %}<div class="step-mock mock-fit" aria-hidden="true">
+            <div class="ring"><b>8.4</b></div>
+            <div class="fit-tags"><span class="ok">✓ Figma</span><span class="ok">✓ Research</span><span class="ok">✓ B2B</span><span class="miss">SQL</span></div>
+          </div>{% endif %}
           <div class="step-num">02</div>
           <h3>See your fit</h3>
           <p>Each role gets a 1 to 10 score against your resume, with what you match and what you miss.</p>
@@ -552,6 +831,11 @@ section { position: relative; }
           <div class="step-ico" aria-hidden="true">
             <svg viewBox="0 0 26 26"><rect x="4" y="3" width="15" height="20" rx="2"/><line x1="7.5" y1="9" x2="15" y2="9"/><line class="pen-line accent" x1="7.5" y1="13" x2="15" y2="13"/><g class="pen"><path class="accent" d="M17 21 L23 11 L25 12.5 L19 22.5 L16.5 23.5 Z"/></g></svg>
           </div>
+          {% if fresh %}<div class="step-mock mock-note" aria-hidden="true">
+            <div class="m-row"><span class="m-ico">✎</span><span class="m-txt">Hi Priya, I loved how your team…</span></div>
+            <div class="m-line"></div><div class="m-line"></div><div class="m-line short"></div>
+            <span class="m-send">Send</span>
+          </div>{% endif %}
           <div class="step-num">03</div>
           <h3>Reach out faster</h3>
           <p>Get a tailored cover letter and LinkedIn note for any job in one click.</p>
@@ -559,6 +843,51 @@ section { position: relative; }
       </div>
     </div>
   </section>
+
+  {% if fresh and live and live.show %}
+  <section class="hiring" id="hiring-now">
+    <div class="container">
+      <div class="kicker reveal">Who's hiring</div>
+      <h2 class="reveal split" style="--d:60ms">Real openings, counted fresh every day.</h2>
+      <p class="hiring-sub reveal" style="--d:120ms">Every number here comes from public job listings Sunny Side found in the last {{ live.window_days }} days. Nothing is made up and nothing comes from anyone's inbox.</p>
+      <div class="hiring-grid">
+        {% if live.top_companies %}
+        <div class="board-card reveal">
+          <h3>Most open roles</h3>
+          {% set top = live.top_companies[0].roles %}
+          <ol class="lb" id="lb">
+            {% for c in live.top_companies %}
+            <li><span class="rk">{{ loop.index }}</span><span class="av" aria-hidden="true">{{ c.company[:1]|upper }}</span>
+                <span class="nm"><div>{{ c.company }}</div><div class="bar" aria-hidden="true"><i style="--w:{{ (c.roles * 100 / top)|round|int }}%"></i></div></span>
+                <span class="ct">{{ c.roles }} roles</span></li>
+            {% endfor %}
+          </ol>
+        </div>
+        {% endif %}
+        <div class="board-card reveal" style="--d:80ms">
+          {% if live.families %}
+          <div class="browse">
+            <h3>Browse by role</h3>
+            <div class="chips">{% for f in live.families %}<a class="bchip" href="/signup">{{ f.name }} <small>{{ f.roles }}</small></a>{% endfor %}</div>
+          </div>
+          {% endif %}
+          {% if live.cities %}
+          <div class="browse">
+            <h3>Browse by city</h3>
+            <div class="chips">{% for c in live.cities %}<a class="bchip" href="{% if live.pins %}#near{% else %}/signup{% endif %}" data-city="{{ c.name }}">{{ c.name }} <small>{{ c.roles }}</small></a>{% endfor %}</div>
+          </div>
+          {% endif %}
+          {% if live.fresher %}<p class="hiring-sub" style="margin-top:18px;font-size:14px">{{ live.fresher }} of these are fresher, intern or junior roles.</p>{% endif %}
+        </div>
+      </div>
+      <div class="promises">
+        <div class="promise reveal"><span class="pi" aria-hidden="true">₹</span><span><b>Free, no card needed</b>No trial that turns into a bill.</span></div>
+        <div class="promise reveal" style="--d:80ms"><span class="pi" aria-hidden="true">⇩</span><span><b>Your data, your call</b>Export or delete your account any time from Settings.</span></div>
+        <div class="promise reveal" style="--d:160ms"><span class="pi" aria-hidden="true">✓</span><span><b>Real numbers only</b>The counts on this page are live, not marketing.</span></div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   <section class="features" id="features">
     <div class="container">
@@ -897,5 +1226,237 @@ section { position: relative; }
   }, { threshold: 0.4 }).observe(preview);
 })();
 </script>
+{% if fresh %}
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hasIO = 'IntersectionObserver' in window;
+  function whenSeen(el, fn, margin) {
+    if (!el) return;
+    if (!hasIO) { fn(); return; }
+    var io = new IntersectionObserver(function (es) {
+      if (!es[0].isIntersecting) return;
+      io.disconnect(); fn();
+    }, { rootMargin: margin || '0px 0px -60px 0px' });
+    io.observe(el);
+  }
+
+  /* Live numbers count up once */
+  if (!reduce) {
+    document.querySelectorAll('.ls b[data-count]').forEach(function (b) {
+      var to = +b.dataset.count, t0 = null;
+      if (!to) return;
+      b.textContent = '0';
+      setTimeout(function () {
+        requestAnimationFrame(function tick(t) {
+          t0 = t0 || t;
+          var k = Math.min((t - t0) / 1300, 1), e = 1 - Math.pow(1 - k, 3);
+          b.textContent = Math.round(to * e).toLocaleString('en-IN');
+          if (k < 1) requestAnimationFrame(tick);
+        });
+      }, 800);
+    });
+  }
+
+  /* Leaderboard bars fill when seen */
+  var lb = document.getElementById('lb');
+  whenSeen(lb, function () { lb.classList.add('in'); });
+
+  /* ---------- Jobs near you ---------- */
+  var mapEl = document.getElementById('jobs-map');
+  var dataEl = document.getElementById('pins-data');
+  if (!mapEl || !dataEl) return;
+  var pins = [];
+  try { pins = JSON.parse(dataEl.textContent) || []; } catch (e) {}
+  if (!pins.length) return;
+
+  var map = null, layer = null, meMarker = null, me = null, filter = '', ready = false, wantLocate = false;
+  var CITY_ZOOM = 10;
+  var listEl = document.getElementById('near-items'), titleEl = document.getElementById('near-title'), countEl = document.getElementById('near-count');
+  var ask = document.getElementById('map-ask'), askTxt = document.getElementById('map-ask-txt'), locBtn = document.getElementById('locate');
+  var markers = [];
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function km(a, b) {
+    var R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function roleMatches(r) { return !filter || (filter === 'fresher' ? r.fresher : r.family === filter); }
+  function visible() {
+    return pins.map(function (p) {
+      var roles = p.roles.filter(roleMatches);
+      return roles.length ? { p: p, roles: roles, n: filter ? roles.length : p.count } : null;
+    }).filter(Boolean);
+  }
+  function fmtKm(d) { return d < 1 ? '< 1 km' : d < 10 ? d.toFixed(1) + ' km' : Math.round(d).toLocaleString('en-IN') + ' km'; }
+
+  function popupHtml(v) {
+    var shown = v.roles.slice(0, 2), locked = v.roles.slice(2, 5), more = v.n - shown.length - locked.length;
+    var h = '<div class="pp-co">' + esc(v.p.company) + '</div><div class="pp-area">' + esc(v.p.area === v.p.city ? v.p.city : v.p.area + ', ' + v.p.city) +
+            (me ? ' · ' + fmtKm(km(me, v.p)) + ' away' : '') + '</div><ul class="pp-roles">';
+    shown.forEach(function (r) { h += '<li>' + esc(r.title) + (r.fresher ? ' <span class="tg">fresher</span>' : '') + '</li>'; });
+    locked.forEach(function () { h += '<li class="locked" aria-hidden="true">Senior role title hidden here</li>'; });
+    h += '</ul>';
+    if (more > 0) h += '<div class="pp-area">+' + more + ' more</div>';
+    h += '<div class="pp-lock"><a class="btn btn-p" href="/signup">Sign up to view jobs</a><a class="lnk" href="/login">Log in</a></div>';
+    return h;
+  }
+
+  function cityGroups(vs) {
+    var g = {};
+    vs.forEach(function (v) {
+      var c = g[v.p.city] || (g[v.p.city] = { city: v.p.city, lat: 0, lng: 0, k: 0, n: 0 });
+      c.lat += v.p.lat; c.lng += v.p.lng; c.k++; c.n += v.n;
+    });
+    return Object.keys(g).map(function (k) { var c = g[k]; c.lat /= c.k; c.lng /= c.k; return c; });
+  }
+
+  function draw() {
+    if (!map) return;
+    layer.clearLayers(); markers = [];
+    var vs = visible();
+    if (map.getZoom() < CITY_ZOOM) {
+      cityGroups(vs).forEach(function (c) {
+        var m = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'cpin', html: '<div>' + esc(c.city) + ' · ' + c.n + '</div>', iconSize: null }),
+                                          keyboard: true, title: c.city + ': ' + c.n + ' roles', riseOnHover: true });
+        m.on('click', function () { map.flyTo([c.lat, c.lng], 12, { duration: reduce ? 0 : 1 }); });
+        layer.addLayer(m);
+      });
+    } else {
+      vs.forEach(function (v) {
+        var hot = v.n > 2;
+        var m = L.marker([v.p.lat, v.p.lng], { icon: L.divIcon({ className: 'jpin' + (hot ? ' hot' : ''), html: '<div><span>' + esc(v.p.company.charAt(0).toUpperCase()) + '</span></div>', iconSize: null }),
+                                              title: v.p.company + ': ' + v.n + (v.n === 1 ? ' role' : ' roles'), riseOnHover: true });
+        m.bindPopup(function () { return popupHtml(v); }, { maxWidth: 280, autoPanPaddingTopLeft: [20, 90], autoPanPaddingBottomRight: [20, 20] });
+        m._v = v;
+        layer.addLayer(m); markers.push(m);
+      });
+    }
+  }
+
+  function renderList() {
+    var vs = visible(), center = me || (map ? map.getCenter() : { lat: 12.97, lng: 77.59 });
+    vs.forEach(function (v) { v.d = km(center, v.p); });
+    vs.sort(function (a, b) { return a.d - b.d; });
+    var near = me ? vs.filter(function (v) { return v.d <= 25; }) : [];
+    var roles = near.reduce(function (s, v) { return s + v.n; }, 0);
+    if (me) {
+      if (near.length) {
+        titleEl.textContent = 'Hiring near you';
+        countEl.textContent = roles + (roles === 1 ? ' role' : ' roles') + ' within 25 km';
+      } else {
+        titleEl.textContent = 'Closest openings';
+        countEl.textContent = vs.length ? 'Nearest is ' + fmtKm(vs[0].d) + ' away, in ' + vs[0].p.city : '';
+      }
+    } else {
+      var total = vs.reduce(function (s, v) { return s + v.n; }, 0);
+      titleEl.textContent = 'Hiring across India';
+      countEl.textContent = total + ' roles at ' + vs.length + ' company locations';
+    }
+    listEl.innerHTML = '';
+    if (!vs.length) { listEl.innerHTML = '<li class="near-empty">No roles like that on the map yet. Try another filter.</li>'; return; }
+    vs.slice(0, 25).forEach(function (v) {
+      var li = document.createElement('li');
+      li.innerHTML = '<button class="ni" type="button"><span class="av" aria-hidden="true">' + esc(v.p.company.charAt(0).toUpperCase()) + '</span>' +
+        '<span class="t"><b>' + esc(v.p.company) + '</b><span>' + esc(v.roles[0].title) + (v.n > 1 ? ' and ' + (v.n - 1) + ' more' : '') + '</span></span>' +
+        '<span class="d">' + (me ? fmtKm(v.d) : esc(v.p.area)) + '</span></button>';
+      li.firstChild.addEventListener('click', function () { focusPin(v.p); });
+      listEl.appendChild(li);
+    });
+  }
+
+  function focusPin(p) {
+    if (!map) return;
+    var open = function () {
+      var m = markers.filter(function (x) { return x._v.p === p; })[0];
+      if (m) m.openPopup();
+    };
+    if (map.getZoom() < 13) { map.once('moveend', function () { setTimeout(open, 50); }); map.flyTo([p.lat, p.lng], 14, { duration: reduce ? 0 : .9 }); }
+    else { map.panTo([p.lat, p.lng]); open(); }
+  }
+
+  function setMe(lat, lng) {
+    me = { lat: lat, lng: lng };
+    ask.classList.add('gone');
+    if (meMarker) meMarker.remove();
+    meMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'me-pin', html: '<div></div>', iconSize: [18, 18] }), title: 'You', interactive: false, zIndexOffset: 1000 }).addTo(map);
+    var vs = visible();
+    vs.forEach(function (v) { v.d = km(me, v.p); });
+    vs.sort(function (a, b) { return a.d - b.d; });
+    if (vs.length && vs[0].d > 25) {
+      // Nothing close by: frame both the person and the nearest openings
+      map.flyToBounds(L.latLngBounds([[lat, lng], [vs[0].p.lat, vs[0].p.lng]]).pad(.3), { duration: reduce ? 0 : 1.2, maxZoom: 11 });
+    } else {
+      map.flyTo([lat, lng], 12, { duration: reduce ? 0 : 1.2 });
+    }
+    renderList();
+  }
+
+  function locate() {
+    if (!ready) { wantLocate = true; return; }
+    if (!navigator.geolocation) { askTxt.textContent = "This browser can't share a location."; locBtn.hidden = true; return; }
+    askTxt.textContent = 'Finding you…';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      setMe(pos.coords.latitude, pos.coords.longitude);
+    }, function (err) {
+      askTxt.textContent = err && err.code === 1 ? 'No problem. Tap a city to explore, or allow location in your browser settings.' : "Couldn't find your location. Tap a city to explore.";
+      locBtn.textContent = 'Try again';
+    }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 });
+  }
+  locBtn.addEventListener('click', locate);
+
+  document.querySelectorAll('.nf').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.dataset.f;
+      document.querySelectorAll('.nf').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      draw(); renderList();
+    });
+  });
+  document.querySelectorAll('.bchip[data-city]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      var c = cityGroups(visible()).filter(function (g) { return g.city === a.dataset.city; })[0];
+      if (c && map) setTimeout(function () { map.flyTo([c.lat, c.lng], 12, { duration: reduce ? 0 : 1 }); }, 400);
+    });
+  });
+
+  function theme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark_all' : 'light_all'; }
+  function start() {
+    map = L.map(mapEl, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false, zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
+    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/' + theme() + '/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd', maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    }).addTo(map);
+    // Follow the page's theme switch, if there is one
+    new MutationObserver(function () { tiles.setUrl('https://{s}.basemaps.cartocdn.com/' + theme() + '/{z}/{x}/{y}{r}.png'); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    map.on('focus', function () { map.scrollWheelZoom.enable(); });
+    map.on('blur', function () { map.scrollWheelZoom.disable(); });
+    var last = map.getZoom() < CITY_ZOOM;
+    map.on('zoomend', function () { var now = map.getZoom() < CITY_ZOOM; if (now !== last) { last = now; draw(); } });
+    map.on('moveend', function () { if (!me) renderList(); });
+    layer = L.layerGroup().addTo(map);
+    ready = true;
+    draw(); renderList();
+    if (wantLocate) { locate(); return; }
+    // Ask for the location as soon as the map is on screen, unless it was refused before
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function (st) { if (st.state !== 'denied') locate(); else askTxt.textContent = 'Location is off for this site. Tap a city to explore.'; },
+                                                                function () { locate(); });
+    } else { locate(); }
+  }
+
+  renderList();
+  // Load the map library only when the map is about to come on screen
+  whenSeen(mapEl, function () {
+    var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/static/vendor/leaflet/leaflet.css?v=1.9.4';
+    document.head.appendChild(css);
+    var js = document.createElement('script'); js.src = '/static/vendor/leaflet/leaflet.js?v=1.9.4';
+    js.onload = function () { mapEl.getBoundingClientRect(); start(); };
+    js.onerror = function () { askTxt.textContent = "The map didn't load. The list on the right still works."; locBtn.hidden = true; };
+    document.body.appendChild(js);
+  }, '300px 0px');
+})();
+</script>
+{% endif %}
 </body>
 </html>

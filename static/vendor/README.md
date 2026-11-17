@@ -5,6 +5,7 @@ Served from our own server so pages never depend on a CDN at run time.
 | File | Contents | License |
 | --- | --- | --- |
 | `sunny-anim.min.js` | [Anime.js](https://github.com/juliangarnier/anime) 4.5.0, [AutoAnimate](https://github.com/formkit/auto-animate) 0.10.2 and [canvas-confetti](https://github.com/catdad/canvas-confetti) 1.9.4, bundled as `window.SunnyAnim` | MIT, MIT, ISC |
+| `leaflet/` | [Leaflet](https://github.com/Leaflet/Leaflet) 1.9.4 (`leaflet.js`, `leaflet.css`, unmodified apart from the source-map comment). Loaded by the homepage's "jobs near you" map only when the map scrolls into view | BSD-2-Clause |
 | `lenis.min.js` | [Lenis](https://github.com/darkroomengineering/lenis) 1.3.27 smooth scrolling. Not loaded by any page since Nov 2026: it made scrolling feel sluggish | MIT |
 
 Rebuild: `cd tools/anim-bundle && npm install && npm run build`.
