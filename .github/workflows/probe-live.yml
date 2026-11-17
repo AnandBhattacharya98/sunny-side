@@ -1,0 +1,13 @@
+name: Temporary live probe
+on:
+  push:
+    branches: [claude/project-thread-3j1x9q]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for i in $(seq 1 30); do
+            echo "$(date -u +%T) $(curl -s -o /tmp/b -w '%{http_code} %{time_total}s' --max-time 30 https://pm-job-hunter-qfva.onrender.com/healthz) $(head -c 200 /tmp/b)"
+            sleep 15
+          done
