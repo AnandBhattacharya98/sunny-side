@@ -161,3 +161,122 @@ def test_other_users_board_is_not_used(client, monkeypatch):
     data = client.get("/api/career-switch/jobs?q=UX+Researcher").get_json()
     zepto = next(r for r in data["results"] if r["company"] == "Zepto")
     assert zepto["on_board"] is False
+
+
+# ── Filters and job details ──────────────────────────────────────────────
+
+from datetime import datetime, timedelta, timezone
+
+import job_compare
+
+LONG_DESC = ("About the role: you'll turn messy data into decisions for our growth team.\n"
+             "Requirements:\n• 3+ years of experience\n• Strong SQL and Python\n• Tableau dashboards\n"
+             "Nice to have:\n• AWS\n" + "We value curiosity and clear writing. " * 8)
+
+
+def dated_search(query, location="", **kwargs):
+    now = datetime.now(timezone.utc)
+    dated_search.kwargs = kwargs
+    return {"results": [
+        {"title": "Data Analyst", "company": "Meesho", "location": "Remote · India", "url": "https://remotive.com/job/1",
+         "source": "remotive", "ref": "remotive:1", "posted_at": (now - timedelta(hours=5)).isoformat(),
+         "remote": True, "salary": "₹12–18 LPA", "description": LONG_DESC},
+        {"title": "Junior Data Analyst", "company": "Swiggy", "location": "Bengaluru", "url": "https://example.com/da-swiggy",
+         "source": "direct", "ref": "x:9", "posted_at": (now - timedelta(days=10)).isoformat()},
+        {"title": "Data Analyst Intern", "company": "Zepto", "location": "Mumbai", "url": "https://in.linkedin.com/jobs/view/123456789",
+         "source": "linkedin", "ref": "https://in.linkedin.com/jobs/view/123456789", "posted_at": ""},
+    ], "failed": []}
+
+
+def test_jobs_api_describes_each_result(client, monkeypatch):
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET resume_text = 'Analyst with 2 years of SQL and Excel work' WHERE id = ?", (UID,))
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(scraper, "search_web_jobs", dated_search)
+    data = client.get("/api/career-switch/jobs?q=Data+Analyst").get_json()
+    by = {r["company"]: r for r in data["results"]}
+    assert by["Meesho"]["remote"] is True and by["Meesho"]["salary"] == "₹12–18 LPA"
+    assert isinstance(by["Meesho"]["match"], int)
+    assert by["Swiggy"]["level"] == "entry" and by["Swiggy"]["match"] is None
+    assert by["Zepto"]["level"] == "intern" and by["Zepto"]["type"] == "internship"
+    assert "description" not in by["Meesho"]
+
+
+def test_date_filter_drops_older_and_undated_postings(client, monkeypatch):
+    monkeypatch.setattr(scraper, "search_web_jobs", dated_search)
+    data = client.get("/api/career-switch/jobs?q=Data+Analyst&days=3").get_json()
+    assert [r["company"] for r in data["results"]] == ["Meesho"]
+    assert data["older"] == 2 and data["days"] == 3
+    assert dated_search.kwargs["days"] == 3
+
+
+def test_work_mode_filters(client, monkeypatch):
+    monkeypatch.setattr(scraper, "search_web_jobs", dated_search)
+    onsite = client.get("/api/career-switch/jobs?q=Data+Analyst&mode=onsite").get_json()
+    assert "Meesho" not in {r["company"] for r in onsite["results"]}
+    client.get("/api/career-switch/jobs?q=Data+Analyst&mode=remote")
+    assert dated_search.kwargs["remote_only"] is True
+
+
+def test_details_compare_resume_against_posting(client, monkeypatch):
+    job_compare._cache.clear()
+    conn = get_conn(DB_PATH)
+    conn.execute("UPDATE users SET resume_text = 'Analyst with 2 years of SQL and Excel work', resume_profile_json = NULL WHERE id = ?", (UID,))
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(scraper, "search_web_jobs", dated_search)
+    client.get("/api/career-switch/jobs?q=Data+Analyst")
+    data = client.post("/api/career-switch/details", json={"source": "remotive", "ref": "remotive:1"}).get_json()
+    assert data["ok"] and data["has_resume"]
+    assert data["job"]["description"].startswith("About the role")
+    cmp = data["compare"]
+    assert "SQL" in cmp["matched"]
+    missing = {m["skill"]: m for m in cmp["missing"]}
+    assert missing["Python"]["importance"] == "must"
+    assert missing["AWS"]["importance"] == "nice"
+    assert missing["Tableau"]["learn_url"] == "/learn?skill=Tableau&from=career-switch"
+    assert cmp["experience"]["required"] == 3
+    assert 0 <= cmp["score"] <= 100 and cmp["mode"] == "local"
+
+
+def test_details_for_an_unknown_remote_ref_is_refused(client):
+    r = client.post("/api/career-switch/details", json={"source": "remotive", "ref": "remotive:nope"})
+    assert r.status_code == 404
+
+
+def test_details_only_fetch_linkedin_job_links(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(scraper, "fetch_linkedin_posting", lambda url: calls.append(url) or {"description": LONG_DESC, "criteria": {"Seniority level": "Entry level", "Employment type": "Internship"}})
+    bad = client.post("/api/career-switch/details", json={"source": "linkedin", "ref": "http://169.254.169.254/latest", "title": "x", "company": "y"})
+    assert bad.status_code == 404 and not calls
+    ok = client.post("/api/career-switch/details", json={"source": "linkedin", "ref": "https://in.linkedin.com/jobs/view/123456789",
+                                                          "title": "Data Analyst", "company": "Zepto"}).get_json()
+    assert ok["ok"] and calls == ["https://in.linkedin.com/jobs/view/123456789"]
+    assert ok["job"]["level"] == "entry" and ok["job"]["type"] == "internship"
+
+
+def test_details_uses_ai_when_a_key_is_set(client, monkeypatch):
+    job_compare._cache.clear()
+    monkeypatch.setattr(dashboard, "get_fallback_gemini_key", lambda: "k")
+    reply = {"score": 64, "summary": "Close.", "matched": ["SQL"], "missing": [{"skill": "Python", "importance": "must", "why": "Daily work."}, "Looker"],
+             "strengths": ["Analytics background"], "tips": ["Ship a notebook"]}
+    monkeypatch.setattr(job_compare, "_call_gemini", lambda *a, **k: json.dumps(reply))
+    monkeypatch.setattr(scraper, "search_web_jobs", dated_search)
+    client.get("/api/career-switch/jobs?q=Data+Analyst")
+    cmp = client.post("/api/career-switch/details", json={"source": "remotive", "ref": "remotive:1"}).get_json()["compare"]
+    assert cmp["mode"] == "ai" and cmp["score"] == 64 and cmp["verdict"] == "Good match"
+    assert [m["skill"] for m in cmp["missing"]] == ["Python", "Looker"]
+    assert all(m["learn_url"].startswith("/learn?skill=") for m in cmp["missing"])
+
+
+def test_details_requires_login():
+    with dashboard.app.test_client() as c:
+        assert c.post("/api/career-switch/details", json={}).status_code == 401
+
+
+def test_job_level_and_type():
+    assert job_compare.job_level("Senior Data Analyst") == "senior"
+    assert job_compare.job_level("Head of Growth") == "lead"
+    assert job_compare.job_level("Data Analyst") == "mid"
+    assert job_compare.job_type("Analyst", "This is a 6 month contract role") == "contract"
