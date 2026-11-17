@@ -1170,7 +1170,8 @@ def index():
         # The refreshed homepage: on for everyone, or an admin previewing it with /?preview=home
         fresh = preview_home or flags.enabled("home_refresh", False)
         live = home_stats.get(lambda: get_conn(DB_PATH)) if fresh else None
-        return render_template("landing.html", seekers=[dict(u) for u in users], fresh=fresh, live=live)
+        return render_template("landing.html", seekers=[dict(u) for u in users], fresh=fresh, live=live,
+                               map_places=home_stats.map_places() if fresh else [])
         
     # Get user settings to pass to frontend profile form (stored secrets are never sent back)
     settings = get_user_settings(conn, uid, mask_secrets=True)
@@ -2867,6 +2868,20 @@ def _career_context(conn, uid):
                            (uid,)).fetchone()
         current = row[0] if row else ""
     return current, settings.get("resume_text") or "", settings.get("gemini_api_key") or get_fallback_gemini_key()
+
+
+@app.route("/map")
+def map_view():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        pins, unplaced = home_stats.board_pins(conn, uid)
+        nearby = home_stats.nearby_openings(conn, uid)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="map", map_pins=pins, map_unplaced=unplaced, map_places=home_stats.map_places(),
+                           map_nearby=nearby, stats=stats)
 
 
 @app.route("/career-switch")
