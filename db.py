@@ -417,6 +417,7 @@ def migrate_db(conn) -> None:
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
+    _run_once(conn, "2026-11-repair-livekit-mojibake", _repair_livekit_mojibake)
 
     if IS_POSTGRES:
         seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls", "login_events", "courses"]
@@ -461,6 +462,25 @@ def _ensure_admin(conn) -> None:
         conn.commit()
         print(f"Admin still had the default password 'admin'; it has been replaced. New password: {pw}  "
               f"(set ADMIN_PASSWORD to choose your own)")
+
+
+def _repair_livekit_mojibake(conn) -> None:
+    """Text written by LiveKit's model before Nov 17 2026 was decoded as ISO-8859-1, so curly quotes and dashes
+    were saved as "â€\x99" and the like. Repairs the saved courses and mock interview reports."""
+    from livekit_llm import repair_json_text
+    for table, key, cols in (("courses", "id", ("outline", "lessons", "final_quiz")), ("calls", "id", ("report",))):
+        try:
+            rows = conn.execute(f"SELECT {key}, {', '.join(cols)} FROM {table}").fetchall()
+        except Exception:
+            conn.rollback()
+            continue
+        for row in rows:
+            changes = {c: repair_json_text(row[i + 1]) for i, c in enumerate(cols)
+                       if row[i + 1] and repair_json_text(row[i + 1]) != row[i + 1]}
+            if changes:
+                conn.execute(f"UPDATE {table} SET {', '.join(c + ' = ?' for c in changes)} WHERE {key} = ?",
+                             list(changes.values()) + [row[0]])
+    conn.commit()
 
 
 def _run_once(conn, key: str, fn) -> None:

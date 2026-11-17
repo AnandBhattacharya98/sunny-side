@@ -220,3 +220,37 @@ def test_account_delete_removes_courses(client, ai):
     delete_user_data(conn, UID)
     assert conn.execute("SELECT COUNT(*) FROM courses WHERE user_id = ?", (UID,)).fetchone()[0] == 0
     conn.close()
+
+
+def test_livekit_stream_is_read_as_utf8():
+    class Resp:
+        def iter_lines(self):
+            yield 'data: {"choices": [{"delta": {"content": "the user’s device — "}}]}'.encode("utf-8")
+            yield 'data: {"choices": [{"delta": {"content": "कोड café"}}]}'.encode("utf-8")
+            yield b"data: [DONE]"
+    assert livekit_llm._parse_stream(Resp()) == "the user’s device — कोड café"
+
+
+@pytest.mark.parametrize("good", ["the user’s device — fast", "“quoted” …", "कोड", "café naïve © 2026"])
+def test_repair_mojibake_round_trip(good):
+    assert livekit_llm.repair_mojibake(good.encode("utf-8").decode("latin-1")) == good
+    assert livekit_llm.repair_mojibake(good) == good  # correct text is left alone
+    cp = good.encode("utf-8").decode("cp1252", errors="ignore")
+    if cp.encode("cp1252", errors="ignore") == good.encode("utf-8"):
+        assert livekit_llm.repair_mojibake(cp) == good
+
+
+def test_saved_courses_are_repaired(client, ai):
+    import db
+    cid = client.post("/api/learn/courses", json={"skill": "SaaS"}).get_json()["id"]
+    bad = "installed on a user’s device".encode("utf-8").decode("latin-1")
+    conn = get_conn(DB_PATH)
+    c = learning.get_course(conn, UID, cid)
+    c["outline"]["tagline"] = bad
+    c["lessons"]["0"] = {"sections": [{"heading": "H", "body": bad}], "quiz": []}
+    learning._save(conn, c, "outline", "lessons")
+    db._repair_livekit_mojibake(conn)
+    c = learning.get_course(conn, UID, cid)
+    conn.close()
+    assert c["outline"]["tagline"] == "installed on a user’s device"
+    assert c["lessons"]["0"]["sections"][0]["body"] == "installed on a user’s device"
