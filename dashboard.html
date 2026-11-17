@@ -8668,6 +8668,11 @@ async function addCareerResult(btn) {
 }
 
 // ── Job details: the full posting and how the resume compares ──
+// The Learn page starts a course for each skill= (up to 5), then opens the first
+function csLearnAll(missing) {
+  return '/learn?' + missing.slice(0, 5).map(m => 'skill=' + encodeURIComponent(m.skill)).join('&') + '&from=career-switch';
+}
+
 function csDescriptionHtml(text) {
   const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
   let html = '', inList = false;
@@ -8781,7 +8786,7 @@ function renderCareerDetails(r, data) {
     </section>
 
     <section class="cs-box" aria-labelledby="cs-miss-h">
-      <h3 id="cs-miss-h">What's missing <span class="n">${missing.length}</span>${missing.length ? '<a href="/learn">My courses →</a>' : ''}</h3>
+      <h3 id="cs-miss-h">What's missing <span class="n">${missing.length}</span>${missing.length > 1 ? `<a href="${esc(csLearnAll(missing))}">Learn all ${Math.min(missing.length, 5)} →</a>` : ''}</h3>
       ${missing.length ? `<ul class="cs-miss">${missing.map((m, k) => `
         <li style="--k:${k}">
           <span class="sk">${esc(m.skill)} <span class="imp${m.importance === 'nice' ? ' nice' : ''}">${m.importance === 'nice' ? 'Nice to have' : 'Must have'}</span></span>
