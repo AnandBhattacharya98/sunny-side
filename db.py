@@ -410,12 +410,16 @@ def migrate_db(conn) -> None:
     import recruiter
     recruiter.migrate(conn)
 
+    # Learn: courses on the skills a resume is missing (learning.py)
+    import learning
+    learning.migrate(conn)
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
 
     if IS_POSTGRES:
-        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls", "login_events"]
+        seq_tables = ["users", "jobs", "contacts", "cover_letters", "application_timeline", "received_emails", "tailored_resumes", "interview_prep", "calls", "login_events", "courses"]
         for t in seq_tables:
             try:
                 conn.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE(max(id), 1)) FROM {t}")
@@ -647,6 +651,8 @@ def delete_user_data(conn, user_id: int) -> None:
     conn.execute("DELETE FROM login_events WHERE user_id = ?", (user_id,))
     import recruiter
     recruiter.delete_recruiter_data(conn, user_id)
+    import learning
+    learning.delete_user_courses(conn, user_id)
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
 

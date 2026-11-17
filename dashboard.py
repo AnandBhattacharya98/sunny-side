@@ -20,6 +20,8 @@ from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
 import legal
 import recruiter as rec
+import learning
+import learning_videos
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -1464,6 +1466,9 @@ def export_account():
                 "calls": [dict(r) for r in conn.execute(
                     "SELECT caller_name, phone_number, status, duration_seconds, summary, kind, transcript, created_at "
                     "FROM calls WHERE user_id = ? ORDER BY created_at", (uid,)).fetchall()],
+                "courses": [dict(r) for r in conn.execute(
+                    "SELECT skill, progress, created_at, completed_at FROM courses WHERE user_id = ? ORDER BY created_at",
+                    (uid,)).fetchall()],
             }
             body, mimetype, ext = json.dumps(data, indent=2, default=str), "application/json", "json"
         else:
@@ -2191,6 +2196,179 @@ def progress_page():
     finally:
         conn.close()
     return render_template("dashboard.html", view_mode="progress", progress=data, interviews=interviews, stats=stats)
+
+
+# ── Learn: courses on the skills a resume is missing (learning.py) ───────
+
+def _learn_context(conn, uid):
+    settings = get_user_settings(conn, uid)
+    return settings.get("resume_text") or "", settings.get("gemini_api_key") or get_fallback_gemini_key()
+
+
+@app.route("/learn")
+@app.route("/learn/<int:course_id>")
+def learn_view(course_id=None):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        if course_id is not None and not learning.get_course(conn, uid, course_id):
+            return redirect(url_for("learn_view"))
+        settings = get_user_settings(conn, uid, mask_secrets=True)
+        stats = _stats(conn)
+    finally:
+        conn.close()
+    return render_template("dashboard.html", view_mode="learn", stats=stats, settings=settings,
+                           course_id=course_id, start_skill=learning.clean_skill(request.args.get("skill")))
+
+
+@app.route("/api/learn/catalog", methods=["GET"])
+def learn_catalog():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        resume, _ = _learn_context(conn, uid)
+        courses = learning.list_courses(conn, uid)
+        gaps = learning.skill_gaps(conn, uid, resume)
+    finally:
+        conn.close()
+    by_skill = {learning.skill_key(c["skill"]): c["id"] for c in courses}
+    for g in gaps:
+        g["course_id"] = by_skill.get(learning.skill_key(g["skill"]))
+    return jsonify({"ok": True, "courses": courses, "gaps": gaps, "has_resume": bool(resume.strip())})
+
+
+@app.route("/api/learn/courses", methods=["POST"])
+def learn_start():
+    uid = get_user_id()
+    skill = learning.clean_skill((request.get_json(silent=True) or {}).get("skill"))
+    if len(skill) < 2:
+        return jsonify({"ok": False, "error": "Type the skill you want to learn."}), 400
+    conn = get_conn(DB_PATH)
+    try:
+        existing = learning.find_course(conn, uid, skill)
+        if existing:
+            return jsonify({"ok": True, "id": existing["id"], "created": False})
+        if not ve.rate_limiter.allow(uid, "learn_start", 6):
+            return jsonify({"ok": False, "error": "That's a lot of new courses at once. Give it a minute."}), 429
+        resume, key = _learn_context(conn, uid)
+        course, created = learning.start_course(conn, uid, skill, resume=resume, api_key=key)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "id": course["id"], "created": created})
+
+
+@app.route("/api/learn/courses/<int:course_id>", methods=["GET"])
+def learn_course(course_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        course = learning.get_course(conn, uid, course_id)
+    finally:
+        conn.close()
+    if not course:
+        return jsonify({"ok": False, "error": "Course not found"}), 404
+    view = learning.course_view(course)
+    if course.get("completed_at"):
+        view["certificate"] = learning.certificate_id(course)
+    return jsonify({"ok": True, "course": view})
+
+
+@app.route("/api/learn/courses/<int:course_id>/delete", methods=["POST"])
+def learn_delete(course_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        learning.delete_course(conn, uid, course_id)
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/learn/courses/<int:course_id>/lessons/<int:index>", methods=["GET"])
+def learn_lesson(course_id, index):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        course = learning.get_course(conn, uid, course_id)
+        if not course:
+            return jsonify({"ok": False, "error": "Course not found"}), 404
+        if not 0 <= index < len(course["outline"].get("lessons") or []):
+            return jsonify({"ok": False, "error": "Lesson not found"}), 404
+        if str(index) not in course["lessons"] and not ve.rate_limiter.allow(uid, "learn_write", 12):
+            return jsonify({"ok": False, "error": "Writing lessons too fast. Give it a minute."}), 429
+        _, key = _learn_context(conn, uid)
+        content = learning.lesson(conn, course, index, api_key=key)
+    finally:
+        conn.close()
+    if not content:
+        return jsonify({"ok": False, "error": "Lesson not found"}), 404
+    meta = course["outline"]["lessons"][index]
+    return jsonify({"ok": True, "index": index, "title": meta["title"], "minutes": meta.get("minutes", 15),
+                    "summary": meta.get("summary", ""),
+                    "sections": content["sections"], "key_points": content.get("key_points", []),
+                    "example": content.get("example", ""), "practice": content.get("practice", ""),
+                    "fallback": bool(content.get("fallback")),
+                    "quiz": learning.public_quiz(content["quiz"]),
+                    "progress": (course["progress"].get("lessons") or {}).get(str(index)),
+                    "videos_link": learning_videos.search_link(f"{course['skill']} {meta['title']}")})
+
+
+@app.route("/api/learn/courses/<int:course_id>/lessons/<int:index>/quiz", methods=["POST"])
+def learn_lesson_quiz(course_id, index):
+    uid = get_user_id()
+    answers = (request.get_json(silent=True) or {}).get("answers")
+    conn = get_conn(DB_PATH)
+    try:
+        course = learning.get_course(conn, uid, course_id)
+        if not course:
+            return jsonify({"ok": False, "error": "Course not found"}), 404
+        try:
+            result = learning.record_lesson_quiz(conn, course, index, answers)
+        except KeyError:
+            return jsonify({"ok": False, "error": "Open the lesson first."}), 400
+    finally:
+        conn.close()
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/learn/courses/<int:course_id>/final", methods=["GET", "POST"])
+def learn_final(course_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        course = learning.get_course(conn, uid, course_id)
+        if not course:
+            return jsonify({"ok": False, "error": "Course not found"}), 404
+        if not learning.lessons_done(course):
+            return jsonify({"ok": False, "error": "Pass every lesson's quiz to unlock the final test."}), 403
+        if request.method == "GET":
+            if not course["final_quiz"] and not ve.rate_limiter.allow(uid, "learn_write", 12):
+                return jsonify({"ok": False, "error": "Writing lessons too fast. Give it a minute."}), 429
+            _, key = _learn_context(conn, uid)
+            quiz = learning.final_quiz(conn, course, api_key=key)
+            return jsonify({"ok": True, "quiz": learning.public_quiz(quiz), "progress": course["progress"].get("final")})
+        result = learning.record_final(conn, course, (request.get_json(silent=True) or {}).get("answers"))
+        if result["passed"]:
+            result["resume_line"] = course["outline"].get("resume_line", "")
+            result["certificate"] = learning.certificate_id(course)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/learn/courses/<int:course_id>/videos", methods=["GET"])
+def learn_videos(course_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        course = learning.get_course(conn, uid, course_id)
+        if not course:
+            return jsonify({"ok": False, "error": "Course not found"}), 404
+        groups = learning_videos.videos_for_gaps(conn, [course["skill"]])
+    finally:
+        conn.close()
+    g = groups[0] if groups else {"videos": [], "more": learning_videos.search_link(course["skill"])}
+    return jsonify({"ok": True, "videos": g["videos"], "more": g["more"]})
 
 
 @app.route("/api/job/<job_id>/interview-prep", methods=["GET"])

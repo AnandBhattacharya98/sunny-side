@@ -1,0 +1,634 @@
+<style>
+  .lv-wrap { flex: 1; overflow-y: auto; min-height: 0; padding-right: 8px; display: flex; flex-direction: column; gap: 22px; padding-bottom: 32px; }
+  .lv-intro { font-size: 13.5px; color: var(--mut); line-height: 1.55; max-width: 640px; margin: 0; }
+  .lv-intro b { color: var(--txt); font-weight: 600; }
+  .lv-kicker { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--txt); display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .lv-kicker::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--yolk); }
+  .lv-kicker small { font-weight: 400; letter-spacing: .04em; text-transform: none; color: var(--hin); margin-left: auto; }
+  .lv-btn { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--yolk); background: var(--yolk); color: var(--ink); white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: transform .15s, box-shadow .2s; }
+  .lv-btn.ghost { background: transparent; color: var(--txt); border-color: var(--bdr-strong); }
+  .lv-btn[disabled] { opacity: .55; cursor: default; }
+  .lv-btn:not([disabled]):hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(255,167,0,.8); }
+  .lv-btn.ghost:not([disabled]):hover { box-shadow: none; border-color: var(--txt); }
+  .lv-btn:not([disabled]):active { transform: scale(.96); }
+  .lv-link { align-self: flex-start; background: none; border: none; padding: 0; font: inherit; font-family: var(--font-mono); font-size: 11.5px; color: var(--mut); cursor: pointer; text-decoration: none; }
+  .lv-link:hover { color: var(--txt); }
+  .lv-note { font-size: 12.5px; color: var(--mut); line-height: 1.5; }
+  .lv-err { font-size: 12.5px; color: var(--bad-txt); }
+
+  /* Catalog */
+  .lv-hero { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .lv-hero > div { flex: 1 1 320px; display: flex; flex-direction: column; gap: 14px; animation: lvRise .6s cubic-bezier(.2,.8,.2,1) both; }
+  .lv-start { display: flex; gap: 8px; flex-wrap: wrap; max-width: 560px; }
+  .lv-start input { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); background: var(--sur); color: var(--txt); font-size: 13px; outline: none; }
+  .lv-start input:focus { border-color: var(--yolk); }
+  .lv-art { flex: 0 1 300px; width: 300px; max-width: 100%; height: auto; overflow: visible; animation: lvRise .6s .1s cubic-bezier(.2,.8,.2,1) both; }
+  .lv-art .rail { stroke: var(--bdr-strong); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 7; fill: none; }
+  .lv-art .fill { stroke: var(--yolk); stroke-width: 3.5; stroke-linecap: round; fill: none; stroke-dasharray: 1; stroke-dashoffset: 1; animation: lvDraw 2s .3s cubic-bezier(.65,0,.35,1) forwards; }
+  .lv-art .dot { fill: var(--sur); stroke: var(--bdr-strong); stroke-width: 2.5; }
+  .lv-art .dot.on { stroke: var(--yolk); fill: var(--yolk); transform-box: fill-box; transform-origin: center; transform: scale(0); animation: lvPop .45s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .lv-art .d1 { animation-delay: .45s !important; } .lv-art .d2 { animation-delay: .85s !important; } .lv-art .d3 { animation-delay: 1.25s !important; } .lv-art .d4 { animation-delay: 1.65s !important; }
+  .lv-art .cap { fill: var(--txt); transform-box: fill-box; transform-origin: center bottom; animation: lvHop 2.6s 2.2s ease-in-out infinite; }
+  .lv-art text { font-family: var(--font-mono); font-size: 10px; fill: var(--hin); letter-spacing: .04em; }
+
+  .lv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .lv-card { position: relative; overflow: hidden; isolation: isolate; text-align: left; display: flex; flex-direction: column; gap: 9px; padding: 15px 16px; border-radius: 14px; border: 1px solid var(--bdr); background: var(--sur); color: var(--txt); font: inherit; text-decoration: none;
+    transition: border-color .2s, box-shadow .25s, transform .25s cubic-bezier(.2,.8,.2,1);
+    animation: lvDeal .6s calc(var(--i, 0) * 70ms) cubic-bezier(.2,.9,.25,1.15) backwards; }
+  .lv-card:hover { transform: translateY(-3px); border-color: var(--bdr-strong); box-shadow: 0 18px 40px -18px rgba(42,35,21,.35); }
+  .lv-card::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), rgba(255,167,0,.15), transparent 65%); }
+  .lv-card:hover::after { opacity: 1; }
+  .lv-card-top { display: flex; align-items: center; gap: 8px; }
+  .lv-tag { font-family: var(--font-mono); font-size: 10px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--bdr-strong); color: var(--txt); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .lv-tag.yolk { background: var(--yolk); border-color: var(--yolk); color: var(--ink); font-weight: 700; }
+  .lv-tag.dash { border-style: dashed; color: var(--mut); }
+  .lv-card h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
+  .lv-card p { margin: 0; font-size: 12.5px; color: var(--mut); line-height: 1.45; }
+  .lv-card .lv-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; }
+  .lv-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--hin); }
+  .lv-bar { height: 6px; border-radius: 999px; background: var(--sur2); overflow: hidden; }
+  .lv-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--yolk); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .lv-asked { font-size: 11.5px; color: var(--mut); line-height: 1.45; }
+  .lv-asked b { color: var(--txt); }
+  .lv-empty { border: 1px dashed var(--bdr-strong); border-radius: 14px; padding: 18px; font-size: 13px; color: var(--mut); line-height: 1.5; }
+  .lv-skel { height: 132px; border-radius: 14px; border: 1px solid var(--bdr); background: linear-gradient(90deg, var(--sur) 0%, var(--sur2) 50%, var(--sur) 100%); background-size: 200% 100%; animation: lvShimmer 1.4s linear infinite; }
+
+  /* Writing a new course */
+  .lv-writing { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 48px 16px; }
+  .lv-writing h3 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+  .lv-book { width: 74px; height: 58px; position: relative; }
+  .lv-book i { position: absolute; top: 4px; width: 34px; height: 48px; border: 2px solid var(--txt); background: var(--sur); border-radius: 3px 8px 8px 3px; left: 37px; transform-origin: left center; animation: lvPage 1.6s ease-in-out infinite; }
+  .lv-book i:nth-child(2) { animation-delay: .3s; } .lv-book i:nth-child(3) { animation-delay: .6s; }
+  .lv-book::before, .lv-book::after { content: ""; position: absolute; top: 4px; width: 34px; height: 48px; border: 2px solid var(--txt); background: var(--sur2); }
+  .lv-book::before { left: 3px; border-radius: 8px 3px 3px 8px; } .lv-book::after { left: 37px; border-radius: 3px 8px 8px 3px; z-index: -1; }
+  .lv-steps { font-family: var(--font-mono); font-size: 11.5px; color: var(--mut); min-height: 1.5em; }
+
+  /* Course page */
+  .lv-chead { display: flex; flex-direction: column; gap: 10px; animation: lvRise .5s cubic-bezier(.2,.8,.2,1) both; }
+  .lv-chead h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.15; }
+  .lv-chead .lv-tagline { font-size: 14px; color: var(--mut); margin: 0; max-width: 720px; line-height: 1.5; }
+  .lv-chead-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .lv-progress { display: flex; align-items: center; gap: 12px; max-width: 520px; }
+  .lv-progress .lv-bar { flex: 1; height: 8px; }
+  .lv-progress b { font-family: var(--font-mono); font-size: 12px; }
+  .lv-outcomes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 18px; margin: 4px 0 0; padding: 0; list-style: none; max-width: 860px; }
+  .lv-outcomes li { font-size: 12.5px; line-height: 1.45; padding-left: 20px; position: relative; }
+  .lv-outcomes li::before { content: "✓"; position: absolute; left: 0; color: var(--purt); font-weight: 700; }
+  .lv-body { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .lv-syl { position: sticky; top: 0; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--bdr); background: var(--sur); border-radius: 14px; padding: 10px; }
+  .lv-syl-h { font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--hin); padding: 4px 8px 6px; }
+  .lv-step { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; padding: 9px 8px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--txt); font: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+  .lv-step:hover { background: var(--sur2); }
+  .lv-step.on { background: var(--purl); border-color: rgba(255,167,0,.45); }
+  .lv-step[disabled] { cursor: default; opacity: .6; }
+  .lv-step[disabled]:hover { background: none; }
+  .lv-num { flex: 0 0 24px; height: 24px; border-radius: 999px; border: 1.5px solid var(--bdr-strong); display: grid; place-items: center; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--mut); background: var(--sur); transition: background .3s, border-color .3s, color .3s; }
+  .lv-step.done .lv-num { background: var(--yolk); border-color: var(--yolk); color: var(--ink); }
+  .lv-step-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .lv-step-t b { font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+  .lv-step-t span { font-family: var(--font-mono); font-size: 10px; color: var(--hin); }
+
+  .lv-pane { min-width: 0; border: 1px solid var(--bdr); background: var(--sur); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .lv-pane.enter { animation: lvRise .45s cubic-bezier(.2,.8,.2,1) both; }
+  .lv-pane-h { display: flex; flex-direction: column; gap: 6px; }
+  .lv-pane-h .lv-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .lv-pane-h h3 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; }
+  .lv-sec h4 { margin: 0 0 8px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .lv-sec p { margin: 0 0 10px; font-size: 14px; line-height: 1.65; color: var(--txt); max-width: 72ch; }
+  .lv-sec ul { margin: 0 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.6; max-width: 72ch; }
+  .lv-box { border-radius: 12px; padding: 14px 16px; border: 1px solid var(--bdr); background: var(--sur2); }
+  .lv-box > b { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); margin-bottom: 8px; }
+  .lv-box pre { margin: 0; white-space: pre-wrap; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; color: var(--txt); overflow-wrap: anywhere; }
+  .lv-box ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
+  .lv-box p { margin: 0; font-size: 13.5px; line-height: 1.55; }
+  .lv-box.yolk { background: var(--purl); border-color: rgba(255,167,0,.4); }
+
+  .lv-vids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .lv-vid { position: relative; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--bdr); border-radius: 12px; overflow: hidden; background: var(--sur); padding: 0; cursor: pointer; text-align: left; color: var(--txt); font: inherit; }
+  .lv-vid img, .lv-vid iframe { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; border: 0; background: #000; }
+  .lv-vid .play { position: absolute; left: 50%; top: 0; margin-top: calc((100% * 9 / 16) / 2 - 20px); margin-left: -20px; width: 40px; height: 40px; border-radius: 999px; background: var(--yolk); color: var(--ink); display: grid; place-items: center; font-size: 14px; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5); transition: transform .2s; }
+  .lv-vid:hover .play { transform: scale(1.1); }
+  .lv-vid span.t { font-size: 12px; font-weight: 600; line-height: 1.3; padding: 0 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .lv-vid span.c { font-size: 11px; color: var(--mut); padding: 0 10px 10px; }
+
+  .lv-quiz { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid var(--bdr); padding-top: 18px; }
+  .lv-q { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+  .lv-q legend { font-size: 14px; font-weight: 600; line-height: 1.45; padding: 0; margin-bottom: 8px; }
+  .lv-q legend span { font-family: var(--font-mono); font-size: 11px; color: var(--hin); margin-right: 6px; }
+  .lv-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--bdr-strong); cursor: pointer; font-size: 13.5px; line-height: 1.4; background: var(--sur); transition: border-color .15s, background .15s, transform .15s; }
+  .lv-opt:hover { border-color: var(--txt); }
+  .lv-opt input { margin-top: 2px; accent-color: #FFA700; flex: 0 0 auto; }
+  .lv-opt:has(input:checked) { border-color: var(--yolk); background: var(--purl); }
+  .lv-opt.right { border-color: var(--ok-txt); background: color-mix(in srgb, var(--ok-txt) 12%, transparent); }
+  .lv-opt.wrong { border-color: var(--bad-txt); background: color-mix(in srgb, var(--bad-txt) 10%, transparent); animation: lvShake .4s; }
+  .lv-why { font-size: 12.5px; line-height: 1.45; color: var(--mut); padding-left: 2px; }
+  .lv-why b { color: var(--ok-txt); } .lv-why b.no { color: var(--bad-txt); }
+  .lv-result { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-radius: 12px; padding: 14px 16px; border: 1px solid var(--bdr-strong); animation: lvRise .4s cubic-bezier(.2,.8,.2,1) both; }
+  .lv-result.pass { border-color: var(--yolk); background: var(--purl); }
+  .lv-result .big { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
+  .lv-result p { margin: 0; flex: 1 1 200px; font-size: 13px; line-height: 1.45; }
+  .lv-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .lv-cert { position: relative; overflow: hidden; border-radius: 16px; padding: 26px 24px; border: 2px solid var(--txt); background: var(--sur); display: flex; flex-direction: column; gap: 8px; text-align: center; align-items: center; animation: lvCert .7s cubic-bezier(.2,.9,.25,1.15) both; }
+  .lv-cert::before { content: ""; position: absolute; inset: 8px; border: 1px dashed var(--bdr-strong); border-radius: 10px; pointer-events: none; }
+  .lv-cert .seal { width: 54px; height: 54px; border-radius: 999px; background: var(--yolk); color: var(--ink); display: grid; place-items: center; font-size: 24px; font-weight: 700; box-shadow: 0 0 0 6px var(--purl); }
+  .lv-cert small { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--hin); }
+  .lv-cert h3 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+  .lv-cert p { margin: 0; font-size: 13px; color: var(--mut); }
+
+  @keyframes lvRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes lvDeal { from { opacity: 0; transform: translateY(22px) scale(.96); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes lvDraw { to { stroke-dashoffset: 0; } }
+  @keyframes lvPop { from { transform: scale(0); } to { transform: scale(1); } }
+  @keyframes lvHop { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-7px) rotate(-6deg); } 90% { transform: translateY(0); } }
+  @keyframes lvShimmer { to { background-position: -200% 0; } }
+  @keyframes lvPage { 0% { transform: rotateY(0); } 50%, 100% { transform: rotateY(-175deg); opacity: .3; } }
+  @keyframes lvShake { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @keyframes lvCert { from { opacity: 0; transform: scale(.92) rotate(-1deg); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lv-hero > div, .lv-art, .lv-art .fill, .lv-art .dot.on, .lv-art .cap, .lv-card, .lv-skel, .lv-book i, .lv-chead, .lv-pane.enter, .lv-opt.wrong, .lv-result, .lv-cert { animation: none !important; }
+    .lv-art .fill { stroke-dashoffset: 0; } .lv-art .dot.on { transform: none; }
+    .lv-card, .lv-btn, .lv-bar i { transition: none; }
+  }
+  @media (max-width: 900px) {
+    .lv-body { grid-template-columns: minmax(0, 1fr); }
+    .lv-syl { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding: 8px; scrollbar-width: none; }
+    .lv-syl-h { display: none; }
+    .lv-step { flex: 0 0 auto; width: auto; max-width: 220px; }
+    .lv-step-t span { display: none; }
+  }
+  @media (max-width: 768px) {
+    .lv-wrap { padding-right: 0; }
+    .lv-art { display: none; }
+    .lv-pane { padding: 16px; }
+    .lv-chead h2 { font-size: 22px; }
+    .lv-vids { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+
+<div class="board-header">
+  <h2 class="board-title">Learn</h2>
+</div>
+<div class="lv-wrap" id="lv-root" data-course="{{ course_id or '' }}" data-skill="{{ start_skill or '' }}">
+  <div class="lv-grid"><div class="lv-skel"></div><div class="lv-skel"></div><div class="lv-skel"></div></div>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById('lv-root');
+  if (!root) return;
+  const S = { course: null, lesson: null, current: null, videos: null, seq: 0 };
+  const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const calm = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cheer = (count, el) => {
+    if (!window.SunnyMotion || !SunnyMotion.celebrate) return;
+    let origin;
+    if (el) { const r = el.getBoundingClientRect(); origin = { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight }; }
+    SunnyMotion.celebrate({ count: count || 90, origin });
+  };
+
+  async function api(url, opts) {
+    try {
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) return { ok: false, error: data.error || 'Something went wrong. Try again.' };
+      return data;
+    } catch (err) {
+      return { ok: false, error: "Couldn't reach Sunny Side. Check your connection and try again." };
+    }
+  }
+  const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+  function glow(scope) {
+    scope.querySelectorAll('.lv-card').forEach(c => c.addEventListener('pointermove', ev => {
+      const r = c.getBoundingClientRect();
+      c.style.setProperty('--mx', (ev.clientX - r.left) + 'px');
+      c.style.setProperty('--my', (ev.clientY - r.top) + 'px');
+    }));
+  }
+  function fillBars(scope) {
+    requestAnimationFrame(() => requestAnimationFrame(() => scope.querySelectorAll('.lv-bar i[data-w]').forEach(i => { i.style.width = i.dataset.w + '%'; })));
+  }
+
+  // Lesson text: blank lines split paragraphs, lines starting "- " become bullets.
+  function prose(text) {
+    const out = [];
+    String(text || '').split(/\n\s*\n/).forEach(block => {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return;
+      if (lines.every(l => /^[-•*]\s+/.test(l))) {
+        out.push('<ul>' + lines.map(l => '<li>' + e(l.replace(/^[-•*]\s+/, '')) + '</li>').join('') + '</ul>');
+      } else {
+        let para = [], list = [];
+        const flush = () => { if (para.length) out.push('<p>' + e(para.join(' ')) + '</p>'); para = []; if (list.length) out.push('<ul>' + list.map(l => '<li>' + e(l) + '</li>').join('') + '</ul>'); list = []; };
+        lines.forEach(l => { if (/^[-•*]\s+/.test(l)) { if (para.length) { out.push('<p>' + e(para.join(' ')) + '</p>'); para = []; } list.push(l.replace(/^[-•*]\s+/, '')); } else { if (list.length) { out.push('<ul>' + list.map(x => '<li>' + e(x) + '</li>').join('') + '</ul>'); list = []; } para.push(l); } });
+        flush();
+      }
+    });
+    return out.join('');
+  }
+
+  // ── Catalog ──────────────────────────────────────────────────────────
+  async function showCatalog(push) {
+    S.course = null; S.videos = null;
+    if (push) history.pushState({}, '', '/learn');
+    document.title = 'Learn · Sunny Side';
+    root.innerHTML = `
+      <div class="lv-hero">
+        <div>
+          <p class="lv-intro">Short courses on the skills <b>your target jobs ask for</b> that your resume doesn't show yet.
+            Each one has a few bite-size lessons, videos, a quiz after every lesson and a final test.</p>
+          <form class="lv-start" id="lv-start">
+            <input type="search" id="lv-skill" maxlength="60" autocomplete="off" placeholder="Learn any skill, like &quot;SQL&quot; or &quot;Figma&quot;" aria-label="Skill to learn">
+            <button type="submit" class="lv-btn">Start course</button>
+          </form>
+          <div class="lv-err" id="lv-start-err" hidden></div>
+        </div>
+        <svg class="lv-art" viewBox="0 0 300 110" aria-hidden="true">
+          <path class="rail" d="M20 80 H280"></path>
+          <path class="fill" pathLength="1" d="M20 80 H220"></path>
+          <circle class="dot on d1" cx="20" cy="80" r="7"></circle>
+          <circle class="dot on d2" cx="86" cy="80" r="7"></circle>
+          <circle class="dot on d3" cx="153" cy="80" r="7"></circle>
+          <circle class="dot on d4" cx="220" cy="80" r="7"></circle>
+          <circle class="dot" cx="280" cy="80" r="9"></circle>
+          <g class="cap"><path d="M262 44 l18 -8 18 8 -18 8z"></path><path d="M270 48 v8 q10 6 20 0 v-8" fill="none" stroke="var(--txt)" stroke-width="2"></path></g>
+          <text x="20" y="104">Lesson 1</text><text x="280" y="104" text-anchor="end">Certified</text>
+        </svg>
+      </div>
+      <section id="lv-mine" hidden><div class="lv-kicker">Continue learning</div><div class="lv-grid" id="lv-mine-list"></div></section>
+      <section><div class="lv-kicker">Close your skill gaps <small id="lv-gap-note"></small></div>
+        <div class="lv-grid" id="lv-gaps"><div class="lv-skel"></div><div class="lv-skel"></div><div class="lv-skel"></div></div></section>`;
+    document.getElementById('lv-start').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const v = document.getElementById('lv-skill').value.trim();
+      if (v.length < 2) { document.getElementById('lv-skill').focus(); return; }
+      startCourse(v);
+    });
+    const data = await api('/api/learn/catalog');
+    const gapsEl = document.getElementById('lv-gaps');
+    if (!gapsEl) return;
+    if (!data.ok) { gapsEl.innerHTML = `<div class="lv-empty">${e(data.error)}</div>`; return; }
+    const mine = document.getElementById('lv-mine');
+    if (data.courses.length) {
+      mine.hidden = false;
+      document.getElementById('lv-mine-list').innerHTML = data.courses.map((c, i) => `
+        <a class="lv-card" href="/learn/${c.id}" data-course="${c.id}" style="--i:${i}">
+          <div class="lv-card-top"><span class="lv-tag ${c.completed ? 'yolk' : ''}">${c.completed ? '✓ Completed' : e(c.skill)}</span><span class="lv-meta">${e(c.level)}</span></div>
+          <h3>${e(c.title)}</h3>
+          <div class="lv-bar"><i data-w="${c.percent}"></i></div>
+          <div class="lv-foot"><span class="lv-meta">${c.completed ? 'Certificate earned' : c.lessons_done + ' of ' + c.lessons + ' lessons · ' + c.percent + '%'}</span>
+            <span class="lv-btn ${c.completed ? 'ghost' : ''}">${c.completed ? 'Review' : (c.lessons_done || c.percent ? 'Resume' : 'Start')} →</span></div>
+        </a>`).join('');
+    }
+    const gaps = data.gaps.filter(g => !g.course_id);
+    document.getElementById('lv-gap-note').textContent = gaps.length ? 'from the jobs on your board' : '';
+    if (!gaps.length) {
+      gapsEl.innerHTML = `<div class="lv-empty">${data.gaps.length ? "You've started a course for every gap on your board. Nice. Type any other skill above to keep going."
+        : !data.has_resume ? 'Add your resume in Profile Settings and Sunny Side will spot the skills your jobs ask for that it doesn’t show.'
+        : 'No skill gaps on your board right now. As new jobs are scored, the skills they ask for that your resume lacks will show up here. You can also type any skill above.'}</div>`;
+    } else {
+      gapsEl.innerHTML = gaps.map((g, i) => `
+        <button type="button" class="lv-card" data-skill="${e(g.skill)}" style="--i:${i}">
+          <div class="lv-card-top"><span class="lv-tag dash">Skill gap</span><span class="lv-meta">${g.jobs} ${g.jobs === 1 ? 'job' : 'jobs'}</span></div>
+          <h3>${e(g.skill)}</h3>
+          <p class="lv-asked">Asked for by <b>${g.jobs === 1 ? '1 job' : g.jobs + ' jobs'}</b> on your board${g.examples.length ? ', like ' + g.examples.map(e).join('; ') : ''}.</p>
+          <div class="lv-foot"><span class="lv-meta">5 lessons</span><span class="lv-btn">Start course</span></div>
+        </button>`).join('');
+      gapsEl.querySelectorAll('button[data-skill]').forEach(b => b.addEventListener('click', () => startCourse(b.dataset.skill, b)));
+    }
+    root.querySelectorAll('a.lv-card[data-course]').forEach(a => a.addEventListener('click', ev => {
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+      ev.preventDefault(); openCourse(+a.dataset.course, null, true);
+    }));
+    glow(root); fillBars(root);
+  }
+
+  const WRITING_STEPS = ['Reading the jobs that ask for it…', 'Planning the lessons…', 'Pitching it to your level…', 'Almost there…'];
+  async function startCourse(skill, fromEl) {
+    if (fromEl) cheer(40, fromEl);
+    const seq = ++S.seq;
+    root.innerHTML = `<div class="lv-writing" aria-live="polite">
+        <div class="lv-book" aria-hidden="true"><i></i><i></i><i></i></div>
+        <h3>Writing your course on ${e(skill)}</h3>
+        <div class="lv-steps" id="lv-steps">${WRITING_STEPS[0]}</div></div>`;
+    let n = 0;
+    const tick = setInterval(() => { const el = document.getElementById('lv-steps'); if (el && n < WRITING_STEPS.length - 1) el.textContent = WRITING_STEPS[++n]; }, 3500);
+    const data = await post('/api/learn/courses', { skill });
+    clearInterval(tick);
+    if (seq !== S.seq) return;
+    if (!data.ok) {
+      root.innerHTML = `<div class="lv-writing"><h3>Couldn't start that course</h3><p class="lv-note">${e(data.error)}</p>
+        <button type="button" class="lv-btn ghost" id="lv-back">← Back to Learn</button></div>`;
+      document.getElementById('lv-back').addEventListener('click', () => showCatalog(true));
+      return;
+    }
+    openCourse(data.id, null, true, true);
+  }
+
+  // ── Course ───────────────────────────────────────────────────────────
+  async function openCourse(id, target, push, replace) {
+    const seq = ++S.seq;
+    if (!S.course || S.course.id !== id) root.innerHTML = '<div class="lv-grid"><div class="lv-skel"></div><div class="lv-skel"></div></div>';
+    const data = await api('/api/learn/courses/' + id);
+    if (seq !== S.seq) return;
+    if (!data.ok) { showCatalog(true); return; }
+    S.course = data.course;
+    const c = S.course;
+    if (target == null) target = c.completed ? 'final' : (c.final_unlocked ? 'final' : (c.next_lesson != null ? c.next_lesson : 0));
+    const url = '/learn/' + id + (target === 'final' ? '#final' : '#lesson-' + (target + 1));
+    if (replace) history.replaceState({}, '', url); else if (push) history.pushState({}, '', url);
+    document.title = c.title + ' · Learn';
+    root.innerHTML = `
+      <button type="button" class="lv-link" id="lv-all">← All courses</button>
+      <header class="lv-chead">
+        <div class="lv-chead-row"><span class="lv-tag yolk">${e(c.skill)}</span><span class="lv-tag">${e(c.level)}</span>
+          <span class="lv-meta">${c.lessons} lessons · about ${Math.max(1, Math.round(c.minutes / 5) * 5)} min</span></div>
+        <h2>${e(c.title)}</h2>
+        ${c.tagline ? `<p class="lv-tagline">${e(c.tagline)}</p>` : ''}
+        <div class="lv-progress"><div class="lv-bar"><i id="lv-pbar" data-w="${c.percent}"></i></div><b id="lv-pct">${c.percent}%</b></div>
+        ${c.outcomes.length ? `<ul class="lv-outcomes">${c.outcomes.map(o => `<li>${e(o)}</li>`).join('')}</ul>` : ''}
+        ${c.targets.length ? `<div class="lv-note">Asked for by ${c.targets.map(e).join('; ')}.</div>` : ''}
+        ${c.source === 'local' ? `<div class="lv-note">This is Sunny Side's built-in study plan, because the AI course writer couldn't be reached. Add a Gemini key in Profile Settings, then start a new course for a full one.</div>` : ''}
+      </header>
+      <div class="lv-body">
+        <nav class="lv-syl" id="lv-syl" aria-label="Course lessons"></nav>
+        <section class="lv-pane" id="lv-pane" aria-live="polite"></section>
+      </div>
+      <div class="lv-actions" style="justify-content:flex-end"><button type="button" class="lv-link" id="lv-del">Remove this course</button></div>`;
+    document.getElementById('lv-all').addEventListener('click', () => showCatalog(true));
+    document.getElementById('lv-del').addEventListener('click', async () => {
+      if (!confirmRemove()) return;
+      await post('/api/learn/courses/' + c.id + '/delete');
+      showCatalog(true);
+    });
+    renderSyllabus();
+    fillBars(root);
+    if (target === 'final') openFinal(false); else openLesson(target, false);
+  }
+
+  let removeArmed = 0;
+  function confirmRemove() {
+    // Two clicks within 4 seconds, instead of a blocking browser dialog
+    const btn = document.getElementById('lv-del');
+    if (Date.now() - removeArmed < 4000) return true;
+    removeArmed = Date.now();
+    btn.textContent = 'Click again to remove it and its progress';
+    setTimeout(() => { if (btn.isConnected) btn.textContent = 'Remove this course'; }, 4000);
+    return false;
+  }
+
+  function renderSyllabus() {
+    const c = S.course;
+    const syl = document.getElementById('lv-syl');
+    if (!syl) return;
+    syl.innerHTML = '<div class="lv-syl-h">Syllabus</div>' + c.outline.map(l => {
+      const done = l.progress && l.progress.passed;
+      return `<button type="button" class="lv-step ${done ? 'done' : ''} ${S.current === l.index ? 'on' : ''}" data-i="${l.index}">
+        <span class="lv-num">${done ? '✓' : l.index + 1}</span>
+        <span class="lv-step-t"><b>${e(l.title)}</b><span>${l.minutes} min${l.progress ? ' · quiz ' + l.progress.best + '/' + l.progress.total : ''}</span></span></button>`;
+    }).join('') + `<button type="button" class="lv-step ${c.completed ? 'done' : ''} ${S.current === 'final' ? 'on' : ''}" data-i="final" ${c.final_unlocked ? '' : 'disabled title="Pass every lesson quiz to unlock"'}>
+        <span class="lv-num">${c.completed ? '✓' : (c.final_unlocked ? '★' : '🔒')}</span>
+        <span class="lv-step-t"><b>Final test${c.completed ? ' · certificate' : ''}</b><span>${c.final_unlocked ? (c.final ? 'best ' + c.final.best + '/' + c.final.total : 'unlocked') : 'pass every lesson to unlock'}</span></span></button>`;
+    syl.querySelectorAll('.lv-step').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.i === 'final') openFinal(true); else openLesson(+b.dataset.i, true);
+    }));
+    const on = syl.querySelector('.lv-step.on');
+    if (on && syl.scrollWidth > syl.clientWidth) on.scrollIntoView({ block: 'nearest', inline: 'center', behavior: calm() ? 'auto' : 'smooth' });
+  }
+
+  function refreshSummary(sum) {
+    Object.assign(S.course, sum);
+    const bar = document.getElementById('lv-pbar'), pct = document.getElementById('lv-pct');
+    if (bar) bar.style.width = S.course.percent + '%';
+    if (pct) pct.textContent = S.course.percent + '%';
+  }
+
+  function paneLoading(text) {
+    const pane = document.getElementById('lv-pane');
+    pane.className = 'lv-pane';
+    pane.innerHTML = `<div class="lv-writing" style="padding:28px 8px"><div class="lv-book" aria-hidden="true"><i></i><i></i><i></i></div><div class="lv-steps">${e(text)}</div></div>`;
+    return pane;
+  }
+
+  async function openLesson(i, push) {
+    const c = S.course;
+    S.current = i;
+    renderSyllabus();
+    if (push) history.pushState({}, '', '/learn/' + c.id + '#lesson-' + (i + 1));
+    const meta = c.outline[i];
+    const pane = paneLoading(meta && meta.ready ? 'Opening the lesson…' : 'Writing this lesson for you…');
+    const seq = ++S.seq;
+    const data = await api('/api/learn/courses/' + c.id + '/lessons/' + i);
+    if (seq !== S.seq) return;
+    if (!data.ok) { pane.innerHTML = `<div class="lv-err">${e(data.error)}</div><div><button type="button" class="lv-btn ghost" id="lv-retry">Try again</button></div>`; document.getElementById('lv-retry').onclick = () => openLesson(i); return; }
+    c.outline[i].ready = true;
+    S.lesson = data;
+    const last = i === c.outline.length - 1;
+    pane.className = 'lv-pane enter';
+    pane.innerHTML = `
+      <div class="lv-pane-h">
+        <div class="lv-meta"><span>Lesson ${i + 1} of ${c.outline.length}</span><span>${data.minutes} min</span>
+          ${'speechSynthesis' in window ? '<button type="button" class="lv-link" id="lv-listen">▶ Listen</button>' : ''}</div>
+        <h3>${e(data.title)}</h3>
+        ${data.fallback ? '<div class="lv-note">The AI writer was busy, so this lesson uses Sunny Side’s built-in study plan.</div>' : ''}
+      </div>
+      ${data.sections.map(s => `<div class="lv-sec">${s.heading ? `<h4>${e(s.heading)}</h4>` : ''}${prose(s.body)}</div>`).join('')}
+      ${data.example ? `<div class="lv-box"><b>Worked example</b><pre>${e(data.example)}</pre></div>` : ''}
+      ${data.key_points.length ? `<div class="lv-box yolk"><b>Key points</b><ul>${data.key_points.map(k => `<li>${e(k)}</li>`).join('')}</ul></div>` : ''}
+      <div><div class="lv-kicker" style="margin-bottom:10px">Watch</div><div class="lv-vids" id="lv-vids"><div class="lv-skel" style="height:120px"></div></div>
+        <div style="margin-top:8px"><a class="lv-link" href="${e(data.videos_link)}" target="_blank" rel="noopener">More videos on this lesson on YouTube ↗</a></div></div>
+      ${data.practice ? `<div class="lv-box"><b>Try it yourself</b><p>${e(data.practice)}</p></div>` : ''}
+      <form class="lv-quiz" id="lv-quiz">
+        <div class="lv-kicker" style="margin-bottom:0">Check your understanding <small>${data.progress ? (data.progress.passed ? 'passed · best ' : 'best ') + data.progress.best + '/' + data.progress.total : 'pass with 70%'}</small></div>
+        ${quizHtml(data.quiz)}
+        <div id="lv-qres"></div>
+        <div class="lv-actions" id="lv-qact"><button type="submit" class="lv-btn">Submit answers</button>
+          ${data.progress && data.progress.passed ? `<button type="button" class="lv-btn ghost" id="lv-next">${last ? 'Go to the final test' : 'Next lesson'} →</button>` : ''}</div>
+      </form>`;
+    wireQuiz(data.quiz.length, ans => post('/api/learn/courses/' + c.id + '/lessons/' + i + '/quiz', { answers: ans }), res => {
+      c.outline[i].progress = res.lesson;
+      refreshSummary(res.summary);
+      renderSyllabus();
+      const act = document.getElementById('lv-qact');
+      const nextLabel = last ? (S.course.final_unlocked ? 'Go to the final test' : 'Back to unfinished lessons') : 'Next lesson';
+      act.innerHTML = res.passed
+        ? `<button type="button" class="lv-btn" id="lv-next">${nextLabel} →</button><button type="button" class="lv-btn ghost" id="lv-redo">Retake quiz</button>`
+        : `<button type="button" class="lv-btn" id="lv-redo">Try again</button><button type="button" class="lv-link" id="lv-top">Re-read the lesson ↑</button>`;
+      wireNext(i, last);
+      document.getElementById('lv-redo').onclick = () => openLesson(i);
+      const top = document.getElementById('lv-top');
+      if (top) top.onclick = () => pane.scrollIntoView({ behavior: calm() ? 'auto' : 'smooth' });
+      if (res.passed) cheer(res.score === res.total ? 110 : 60, document.getElementById('lv-qres'));
+    });
+    wireNext(i, last);
+    loadVideos();
+    const listen = document.getElementById('lv-listen');
+    if (listen) listen.addEventListener('click', () => toggleListen(listen, data));
+    if (push) root.scrollTo({ top: document.getElementById('lv-pane').offsetTop - 80, behavior: calm() ? 'auto' : 'smooth' });
+  }
+
+  function wireNext(i, last) {
+    const next = document.getElementById('lv-next');
+    if (!next) return;
+    next.onclick = () => {
+      if (!last) return openLesson(i + 1, true);
+      if (S.course.final_unlocked) return openFinal(true);
+      openLesson(S.course.next_lesson != null ? S.course.next_lesson : 0, true);
+    };
+  }
+
+  function toggleListen(btn, data) {
+    const synth = window.speechSynthesis;
+    if (synth.speaking) { synth.cancel(); btn.textContent = '▶ Listen'; return; }
+    const text = [data.title].concat(data.sections.map(s => (s.heading ? s.heading + '. ' : '') + s.body.replace(/^[-•*]\s+/gm, ''))).join('\n\n');
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1; u.onend = u.onerror = () => { btn.textContent = '▶ Listen'; };
+    synth.speak(u);
+    btn.textContent = '■ Stop';
+  }
+  window.addEventListener('pagehide', () => { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (err) {} });
+
+  async function loadVideos() {
+    const box = document.getElementById('lv-vids');
+    if (!box) return;
+    if (!S.videos || S.videos.course !== S.course.id) {
+      const data = await api('/api/learn/courses/' + S.course.id + '/videos');
+      S.videos = { course: S.course.id, list: data.ok ? data.videos : [], more: data.more };
+    }
+    const el = document.getElementById('lv-vids');
+    if (!el) return;
+    if (!S.videos.list.length) { el.innerHTML = '<div class="lv-note">No videos picked yet. Use the YouTube link below to find one.</div>'; return; }
+    el.innerHTML = S.videos.list.map(v => `<button type="button" class="lv-vid" data-id="${e(v.id)}" aria-label="Play ${e(v.title)}">
+        <img src="${e(v.thumb)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="play" aria-hidden="true">▶</span>
+        <span class="t">${e(v.title)}</span><span class="c">${e(v.channel)}</span></button>`).join('');
+    el.querySelectorAll('.lv-vid').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.id;
+      if (!/^[A-Za-z0-9_-]{6,20}$/.test(id) || b.querySelector('iframe')) return;
+      b.querySelector('img').outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0" title="Video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+      const p = b.querySelector('.play'); if (p) p.remove();
+    }));
+  }
+
+  function quizHtml(quiz) {
+    return quiz.map((q, qi) => `<fieldset class="lv-q" data-q="${qi}"><legend><span>Q${qi + 1}</span>${e(q.q)}</legend>
+      ${q.options.map((o, oi) => `<label class="lv-opt"><input type="radio" name="q${qi}" value="${oi}" required><span>${e(o)}</span></label>`).join('')}
+      <div class="lv-why" hidden></div></fieldset>`).join('');
+  }
+
+  function wireQuiz(n, send, after) {
+    const form = document.getElementById('lv-quiz');
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const answers = [];
+      for (let qi = 0; qi < n; qi++) {
+        const pick = form.querySelector(`input[name="q${qi}"]:checked`);
+        answers.push(pick ? +pick.value : null);
+      }
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const res = await send(answers);
+      if (!res.ok) { btn.disabled = false; btn.textContent = 'Submit answers'; document.getElementById('lv-qres').innerHTML = `<div class="lv-err">${e(res.error)}</div>`; return; }
+      res.results.forEach((r, qi) => {
+        const fs = form.querySelector(`fieldset[data-q="${qi}"]`);
+        fs.querySelectorAll('input').forEach(inp => { inp.disabled = true; });
+        const labels = fs.querySelectorAll('.lv-opt');
+        if (labels[r.answer]) labels[r.answer].classList.add('right');
+        if (!r.correct && labels[r.picked]) labels[r.picked].classList.add('wrong');
+        const why = fs.querySelector('.lv-why');
+        why.hidden = false;
+        why.innerHTML = (r.correct ? '<b>Correct.</b> ' : '<b class="no">Not quite.</b> ') + e(r.why || '');
+      });
+      document.getElementById('lv-qres').innerHTML = `<div class="lv-result ${res.passed ? 'pass' : ''}">
+          <span class="big">${res.score}/${res.total}</span>
+          <p>${res.passed ? (res.score === res.total ? 'Perfect score. ' : 'Passed. ') + 'Nice work.' : 'You need 70% to pass. Have a look at the explanations and try again.'}</p></div>`;
+      after(res);
+    });
+  }
+
+  async function openFinal(push) {
+    const c = S.course;
+    S.current = 'final';
+    renderSyllabus();
+    if (push) history.pushState({}, '', '/learn/' + c.id + '#final');
+    if (c.completed) return showCertificate(null);
+    const pane = paneLoading('Writing your final test…');
+    const seq = ++S.seq;
+    const data = await api('/api/learn/courses/' + c.id + '/final');
+    if (seq !== S.seq) return;
+    if (!data.ok) { pane.innerHTML = `<div class="lv-err">${e(data.error)}</div>`; return; }
+    pane.className = 'lv-pane enter';
+    pane.innerHTML = `<div class="lv-pane-h"><div class="lv-meta"><span>Final test</span><span>${data.quiz.length} questions</span></div>
+        <h3>Show what you've learned about ${e(c.skill)}</h3>
+        <div class="lv-note">Pass with 70% to finish the course and get your certificate and a resume line.</div></div>
+      <form class="lv-quiz" id="lv-quiz" style="border-top:0;padding-top:0">${quizHtml(data.quiz)}<div id="lv-qres"></div>
+        <div class="lv-actions" id="lv-qact"><button type="submit" class="lv-btn">Submit final test</button></div></form>`;
+    wireQuiz(data.quiz.length, ans => post('/api/learn/courses/' + c.id + '/final', { answers: ans }), res => {
+      refreshSummary(res.summary);
+      renderSyllabus();
+      if (res.passed) {
+        cheer(160);
+        setTimeout(() => showCertificate(res), calm() ? 0 : 900);
+      } else {
+        document.getElementById('lv-qact').innerHTML = '<button type="button" class="lv-btn" id="lv-redo">Try again</button>';
+        document.getElementById('lv-redo').onclick = () => openFinal(false);
+      }
+    });
+  }
+
+  async function showCertificate(res) {
+    const c = S.course;
+    if (!res) {
+      const fresh = await api('/api/learn/courses/' + c.id);
+      if (fresh.ok) { Object.assign(S.course, fresh.course); }
+    }
+    const cert = (res && res.certificate) || S.course.certificate || '';
+    const line = (res && res.resume_line) || S.course.resume_line || '';
+    const when = S.course.completed_at ? new Date(S.course.completed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const pane = document.getElementById('lv-pane');
+    pane.className = 'lv-pane enter';
+    pane.innerHTML = `
+      <div class="lv-cert">
+        <div class="seal" aria-hidden="true">✓</div>
+        <small>Certificate of completion</small>
+        <h3>${e(S.course.title)}</h3>
+        <p>Completed${when ? ' on ' + e(when) : ''} with Sunny Side${S.course.final ? ' · final test ' + S.course.final.best + '/' + S.course.final.total : ''}</p>
+        ${cert ? `<small>ID ${e(cert)}</small>` : ''}
+      </div>
+      ${line ? `<div class="lv-box yolk"><b>A line for your resume</b><p id="lv-line">${e(line)}</p>
+        <div class="lv-actions" style="margin-top:10px"><button type="button" class="lv-btn ghost" id="lv-copy">Copy</button>
+          ${typeof window.openSettingsModal === 'function' ? '<button type="button" class="lv-btn ghost" id="lv-resume">Update my resume</button>' : ''}</div>
+        <div class="lv-note" style="margin-top:8px">Only add it once you've done the practice work it describes. Updating your resume rescores your jobs.</div></div>` : ''}
+      <div class="lv-actions"><button type="button" class="lv-btn" id="lv-more">Find your next course →</button>
+        <a class="lv-btn ghost" href="/calls">Practise talking about it with Sunny</a></div>`;
+    const copy = document.getElementById('lv-copy');
+    if (copy) copy.onclick = async () => { try { await navigator.clipboard.writeText(line); copy.textContent = 'Copied ✓'; } catch (err) { copy.textContent = 'Select and copy it above'; } };
+    const resume = document.getElementById('lv-resume');
+    if (resume) resume.onclick = () => window.openSettingsModal();
+    document.getElementById('lv-more').onclick = () => showCatalog(true);
+  }
+
+  function route() {
+    const m = location.pathname.match(/^\/learn\/(\d+)/);
+    if (!m) { S.course = null; return showCatalog(false); }
+    const id = +m[1];
+    const h = location.hash;
+    const target = h === '#final' ? 'final' : (/^#lesson-(\d+)$/.test(h) ? +h.slice(8) - 1 : null);
+    if (S.course && S.course.id === id && target != null) {
+      return target === 'final' ? openFinal(false) : openLesson(target, false);
+    }
+    openCourse(id, target, false);
+  }
+  window.addEventListener('popstate', route);
+
+  const skill = root.dataset.skill;
+  if (skill && !root.dataset.course) {
+    history.replaceState({}, '', '/learn');
+    startCourse(skill);
+  } else {
+    route();
+  }
+})();
+</script>
