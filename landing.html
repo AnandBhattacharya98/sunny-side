@@ -114,6 +114,8 @@ nav.scrolled .nav-inner { height: 56px; }
 .logo-sun .rays { transform-origin: 12px 12px; }
 .logo:hover .logo-sun .rays { animation: spin 2s linear infinite; }
 .nav-links { display: flex; gap: 4px; align-items: center; }
+.cta .cta-hiring { margin: 22px 0 0; font-size: 15px; }
+.cta-hiring a { color: inherit; font-weight: 700; text-underline-offset: 3px; }
 .nav-link { font-size: 14px; font-weight: 500; color: var(--mut); text-decoration: none; padding: 8px 12px; border-radius: 8px;
             position: relative; transition: color .2s; }
 .nav-link::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px;
@@ -424,6 +426,7 @@ section { position: relative; }
     <div class="nav-links">
       <a class="nav-link" href="#how">How it works</a>
       <a class="nav-link" href="#features">Features</a>
+      <a class="nav-link" href="/hiring">Hiring? Post a job</a>
     </div>
     <div class="nav-actions">
       <a class="btn" href="/login">Log in</a>
@@ -599,6 +602,7 @@ section { position: relative; }
       <h2 class="reveal split">Start your board today.</h2>
       <p class="reveal" style="--d:120ms">It takes a minute. Bring your resume.</p>
       <a class="btn btn-p btn-lg magnetic reveal" style="--d:200ms" href="/signup">Start free <span class="arrow" aria-hidden="true">→</span></a>
+      <p class="reveal cta-hiring" style="--d:280ms">Hiring? <a href="/hiring">Post a job</a> and it reaches the people whose resumes fit.</p>
     </div>
   </section>
 </main>

@@ -1168,6 +1168,18 @@ a.wr-title:hover .wr-arrow { color: var(--purt); transform: translate(1px, -1px)
 .jtag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; color: var(--txt); border: 1px solid var(--bdr); border-radius: 999px; padding: 1px 7px; }
 .jtag-pay { background: var(--purl); border-color: transparent; }
 .jtag-closed { color: var(--rd); border-color: currentColor; }
+.jtag-rec { background: var(--yolk); border-color: var(--yolk); color: #0D0C0A; }
+.rp-box { border: 1.5px solid var(--yolk); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; background: var(--purl); }
+.rp-head { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-apply { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.rp-apply p { font-size: 12.5px; color: var(--mut); line-height: 1.5; margin: 0 0 4px; }
+.rp-apply label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--mut); }
+.rp-apply label span { text-transform: none; font-weight: 500; }
+.rp-apply input, .rp-apply textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--bdr); background: var(--sur); color: var(--txt); font: inherit; font-size: 13px; outline: none; resize: vertical; }
+.rp-apply input:focus, .rp-apply textarea:focus { border-color: var(--yolk); }
+.rp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.rp-row a { font-size: 12px; color: var(--pur); }
+.rp-sent { font-size: 12.5px; color: var(--txt); margin-top: 10px; line-height: 1.5; }
 .jcard.is-closed .jt { color: var(--mut); text-decoration: line-through; text-decoration-color: var(--bdr-strong); }
 
 /* Card "Move" menu: a native select so it works with touch and screen readers */
@@ -1604,6 +1616,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       Already have an account? <a href="/login">Log in</a>
       {% endif %}
     </p>
+    <p class="auth-switch" style="margin-top:6px;">Hiring? <a href="/hiring">Post a job</a></p>
     {% endif %}
   </div>
   {% if view_mode != 'mock_auth' %}
@@ -1820,6 +1833,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         <option value="whatsapp">WhatsApp</option>
         <option value="gmail">Gmail</option>
         <option value="direct">Startups</option>
+        <option value="recruiter">Posted by recruiters</option>
       </select>
       <select id="work-filter" onchange="filterBoard()" aria-label="Filter by remote or on-site" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bdr); font-size: 11px; outline: none; background: var(--sur); cursor: pointer; color: var(--txt); font-weight: 500;">
         <option value="all">Work: Any</option>
@@ -1937,6 +1951,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
         {% elif "indeed.com" in (job.url or "") %}
           {% set source_domain = "indeed.com" %}
           {% set source_type = "indeed" %}
+        {% elif job.source == "recruiter" %}
+          {% set source_type = "recruiter" %}
         {% elif job.job_id.startswith("auto_") %}
           {% set source_domain = "mail.google.com" %}
           {% set source_type = "gmail" %}
@@ -1958,8 +1974,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
             <img src="https://www.google.com/s2/favicons?sz=32&domain={{ source_domain }}" alt="" style="width:12px;height:12px;object-fit:contain;border-radius:2px;flex-shrink:0;">
             <span>{{ job.company }}</span>
           </div>
-          {% if job.salary_text or job.is_remote or job.closed_at %}
+          {% if job.salary_text or job.is_remote or job.closed_at or job.source == 'recruiter' %}
           <div class="jtags">
+            {% if job.source == 'recruiter' %}<span class="jtag jtag-rec" title="The recruiter posted this job on Sunny Side for people whose resumes fit it">Posted directly by recruiter</span>{% endif %}
             {% if job.closed_at %}<span class="jtag jtag-closed" title="The posting was taken down{% if job.closed_at %} around {{ job.closed_at[:10] }}{% endif %}">Closed</span>{% endif %}
             {% if job.is_remote %}<span class="jtag">Remote</span>{% endif %}
             {% if job.salary_text %}<span class="jtag jtag-pay" title="Pay stated in the posting">{{ job.salary_text }}</span>{% endif %}
@@ -2631,6 +2648,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     .adm-msg.err { background:var(--rdl); color:var(--rd); }
     .adm-msg.ok { background:var(--gnl); color:var(--gn); }
     .adm a.ulink { color:inherit; text-decoration:none; border-bottom:1px dotted var(--hin); }
+    .adm-post { border:1px solid var(--bdr); border-radius:10px; padding:12px 14px; }
+    .adm-post + .adm-post { margin-top:8px; }
     @media (max-width: 900px) {
       .adm-grid { grid-template-columns:1fr; }
       .adm-table.stack thead { display:none; }
@@ -2652,6 +2671,32 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
       <div class="adm-tile"><b>{{ admin_stats.logins_day }}</b><span>Sign-ins, last 24h</span></div>
       <div class="adm-tile"><b style="{% if admin_stats.failed_day %}color:var(--rd){% endif %}">{{ admin_stats.failed_day }}</b><span>Failed sign-ins, last 24h</span></div>
       <div class="adm-tile"><b>{{ admin_stats.disabled }}</b><span>Turned off</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.recruiters }}</b><span>Recruiters</span></div>
+      <div class="adm-tile"><b>{{ admin_stats.live_posts }}</b><span>Live recruiter posts</span></div>
+    </div>
+
+    <div class="adm-card" id="recruiter-posts">
+      <h3>Recruiter posts waiting for approval{% if pending_posts %} ({{ pending_posts|length }}){% endif %}</h3>
+      <p class="sub">A recruiter's first post waits here. Approving it puts it live, matches it to job seekers, and lets that recruiter's later posts go live without review.</p>
+      {% for p in pending_posts %}
+      <div class="adm-post" data-post-id="{{ p.post_id }}">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+          <div style="min-width:0;">
+            <b style="font-size:13px;">{{ p.title }}</b> <span style="color:var(--mut); font-size:12px;">at {{ p.company }} · {{ p.location }}</span><br>
+            <span style="font-size:11px; color:var(--mut);">By {{ p.recruiter_name or p.recruiter_username }}{% if p.recruiter_company %} ({{ p.recruiter_company }}){% endif %} · {{ p.recruiter_email }} · <time class="local-time" data-fmt="ymd-hm" datetime="{{ p.created_at|utc_iso }}">{{ (p.created_at or '')[:16]|replace('T', ' ') }}</time></span>
+          </div>
+          <div class="adm-acts">
+            <a class="btn" href="/jobs/r/{{ p.post_id }}" target="_blank">Preview</a>
+            <button class="btn btn-p" onclick="adminReviewPost(this, 'approve')">Approve</button>
+            <button class="btn danger" onclick="adminReviewPost(this, 'reject')">Reject</button>
+          </div>
+        </div>
+        <details style="margin-top:8px;"><summary style="font-size:11px; cursor:pointer; color:var(--mut);">Description</summary>
+          <div style="white-space:pre-wrap; font-size:12px; color:var(--mut); max-height:240px; overflow:auto; margin-top:6px;">{{ p.description }}</div></details>
+      </div>
+      {% else %}
+      <p class="sub" style="margin:0;">Nothing waiting.</p>
+      {% endfor %}
     </div>
 
     <div class="adm-grid">
@@ -2690,6 +2735,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
                   <span>
                     <a class="ulink" href="/users?user={{ u.id }}#admin-logins"><b>{{ u.name or u.username }}</b></a>
                     {% if u.id == 1 %}<span class="adm-pill admin">Admin</span>{% endif %}
+                    {% if u.account_type == 'recruiter' %}<span class="adm-pill admin">Recruiter{% if u.company_name %} · {{ u.company_name }}{% endif %}</span>{% endif %}
                     {% if u.disabled %}<span class="adm-pill off">Off</span>{% endif %}
                     {% if u.name and u.name != u.username %}<br><span style="font-size:11px; color:var(--mut);">{{ u.username }}</span>{% endif %}
                     {% if u.email %}<br><span style="font-size:11px; color:var(--mut);">{{ u.email }}</span>{% endif %}
@@ -2763,6 +2809,26 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
     </div>
   </div>
   <script>
+    async function adminReviewPost(btn, action) {
+      const box = btn.closest('.adm-post');
+      let note = '';
+      if (action === 'reject') {
+        note = prompt('Why is it turned down? The recruiter sees this note (optional).', '');
+        if (note === null) return;
+      }
+      btn.disabled = true;
+      try {
+        const resp = await fetch(`/api/admin/recruiter-posts/${box.dataset.postId}/${action}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note }) });
+        const data = await resp.json();
+        if (!data.ok) { toast(data.error || 'Could not update the post'); return; }
+        box.style.transition = 'opacity .3s, transform .3s';
+        box.style.opacity = '0'; box.style.transform = 'translateX(12px)';
+        setTimeout(() => box.remove(), 300);
+        toast(action === 'approve' ? 'Approved. Matching it to job seekers now.' : 'Turned down. The recruiter can edit and resubmit.');
+      } catch (e) { toast('Connection error'); }
+      finally { btn.disabled = false; }
+    }
     async function adminResetPassword(btn) {
       const row = btn.closest('tr');
       const name = row.dataset.username;
@@ -5144,12 +5210,37 @@ async function openJobModal(id) {
   return true;
 }
 
+// Links like /?job=<id> (from a recruiter's public post page) open that job's details
+document.addEventListener('DOMContentLoaded', function () {
+  const jid = new URLSearchParams(location.search).get('job');
+  if (jid && document.querySelector('.jcard[data-job-id="' + CSS.escape(jid) + '"]')) openJobModal(jid);
+});
+
+async function sendResumeToRecruiter(jobId, btn) {
+  const box = btn.closest('.rp-apply');
+  const email = box.querySelector('input[name="rp-email"]').value.trim();
+  const note = box.querySelector('textarea[name="rp-note"]').value.trim();
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/job/${encodeURIComponent(jobId)}/recruiter-apply`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, note }) });
+    const data = await resp.json();
+    if (!data.ok) { toast(data.error || 'Could not send your resume'); return; }
+    box.innerHTML = '<div class="rp-sent"><b>Resume sent.</b> The recruiter can see your resume and match score. This job moves to your Applied column.</div>';
+    window.__reloadOnModalClose = true;
+    if (typeof sunnyAct === 'function') sunnyAct('cheer');
+    toast('Resume sent to the recruiter');
+  } catch (e) { toast('Connection error'); }
+  finally { btn.disabled = false; }
+}
+
 function closeJobModal(id) {
   quizStopMic(id);
   if (QZ[id]) stopSpeaking();
   const modal = document.getElementById('modal-backdrop-' + id);
   if (modal) modal.style.display = 'none';
   if (typeof sunnyAct === 'function') sunnyAct('wave');
+  if (window.__reloadOnModalClose) { window.__reloadOnModalClose = false; location.reload(); }
 }
 
 function toggleEmailBody(header) {

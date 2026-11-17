@@ -19,6 +19,7 @@ from notifier import send_email_digest, recipient_for_user, send_email, email_co
 from auth import signup_user, login_user, hash_password, MIN_PASSWORD_LENGTH
 from crypto_util import get_app_secret, encrypt_secret
 import legal
+import recruiter as rec
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -214,6 +215,30 @@ def _account_disabled(uid) -> bool:
     return disabled
 
 
+_recruiter_cache = {}  # user_id -> is a recruiter account; never changes once set, so no expiry
+
+
+def _is_recruiter(uid) -> bool:
+    if not uid or uid == 1:
+        return False
+    if uid not in _recruiter_cache:
+        conn = get_conn(DB_PATH)
+        try:
+            _recruiter_cache[uid] = rec.is_recruiter(conn, uid)
+        finally:
+            conn.close()
+    return _recruiter_cache[uid]
+
+
+# What a signed-in recruiter may open. Everything else (the board, Sunny, settings) is for job seekers.
+RECRUITER_ENDPOINTS = {"recruiter_home", "recruiter_new", "recruiter_edit", "recruiter_post", "recruiter_post_action",
+                       "api_recruiter_parse", "public_posting", "hiring", "logout", "delete_own_account",
+                       "static", "serve_logo", "serve_favicon", "serve_manifest", "serve_service_worker", "serve_offline",
+                       "healthz", *legal.PUBLIC_ENDPOINTS}
+RECRUITER_ONLY_ENDPOINTS = {"recruiter_home", "recruiter_new", "recruiter_edit", "recruiter_post",
+                            "recruiter_post_action", "api_recruiter_parse"}
+
+
 def _log_login(conn, user_id, username, method, success=True):
     """Best effort: a history write must never block someone from signing in."""
     try:
@@ -275,7 +300,7 @@ def _check_oauth_state():
 
 @app.before_request
 def require_login():
-    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz", *legal.PUBLIC_ENDPOINTS]
+    allowed_endpoints = ["login", "signup", "static", "index", "auth_google", "auth_google_callback", "auth_linkedin", "auth_linkedin_callback", "auth_mock_callback", "serve_logo", "serve_favicon", "serve_hero_background", "serve_manifest", "serve_service_worker", "serve_offline", "cron_daily_recommendations", "forgot_password", "reset_password", "healthz", "hiring", "recruiter_signup", "public_posting", *legal.PUBLIC_ENDPOINTS]
     if request.endpoint in AGENT_ENDPOINTS:
         if not phone.agent_authorized(request.headers.get("Authorization")):
             return jsonify({"ok": False, "error": "Not authorized"}), 401
@@ -294,6 +319,17 @@ def require_login():
             if request.path.startswith("/api/"):
                 return jsonify({"ok": False, "error": "Not signed in"}), 401
             return redirect(url_for("login"))
+    uid = session.get("user_id")
+    if uid and request.endpoint:
+        if _is_recruiter(uid):
+            if request.endpoint not in RECRUITER_ENDPOINTS:
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "Recruiter accounts can't use this."}), 403
+                return redirect(url_for("recruiter_home"))
+        elif request.endpoint in RECRUITER_ONLY_ENDPOINTS:
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "This is for recruiter accounts."}), 403
+            return redirect(url_for("hiring"))
     # The login cookie is shared by every tab. A board page opened as one person must not
     # keep talking to Sunny after someone else signs in from another tab.
     page_user = request.headers.get("X-Sunny-User")
@@ -1106,7 +1142,8 @@ def index():
         return render_template("dashboard.html", settings=settings, view_mode="onboarding", stats=stats)
         
     # Fetch all active jobs (ignore archived)
-    raw_jobs = conn.execute("SELECT * FROM jobs WHERE user_id = ? AND status != 'archived' ORDER BY COALESCE(ai_score,0) DESC", (uid,)).fetchall()
+    raw_jobs = conn.execute("SELECT * FROM jobs WHERE user_id = ? AND status != 'archived' "
+        "ORDER BY COALESCE(ai_score,0) DESC, CASE WHEN source = 'recruiter' THEN 0 ELSE 1 END", (uid,)).fetchall()
     
     board = {
         "whatsapp": [],
@@ -1160,9 +1197,17 @@ def job_modal(job_id):
         if not row:
             return "Not found", 404
         job = _batch_full_jobs(conn, [row], uid)[0]
+        rpost = rapp = None
+        apply_email = ""
+        if job.get("source") == "recruiter":
+            rpost, _ = rec.post_for_seeker_job(conn, uid, job_id)
+            if rpost:
+                rapp = rec.application_for(conn, uid, rpost["post_id"])
+                u = conn.execute("SELECT email, imap_email, username FROM users WHERE id = ?", (uid,)).fetchone()
+                apply_email = next((v for v in (u[0], u[1], u[2]) if v and "@" in v), "") if u else ""
     finally:
         conn.close()
-    return render_template("job_modal.html", job=job)
+    return render_template("job_modal.html", job=job, rpost=rpost, rapp=rapp, apply_email=apply_email)
 
 
 @app.route("/api/job/<job_id>/videos", methods=["GET"])
@@ -1273,7 +1318,7 @@ def admin_users():
         job_counts = {r[0]: r[1] for r in conn.execute("SELECT user_id, COUNT(*) FROM jobs GROUP BY user_id").fetchall()}
         users = []
         for r in conn.execute("SELECT id, username, name, email, auth_provider, created_at, last_login_at, login_count, "
-                              "disabled FROM users ORDER BY COALESCE(last_login_at, created_at, '') DESC").fetchall():
+                              "disabled, account_type, company_name FROM users ORDER BY COALESCE(last_login_at, created_at, '') DESC").fetchall():
             u = dict(r)
             u["job_count"] = job_counts.get(u["id"], 0)
             u["login_count"] = u.get("login_count") or 0
@@ -1303,11 +1348,16 @@ def admin_users():
             "disabled": sum(1 for u in users if u.get("disabled")),
         }
         filter_user = next((u for u in users if u["id"] == filter_uid), None)
+        rec.expire_posts(conn)
+        pending = rec.pending_posts(conn)
+        live_posts = conn.execute("SELECT COUNT(*) FROM recruiter_posts WHERE status = 'live'").fetchone()[0]
+        admin_stats["recruiters"] = sum(1 for u in users if u.get("account_type") == "recruiter")
+        admin_stats["live_posts"] = live_posts
         stats = _stats(conn)
     finally:
         conn.close()
     return render_template("dashboard.html", view_mode="users", users=users, stats=stats, error=error, notice=notice,
-                           logins=logins, admin_stats=admin_stats, filter_user=filter_user)
+                           logins=logins, admin_stats=admin_stats, filter_user=filter_user, pending_posts=pending)
 
 
 @app.route("/api/admin/users/<int:user_id>/disable", methods=["POST"])
@@ -1365,6 +1415,7 @@ def delete_user(user_id):
     finally:
         conn.close()
     _disabled_cache.pop(user_id, None)
+    _recruiter_cache.pop(user_id, None)
     return jsonify({"ok": True})
 
 
@@ -1444,6 +1495,291 @@ def delete_own_account():
         conn.close()
     session.clear()
     return jsonify({"ok": True})
+
+
+# ── Recruiters: post jobs straight to job seekers (recruiter.py) ──────────
+
+RECRUITER_PARSES_PER_HOUR = int(os.getenv("RECRUITER_PARSES_PER_HOUR", "30"))
+
+
+def _notify_async(to, subject, html):
+    """Best effort email that never holds up the page."""
+    if to and email_configured():
+        threading.Thread(target=send_email, args=(to, subject, html), daemon=True).start()
+
+
+def _site_url(path=""):
+    base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/") or request.url_root.rstrip("/")
+    return f"{base}{path}"
+
+
+def _recruiter_ctx(conn, uid):
+    row = conn.execute("SELECT name, username, email, company_name, recruiter_trusted FROM users WHERE id = ?", (uid,)).fetchone()
+    return dict(row) if row else {}
+
+
+def _own_post_or_404(conn, uid, post_id):
+    post = rec.get_post(conn, post_id)
+    if not post or post["recruiter_id"] != uid:
+        abort(404)
+    return post
+
+
+@app.route("/hiring")
+def hiring():
+    """The recruiter front door: what posting here does, and the sign-up form."""
+    if session.get("user_id") and _is_recruiter(session["user_id"]):
+        return redirect(url_for("recruiter_home"))
+    return render_template("recruiter.html", view="hiring", form={}, limits=_recruiter_limits())
+
+
+def _recruiter_limits():
+    return {"days": rec.POST_DAYS, "open": rec.MAX_OPEN_POSTS, "per_day": rec.MAX_NEW_PER_DAY,
+            "min_score": rec.MATCH_MIN_SCORE}
+
+
+@app.route("/hiring/signup", methods=["POST"])
+def recruiter_signup():
+    form = {k: request.form.get(k, "").strip() for k in ("name", "company", "email")}
+    def fail(msg, code=200):
+        return render_template("recruiter.html", view="hiring", form=form, error=msg, limits=_recruiter_limits()), code
+    if not login_throttle.allow(("ip", _client_ip()), "signup", SIGNUPS_PER_IP_PER_HOUR, 3600):
+        return fail(TOO_MANY_ATTEMPTS, 429)
+    email = form["email"].lower()
+    password = request.form.get("password", "")
+    if not form["name"] or not form["company"]:
+        return fail("Add your name and your company.")
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return fail("Add a valid work email. You'll log in with it.")
+    conn = get_conn(DB_PATH)
+    try:
+        if conn.execute("SELECT 1 FROM users WHERE email = ? OR username = ?", (email, email)).fetchone():
+            return fail("There's already an account with that email. Log in instead.")
+        try:
+            uid = signup_user(conn, email, password)
+        except ValueError as e:
+            msg = str(e)
+            return fail("That email is too long to use as a login. Use one up to 64 characters." if msg.startswith("Username must") else msg)
+        conn.execute("UPDATE users SET account_type = 'recruiter', name = ?, email = ?, company_name = ?, share_profile = 0, "
+                     "daily_recs_enabled = 0 WHERE id = ?", (form["name"][:120], email, form["company"][:120], uid))
+        conn.commit()
+        _log_login(conn, uid, email, "signup")
+    finally:
+        conn.close()
+    _recruiter_cache[uid] = True
+    session.clear()
+    session.permanent = True
+    session["user_id"] = uid
+    session["username"] = email
+    return redirect(url_for("recruiter_new"))
+
+
+@app.route("/recruiter")
+def recruiter_home():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        me = _recruiter_ctx(conn, uid)
+        posts = rec.recruiter_posts(conn, uid)
+        limit_error = rec.posting_limits_error(conn, uid)
+    finally:
+        conn.close()
+    return render_template("recruiter.html", view="home", me=me, posts=posts, limit_error=limit_error,
+                           posted=request.args.get("posted", ""), limits=_recruiter_limits())
+
+
+def _render_editor(me, form, error=None, post=None, code=200):
+    return render_template("recruiter.html", view="edit", me=me, form=form, error=error, post=post,
+                           employment_types=rec.EMPLOYMENT_TYPES, limits=_recruiter_limits()), code
+
+
+@app.route("/recruiter/new", methods=["GET", "POST"])
+def recruiter_new():
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        me = _recruiter_ctx(conn, uid)
+        if request.method == "GET":
+            return _render_editor(me, {"company": me.get("company_name") or ""},
+                                  error=rec.posting_limits_error(conn, uid) or None)
+        fields, error = rec.validate_fields(request.form)
+        error = error or rec.posting_limits_error(conn, uid)
+        if error:
+            return _render_editor(me, {**fields, "requirements": "\n".join(fields["requirements"])}, error=error, code=400)
+        post = rec.create_post(conn, uid, fields)
+    finally:
+        conn.close()
+    if post["status"] == "live":
+        rec.match_post_in_background(post["post_id"])
+    else:
+        admin_to = recipient_for_user(1)
+        _notify_async(admin_to, f"Recruiter post to approve: {post['title']} at {post['company']}",
+                      f"<p>{me.get('name') or me.get('username')} ({me.get('email')}) posted <b>{post['title']}</b> at "
+                      f"{post['company']}. It's their first post, so it waits for you.</p>"
+                      f"<p><a href=\"{_site_url('/users#recruiter-posts')}\">Review it in the Admin Console</a></p>")
+    return redirect(url_for("recruiter_home", posted=post["post_id"]))
+
+
+@app.route("/recruiter/post/<post_id>/edit", methods=["GET", "POST"])
+def recruiter_edit(post_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        me = _recruiter_ctx(conn, uid)
+        post = _own_post_or_404(conn, uid, post_id)
+        if request.method == "GET":
+            return _render_editor(me, {**post, "requirements": "\n".join(post["requirements_list"])}, post=post)
+        fields, error = rec.validate_fields(request.form)
+        if error:
+            return _render_editor(me, {**fields, "requirements": "\n".join(fields["requirements"])}, error=error,
+                                  post=post, code=400)
+        rec.update_post(conn, post, fields)
+        if post["status"] == "rejected":
+            # Fixed up after a rejection: back in the queue
+            conn.execute("UPDATE recruiter_posts SET status = 'pending' WHERE post_id = ?", (post_id,))
+            conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for("recruiter_post", post_id=post_id, saved=1))
+
+
+@app.route("/recruiter/post/<post_id>")
+def recruiter_post(post_id):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    try:
+        rec.expire_posts(conn)
+        me = _recruiter_ctx(conn, uid)
+        post = _own_post_or_404(conn, uid, post_id)
+        people = rec.applicants(conn, post_id)
+        post["match_count"] = conn.execute(
+            "SELECT COUNT(*) FROM recruiter_matches WHERE post_id = ? AND job_id IS NOT NULL", (post_id,)).fetchone()[0]
+        limit_error = rec.posting_limits_error(conn, uid) if post["status"] in ("closed", "expired") else ""
+    finally:
+        conn.close()
+    return render_template("recruiter.html", view="post", me=me, post=post, applicants=people,
+                           saved=request.args.get("saved"), limit_error=limit_error, limits=_recruiter_limits())
+
+
+@app.route("/recruiter/post/<post_id>/<action>", methods=["POST"])
+def recruiter_post_action(post_id, action):
+    uid = get_user_id()
+    conn = get_conn(DB_PATH)
+    rematch = False
+    try:
+        post = _own_post_or_404(conn, uid, post_id)
+        if action == "close" and post["status"] in rec.OPEN_STATUSES:
+            rec.close_post(conn, post_id)
+        elif action == "renew" and post["status"] in ("live", "closed", "expired"):
+            if post["status"] != "live":
+                error = rec.posting_limits_error(conn, uid)
+                if error:
+                    return redirect(url_for("recruiter_post", post_id=post_id))
+            trusted = _recruiter_ctx(conn, uid).get("recruiter_trusted")
+            if trusted:
+                rec.publish_post(conn, post_id)
+                rematch = True
+            else:
+                conn.execute("UPDATE recruiter_posts SET status = 'pending' WHERE post_id = ?", (post_id,))
+                conn.commit()
+        else:
+            abort(400)
+    finally:
+        conn.close()
+    if rematch:
+        rec.match_post_in_background(post_id)
+    return redirect(url_for("recruiter_post", post_id=post_id))
+
+
+@app.route("/api/recruiter/parse", methods=["POST"])
+def api_recruiter_parse():
+    uid = get_user_id()
+    text = ((request.get_json(silent=True) or {}).get("text") or "").strip()
+    if len(text) < 40:
+        return jsonify({"ok": False, "error": "Paste the whole job description first."}), 400
+    if not login_throttle.allow(("user", uid), "jd_parse", RECRUITER_PARSES_PER_HOUR, 3600):
+        return jsonify({"ok": False, "error": "That's a lot of job descriptions in an hour. Fill the form by hand, or try again later."}), 429
+    conn = get_conn(DB_PATH)
+    try:
+        company = _recruiter_ctx(conn, uid).get("company_name") or ""
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "fields": rec.parse_posting(text, company_hint=company)})
+
+
+@app.route("/jobs/r/<post_id>")
+def public_posting(post_id):
+    """A recruiter's post as its own page: open to anyone while it's live; the owner and admin always."""
+    uid = session.get("user_id")
+    conn = get_conn(DB_PATH)
+    try:
+        rec.expire_posts(conn)
+        post = rec.get_post(conn, post_id)
+        if not post or (post["status"] != "live" and uid not in (post["recruiter_id"], 1)):
+            abort(404)
+        on_board = None
+        if uid and not _is_recruiter(uid):
+            row = conn.execute("SELECT job_id FROM jobs WHERE job_id = ? AND user_id = ?",
+                               (rec.seeker_job_id(post_id, uid), uid)).fetchone()
+            on_board = row[0] if row else ""
+    finally:
+        conn.close()
+    return render_template("recruiter.html", view="public", post=post, on_board=on_board, limits=_recruiter_limits())
+
+
+@app.route("/api/job/<job_id>/recruiter-apply", methods=["POST"])
+def api_recruiter_apply(job_id):
+    uid = get_user_id()
+    data = request.get_json(silent=True) or {}
+    conn = get_conn(DB_PATH)
+    try:
+        ok, message, post = rec.apply(conn, uid, job_id, data.get("email", ""), data.get("note", ""))
+        if ok:
+            add_timeline(conn, job_id, "Sent resume to the recruiter")
+            to = recipient_for_user(post["recruiter_id"])
+            name = conn.execute("SELECT name, username FROM users WHERE id = ?", (uid,)).fetchone()
+    finally:
+        conn.close()
+    if not ok:
+        return jsonify({"ok": False, "error": message}), 400
+    from html import escape
+    _notify_async(to, f"New applicant for {post['title']}",
+                  f"<p>{escape((name[0] or name[1]) if name else 'A job seeker')} sent their resume for "
+                  f"<b>{escape(post['title'])}</b>.</p>"
+                  f"<p><a href=\"{_site_url(url_for('recruiter_post', post_id=post['post_id']))}\">See their resume and match score</a></p>")
+    return jsonify({"ok": True, "message": message})
+
+
+@app.route("/api/admin/recruiter-posts/<post_id>/<action>", methods=["POST"])
+def admin_recruiter_post(post_id, action):
+    """Approve or turn down a recruiter's first post. Approving trusts the recruiter's later posts."""
+    if not is_admin():
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    conn = get_conn(DB_PATH)
+    try:
+        if action == "approve":
+            post = rec.approve_post(conn, post_id)
+        elif action == "reject":
+            post = rec.reject_post(conn, post_id, (request.get_json(silent=True) or {}).get("note", ""))
+        else:
+            return jsonify({"ok": False, "error": "Unknown action"}), 400
+    finally:
+        conn.close()
+    if not post:
+        return jsonify({"ok": False, "error": "No such post."}), 404
+    from html import escape
+    to = recipient_for_user(post["recruiter_id"])
+    if action == "approve":
+        rec.match_post_in_background(post_id)
+        _notify_async(to, f"Your job post is live: {post['title']}",
+                      f"<p><b>{escape(post['title'])}</b> is now live on Sunny Side, and your next posts go live straight away.</p>"
+                      f"<p><a href=\"{_site_url(url_for('recruiter_post', post_id=post_id))}\">See your post</a></p>")
+    else:
+        note = f"<p>Note from the reviewer: {escape(post.get('review_note') or '')}</p>" if post.get("review_note") else ""
+        _notify_async(to, f"Your job post wasn't approved: {post['title']}",
+                      f"<p><b>{escape(post['title'])}</b> wasn't approved.</p>{note}"
+                      f"<p>You can edit it and it goes back for review.</p>")
+    return jsonify({"ok": True, "status": post["status"]})
 
 
 @app.errorhandler(500)
@@ -1631,7 +1967,8 @@ def pipeline_move():
 
 def run_daily_recommendations():
     conn = get_conn(DB_PATH)
-    users = conn.execute("SELECT id, daily_recs_min_score FROM users WHERE daily_recs_enabled = 1").fetchall()
+    users = conn.execute("SELECT id, daily_recs_min_score FROM users WHERE daily_recs_enabled = 1 "
+                         "AND COALESCE(account_type, 'seeker') = 'seeker'").fetchall()
     conn.close()
 
     for user in users:
@@ -2010,6 +2347,10 @@ def run_user_sync(uid, min_score=None):
     if min_score is None:
         min_score = float(os.getenv("MIN_SCORE", "0.0"))
     digest = process_new_jobs(DB_PATH, min_score=min_score, user_id=uid)
+    try:
+        rec.match_open_posts_for_user(uid)
+    except Exception as e:
+        print(f"Recruiter post matching failed for user {uid}: {e}")
 
     conn = get_conn(DB_PATH)
     conn.execute("UPDATE users SET last_scraped_at = ? WHERE id = ?", (datetime.now().isoformat(), uid))
