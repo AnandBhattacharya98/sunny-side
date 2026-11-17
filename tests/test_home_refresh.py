@@ -108,3 +108,12 @@ def test_admin_can_preview_it(conn):
     with other.session_transaction() as s:
         s["user_id"] = 99999
     assert 'id="jobs-map"' not in other.get("/?preview=home").get_data(as_text=True)
+
+
+def test_hello_overlay_can_actually_be_hidden(conn):
+    """Sunny's hello starts hidden and only the first-visit script shows it. Its display:grid
+    used to override the hidden attribute, so a repeat visitor was stuck behind it for good."""
+    flags.set_state(conn, "home_refresh", "on")
+    page = dashboard.app.test_client().get("/").get_data(as_text=True)
+    assert re.search(r'<div class="hello" id="hello" hidden', page)
+    assert ".hello[hidden] { display: none; }" in page

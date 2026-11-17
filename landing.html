@@ -498,6 +498,7 @@ section { position: relative; }
 .hello { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--bg); cursor: pointer;
          transition: opacity .5s var(--ease), visibility .5s; }
 .hello.bye { opacity: 0; visibility: hidden; }
+.hello[hidden] { display: none; } /* display:grid above would otherwise override the hidden attribute */
 .hello-in { text-align: center; padding: 24px; }
 .hello svg { width: 96px; height: 96px; overflow: visible; animation: hello-rise .9s var(--spring) both; }
 .hello svg .hr { transform-origin: 50px 50px; animation: spin 14s linear infinite; }
