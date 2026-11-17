@@ -594,6 +594,9 @@ section { position: relative; }
 .map-wrap .leaflet-container a.btn-p { color: var(--ink); }
 .map-wrap .leaflet-container a.lnk { color: var(--mut); }
 .map-wrap .leaflet-container { font-family: var(--font-sans); }
+/* OpenStreetMap tiles, softened to the page's warm palette; inverted into a night map in dark mode */
+.map-wrap .osm-tiles { filter: grayscale(.85) sepia(.18) brightness(1.04) contrast(.92); }
+[data-theme="dark"] .map-wrap .osm-tiles { filter: grayscale(1) invert(1) brightness(.82) contrast(.9) sepia(.12); }
 .map-wrap .leaflet-control-attribution { font-size: 10px; }
 [data-theme="dark"] .leaflet-control-attribution { background: rgba(13, 12, 10, .7) !important; color: #B5AFA3; }
 [data-theme="dark"] .leaflet-control-attribution a { color: #FFB938; }
@@ -1420,15 +1423,13 @@ section { position: relative; }
     });
   });
 
-  function theme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark_all' : 'light_all'; }
   function start() {
     map = L.map(mapEl, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false, zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 17 }).setView([21.5, 79], 5);
-    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/' + theme() + '/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd', maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    // OpenStreetMap's own tiles: no key needed. Tinted warm in CSS, and inverted for dark mode.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, className: 'osm-tiles',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
-    // Follow the page's theme switch, if there is one
-    new MutationObserver(function () { tiles.setUrl('https://{s}.basemaps.cartocdn.com/' + theme() + '/{z}/{x}/{y}{r}.png'); })
-      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     map.on('focus', function () { map.scrollWheelZoom.enable(); });
     map.on('blur', function () { map.scrollWheelZoom.disable(); });
     var last = map.getZoom() < CITY_ZOOM;
