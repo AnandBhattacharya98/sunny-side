@@ -71,7 +71,7 @@ def test_admin_cannot_delete_itself():
 
 def test_healthz_needs_no_login():
     res = dashboard.app.test_client().get("/healthz")
-    assert res.status_code == 200 and res.get_json() == {"ok": True}
+    assert res.status_code == 200 and res.get_json()["ok"] is True
 
 
 def test_api_errors_come_back_as_json(monkeypatch):

@@ -1,3 +1,9 @@
 {# Load first in <head>: the cookie guard must be in place before anything reads localStorage. #}
 <script src="/static/site/consent.js?v=1" data-version="{{ site.consent_version }}"></script>
 <link rel="stylesheet" href="/static/site/site.css?v=1">
+{% if app_env and app_env != 'production' %}
+{# Staging copy of the site: keep it out of search results and make it obvious which site you're on. #}
+<meta name="robots" content="noindex, nofollow">
+<style>#env-ribbon{position:fixed;left:50%;top:0;transform:translateX(-50%);z-index:2147483000;background:#B45309;color:#fff;font:700 11px/1 'Space Mono',monospace;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;border-radius:0 0 8px 8px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}</style>
+<script>document.addEventListener('DOMContentLoaded',function(){var r=document.createElement('div');r.id='env-ribbon';r.setAttribute('role','note');r.textContent={{ (app_env ~ ' site, not live')|tojson }};document.body.appendChild(r);document.title='['+{{ app_env|tojson }}+'] '+document.title;});</script>
+{% endif %}

@@ -117,6 +117,17 @@ An AI-augmented job application tracker and companion. It automatically scrapes 
 
 ---
 
+## Shipping changes safely
+
+Changes go to a staging site first, then to the live site, with CI smoke tests, a `/healthz` health check,
+feature switches in the Admin Console and one-click rollback. See [docs/RELEASING.md](docs/RELEASING.md).
+
+| Variable | Description |
+|:---|:---|
+| `APP_ENV` | `staging` on the staging site: shows a "staging site" ribbon and keeps it out of search engines. Defaults to `production` |
+| `FLAG_<NAME>` | Default for a feature switch (`on`, `admin` or `off`), e.g. `FLAG_LEARN=off`, until it's changed in the Admin Console |
+| `MIGRATION_LOCK_TIMEOUT` | Seconds a startup migration waits for a locked table before giving up (default 30), so a deploy fails fast instead of hanging |
+
 ## Phone apps
 
 `mobile/` holds the Android and iOS apps. They open this website in a native shell, so a deploy
@@ -137,4 +148,4 @@ Public pages at `/privacy`, `/terms`, `/cookies`, `/acceptable-use`, `/disclaime
 - Refreshing, re-scoring and the daily run happen in the background, so the page stays responsive.
 - Profiles appear on the landing page only when a user opts in.
 - Users can download their data (jobs as CSV, or everything as JSON) and delete their own account from Profile Settings.
-- Point the host's health check at `/healthz`. It needs no login and answers 200 when the app and database are up, 503 otherwise.
+- Point the host's health check at `/healthz`. It needs no login and answers 200 when the app and database are up, 503 otherwise. It also reports `env` and the live commit as `version`.

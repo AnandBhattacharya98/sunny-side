@@ -1,0 +1,39 @@
+# Render Blueprint for the STAGING copy of Sunny-Side. See docs/RELEASING.md for the full workflow.
+#
+# It only describes the staging site. The live site (pm-job-hunter) was set up by hand in Render and
+# is not managed by this file, so creating this Blueprint never touches it.
+#
+# Create it once: Render dashboard > New > Blueprint > pick this repository. Render reads this file,
+# creates "sunny-side-staging" and asks for the values marked sync: false.
+services:
+  - type: web
+    name: sunny-side-staging
+    runtime: python
+    plan: free
+    branch: staging          # deploys every push to the staging branch
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard:app --workers 2 --threads 4 --timeout 120
+    healthCheckPath: /healthz   # a new version only takes over once this answers 200
+    envVars:
+      - key: APP_ENV
+        value: staging        # shows a "staging site" ribbon and keeps it out of search engines
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: FLASK_SECRET_KEY
+        generateValue: true   # its own key, so live logins never work on staging and vice versa
+      - key: ADMIN_PASSWORD
+        sync: false           # pick a password for staging's admin account
+      - key: DATABASE_URL
+        sync: false           # staging's OWN database, never the live one. Leave empty to use a
+                              # throwaway SQLite file that starts fresh on every deploy.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      # Deliberately not set on staging, so it never emails real people or runs the daily job:
+      # CRON_SECRET, BREVO_API_KEY, SENDER_PASSWORD, IMAP_*.

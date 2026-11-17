@@ -4,6 +4,7 @@ All tables are created here; every module imports from here.
 """
 
 import sqlite3
+import time
 import os
 
 DB_PATH = os.getenv("DB_PATH", "jobs.db")
@@ -414,6 +415,10 @@ def migrate_db(conn) -> None:
     import learning
     learning.migrate(conn)
 
+    # Feature flags switched from the Admin Console (flags.py)
+    import flags
+    flags.migrate(conn)
+
     _encrypt_legacy_secrets(conn)
     _run_once(conn, "2026-10-reset-landing-wall-optin", _reset_landing_wall_optin)
     _run_once(conn, "2026-10-drop-default-pm-title", _drop_default_pm_title)
@@ -553,6 +558,8 @@ def get_user_secrets(conn, user_id: int) -> dict:
 
 
 _migrated = set()
+MIGRATION_LOCK_ID = 7106423  # any fixed number; names the Postgres advisory lock that startup migrations hold
+MIGRATION_LOCK_TIMEOUT = int(os.getenv("MIGRATION_LOCK_TIMEOUT", "30"))
 
 
 def init_db(db_path: str = DB_PATH):
@@ -642,8 +649,24 @@ def init_db(db_path: str = DB_PATH):
     """)
     conn.commit()
     if db_path not in _migrated:
-        migrate_db(conn)
+        started = time.monotonic()
+        if IS_POSTGRES:
+            # Workers start together on every deploy: let one run the migrations while the other waits,
+            # and give up instead of hanging if a table stays locked (the deploy then fails and the
+            # previous version keeps serving).
+            conn.execute(f"SET lock_timeout = '{MIGRATION_LOCK_TIMEOUT}s'")
+            conn.execute("SELECT pg_advisory_lock(%s)" % MIGRATION_LOCK_ID)
+            try:
+                migrate_db(conn)
+            finally:
+                conn.rollback()
+                conn.execute("SELECT pg_advisory_unlock(%s)" % MIGRATION_LOCK_ID)
+                conn.execute("RESET lock_timeout")
+                conn.commit()
+        else:
+            migrate_db(conn)
         _migrated.add(db_path)
+        print(f"Database ready in {time.monotonic() - started:.1f}s", flush=True)
     return conn
 
 
