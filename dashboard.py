@@ -1170,7 +1170,8 @@ def index():
         # The refreshed homepage: on for everyone, or an admin previewing it with /?preview=home
         fresh = preview_home or flags.enabled("home_refresh", False)
         live = home_stats.get(lambda: get_conn(DB_PATH)) if fresh else None
-        return render_template("landing.html", seekers=[dict(u) for u in users], fresh=fresh, live=live)
+        return render_template("landing.html", seekers=[dict(u) for u in users], fresh=fresh, live=live,
+                               map_places=home_stats.map_places() if fresh else [])
         
     # Get user settings to pass to frontend profile form (stored secrets are never sent back)
     settings = get_user_settings(conn, uid, mask_secrets=True)
@@ -2879,7 +2880,7 @@ def map_view():
         stats = _stats(conn)
     finally:
         conn.close()
-    return render_template("dashboard.html", view_mode="map", map_pins=pins, map_unplaced=unplaced,
+    return render_template("dashboard.html", view_mode="map", map_pins=pins, map_unplaced=unplaced, map_places=home_stats.map_places(),
                            map_nearby=nearby, stats=stats)
 
 
