@@ -24,6 +24,7 @@ FINAL_QUESTIONS = 8
 PASS_RATIO = 0.7
 MAX_SKILL_CHARS = 60
 MAX_GAPS = 12
+MAX_START_SKILLS = 5      # skills one /learn link may start at once (the start route allows 6 a minute)
 
 
 # ── Storage ───────────────────────────────────────────────────────────────
