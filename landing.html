@@ -1452,11 +1452,11 @@ section { position: relative; }
   whenSeen(mapEl, function () {
     var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/static/vendor/leaflet/leaflet.css?v=1.9.4';
     document.head.appendChild(css);
-    var css2 = document.createElement('link'); css2.rel = 'stylesheet'; css2.href = '/static/site/sunnymap.css?v=1';
+    var css2 = document.createElement('link'); css2.rel = 'stylesheet'; css2.href = '/static/site/sunnymap.css?v=2';
     document.head.appendChild(css2);
     var js = document.createElement('script'); js.src = '/static/vendor/leaflet/leaflet.js?v=1.9.4';
     js.onload = function () {
-      var js2 = document.createElement('script'); js2.src = '/static/site/sunnymap.js?v=1';
+      var js2 = document.createElement('script'); js2.src = '/static/site/sunnymap.js?v=2';
       js2.onload = function () { mapEl.getBoundingClientRect(); start(); };
       js2.onerror = js.onerror;
       document.body.appendChild(js2);
