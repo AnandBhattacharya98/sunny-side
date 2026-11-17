@@ -23,6 +23,7 @@ import recruiter as rec
 import learning
 import learning_videos
 import flags
+import home_stats
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -1159,13 +1160,17 @@ def _batch_full_jobs(conn, raw_jobs, uid):
 def index():
     conn = get_conn(DB_PATH)
     uid = session.get("user_id")
-    if not uid:
+    preview_home = bool(uid) and is_admin() and request.args.get("preview") == "home"
+    if not uid or preview_home:
         # Fetch consenting seekers for landing page wall (excluding admin)
         users = conn.execute(
             "SELECT name, designation, linkedin_profile FROM users WHERE share_profile = 1 AND username != 'admin' ORDER BY id DESC"
         ).fetchall()
         conn.close()
-        return render_template("landing.html", seekers=[dict(u) for u in users])
+        # The refreshed homepage: on for everyone, or an admin previewing it with /?preview=home
+        fresh = preview_home or flags.enabled("home_refresh", False)
+        live = home_stats.get(lambda: get_conn(DB_PATH)) if fresh else None
+        return render_template("landing.html", seekers=[dict(u) for u in users], fresh=fresh, live=live)
         
     # Get user settings to pass to frontend profile form (stored secrets are never sent back)
     settings = get_user_settings(conn, uid, mask_secrets=True)

@@ -25,8 +25,8 @@ services:
       - key: ADMIN_PASSWORD
         sync: false           # pick a password for staging's admin account
       - key: DATABASE_URL
-        sync: false           # staging's OWN database, never the live one. Leave empty to use a
-                              # throwaway SQLite file that starts fresh on every deploy.
+        sync: false           # staging's OWN Postgres (e.g. a free Neon project), never the live one.
+                              # Don't leave it empty: SQLite on Render's disk stays locked ("database is locked").
       - key: GEMINI_API_KEY
         sync: false
       - key: LIVEKIT_API_KEY

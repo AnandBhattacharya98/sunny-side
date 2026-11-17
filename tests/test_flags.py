@@ -46,8 +46,11 @@ def test_paths_map_to_their_flag():
 
 
 def test_features_are_on_by_default():
-    for key in flags.FLAGS:
-        assert flags.enabled(key)
+    for key, f in flags.FLAGS.items():
+        if f.default == "on":
+            assert flags.enabled(key)
+    # Unfinished features ship dark: only the admin sees them until they're switched on
+    assert flags.FLAGS["home_refresh"].default == "admin"
 
 
 def test_env_sets_the_default_until_the_console_changes_it(conn, monkeypatch):
