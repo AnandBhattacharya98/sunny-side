@@ -16,7 +16,7 @@
   var VERSION = String((script && script.getAttribute('data-version')) || '1');
   var COOKIE = 'ss_consent';
   var YEAR = 365 * 24 * 60 * 60;
-  var PREF_EXACT = { 'theme': 1, 'walkthrough_completed': 1, 'ss-practice-phone': 1, 'qz_handsfree': 1 };
+  var PREF_EXACT = { 'theme': 1, 'walkthrough_completed': 1, 'ss-practice-phone': 1, 'qz_handsfree': 1, 'ss_hello': 1 };
 
   function isPref(key) {
     key = String(key);
