@@ -2218,7 +2218,20 @@ def learn_view(course_id=None):
     finally:
         conn.close()
     return render_template("dashboard.html", view_mode="learn", stats=stats, settings=settings,
-                           course_id=course_id, start_skill=learning.clean_skill(request.args.get("skill")))
+                           course_id=course_id, start_skills=_learn_skills_arg(),
+                           learn_from=request.args.get("from") if request.args.get("from") in ("career-switch",) else "")
+
+
+def _learn_skills_arg() -> list[str]:
+    """Skills named in the link (?skill=A&skill=B), cleaned, de-duplicated and capped, in the order given."""
+    out, seen = [], set()
+    for raw in request.args.getlist("skill"):
+        s = learning.clean_skill(raw)
+        k = learning.skill_key(s)
+        if len(s) >= 2 and k not in seen:
+            seen.add(k)
+            out.append(s)
+    return out[:learning.MAX_START_SKILLS]
 
 
 @app.route("/api/learn/catalog", methods=["GET"])

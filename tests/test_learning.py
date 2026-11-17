@@ -113,7 +113,11 @@ def test_learn_pages_render(client, ai):
     page = client.get("/learn").get_data(as_text=True)
     assert 'id="lv-root"' in page and 'href="/learn"' in page
     page = client.get("/learn?skill=SQL").get_data(as_text=True)
-    assert 'data-skill="SQL"' in page
+    assert "data-skills='[\"SQL\"]'" in page
+    page = client.get("/learn?skill=Python&skill=Statistics&skill=python&skill=A%2FB+Testing&from=career-switch").get_data(as_text=True)
+    assert "data-skills='[\"Python\", \"Statistics\", \"A/B Testing\"]'" in page and 'data-from="career-switch"' in page
+    page = client.get("/learn?" + "&".join(f"skill=S{i}" for i in range(9)) + "&from=evil").get_data(as_text=True)
+    assert '\"S4\"' in page and '\"S5\"' not in page and 'data-from=""' in page
     assert client.get("/learn/999999").status_code == 302
 
 
